@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Портфель — ADX Finance</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+    <style>
+        .portfolio-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+        
+        .portfolio-summary {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 32px;
+        }
+        
+        @media (max-width: 1024px) {
+            .portfolio-summary {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .portfolio-summary {
+                grid-template-columns: 1fr;
+            }
+            
+            .portfolio-header {
+                gap: 12px;
+            }
+            
+            #portfolioChart {
+                height: 200px;
+            }
+            
+            .allocation-chart {
+                height: 180px;
+            }
+            
+            .portfolio-item {
+                padding: 10px;
+                flex-wrap: wrap;
+            }
+            
+            .portfolio-item-info {
+                width: 100%;
+                margin-bottom: 8px;
+            }
+            
+            .portfolio-item-actions {
+                width: 100%;
+                display: flex;
+                gap: 8px;
+            }
+            
+            .portfolio-item-actions .btn {
+                flex: 1;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .portfolio-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            #portfolioChart {
+                height: 250px;
+            }
+            
+            .allocation-chart {
+                height: 200px;
+            }
+            
+            .portfolio-item {
+                padding: 12px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .portfolio-header {
+                gap: 12px;
+            }
+            
+            #portfolioChart {
+                height: 200px;
+            }
+            
+            .allocation-chart {
+                height: 180px;
+            }
+        }
+        
+        .portfolio-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 24px;
+        }
+        
+        @media (max-width: 1024px) {
+            .portfolio-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        #portfolioChart {
+            height: 300px;
+        }
+        
+        .allocation-chart {
+            height: 250px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .allocation-list {
+            padding: 0 20px 20px;
+        }
+        
+        .allocation-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .allocation-item:last-child {
+            border-bottom: none;
+        }
+        
+        .allocation-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+        
+        .allocation-info {
+            flex: 1;
+        }
+        
+        .allocation-name {
+            font-weight: 500;
+            font-size: 0.9375rem;
+        }
+        
+        .allocation-amount {
+            font-size: 0.8125rem;
+            color: var(--text-tertiary);
+            font-family: var(--font-primary);
+        }
+        
+        .allocation-percent {
+            font-family: var(--font-primary);
+            font-weight: 600;
+            font-size: 0.9375rem;
+        }
+        
+        .asset-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr 100px;
+            align-items: center;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .asset-row:last-child {
+            border-bottom: none;
+        }
+        
+        .asset-row.header {
+            background: var(--bg-tertiary);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            color: var(--text-tertiary);
+            font-weight: 600;
+        }
+        
+        @media (max-width: 768px) {
+            .asset-row {
+                grid-template-columns: 1fr auto auto;
+            }
+            
+            .asset-row .hide-mobile {
+                display: none;
+            }
+        }
+        
+        .asset-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .asset-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--bg-tertiary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            font-weight: 600;
+        }
+        
+        .asset-symbol {
+            font-weight: 600;
+        }
+        
+        .asset-name {
+            font-size: 0.8125rem;
+            color: var(--text-tertiary);
+        }
+        
+        .pnl {
+            font-weight: 500;
+        }
+        
+        .pnl.positive { color: var(--success-text); }
+        .pnl.negative { color: var(--danger-text); }
+    </style>
+</head>
+<body>
+    <div class="page-wrapper">
+        <!-- Header -->
+        <header class="header">
+            <div class="container">
+                <div class="header-inner">
+                    <a href="index.html" class="logo">
+                        <div class="logo-icon">
+                            <i class="bi bi-lightning-charge-fill"></i>
+                        </div>
+                        <span>ADX Finance</span>
+                    </a>
+                    
+                    <nav class="nav-main">
+                        <a href="index.html" class="nav-link">
+                            <i class="bi bi-house"></i>
+                            Главная
+                        </a>
+                        <a href="trade.html?mode=normal" class="nav-link">
+                            <i class="bi bi-graph-up"></i>
+                            Обычная торговля
+                        </a>
+                        <a href="trade.html?mode=quick" class="nav-link">
+                            <i class="bi bi-lightning-charge"></i>
+                            Быстрая торговля
+                        </a>
+                        <a href="wallet.html" class="nav-link">
+                            <i class="bi bi-wallet2"></i>
+                            Кошелёк
+                        </a>
+                        <a href="portfolio.html" class="nav-link active">
+                            <i class="bi bi-pie-chart"></i>
+                            Портфель
+                        </a>
+                        <a href="positions.html" class="nav-link">
+                            <i class="bi bi-list-check"></i>
+                            Позиции
+                        </a>
+                        <a href="history.html" class="nav-link">
+                            <i class="bi bi-clock-history"></i>
+                            История
+                        </a>
+                    </nav>
+                    
+                    <div class="header-actions">
+                        <button class="theme-toggle" onclick="toggleTheme()" title="Переключить тему">
+                            <i class="bi bi-moon-stars"></i>
+                        </button>
+                        
+                        <div class="user-menu" data-auth="true">
+                            <button class="user-menu-trigger">
+                                <div class="user-avatar" data-user-avatar>U</div>
+                                <div class="user-info">
+                                    <div class="user-name" data-user-name>Пользователь</div>
+                                    <div class="user-balance">$<span id="headerBalance">0.00</span></div>
+                                </div>
+                                <i class="bi bi-chevron-down"></i>
+                            </button>
+                            <div class="user-dropdown">
+                                <a href="profile.html" class="dropdown-item">
+                                    <i class="bi bi-person"></i>
+                                    Профиль
+                                </a>
+                                <a href="wallet.html" class="dropdown-item">
+                                    <i class="bi bi-wallet2"></i>
+                                    Кошелёк
+                                </a>
+                                <div class="dropdown-divider"></div>
+                                <a href="#" class="dropdown-item" onclick="Auth.logout(); return false;">
+                                    <i class="bi bi-box-arrow-right"></i>
+                                    Выйти
+                                </a>
+                            </div>
+                        </div>
+                        
+                        <button class="mobile-menu-toggle">
+                            <i class="bi bi-list"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+        
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="container">
+                <div class="portfolio-header">
+                    <div>
+                        <h1 style="margin-bottom: 8px;">Портфель</h1>
+                        <p style="color: var(--text-secondary);">Обзор ваших активов и производительности</p>
+                    </div>
+                    <div class="chart-timeframes">
+                        <button class="chart-timeframe" data-period="7d">7Д</button>
+                        <button class="chart-timeframe active" data-period="30d">30Д</button>
+                        <button class="chart-timeframe" data-period="90d">90Д</button>
+                        <button class="chart-timeframe" data-period="1y">1Г</button>
+                        <button class="chart-timeframe" data-period="all">Всё</button>
+                    </div>
+                </div>
+                
+                <!-- Summary Cards -->
+                <div class="portfolio-summary">
+                    <div class="stat-card">
+                        <div class="stat-icon primary">
+                            <i class="bi bi-wallet2"></i>
+                        </div>
+                        <div class="stat-label">Общая стоимость</div>
+                        <div class="stat-value" id="totalValue">$0.00</div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-icon success">
+                            <i class="bi bi-graph-up-arrow"></i>
+                        </div>
+                        <div class="stat-label">Прибыль/Убыток</div>
+                        <div class="stat-value" id="totalPnL">$0.00</div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-icon warning">
+                            <i class="bi bi-arrow-left-right"></i>
+                        </div>
+                        <div class="stat-label">Всего сделок</div>
+                        <div class="stat-value" id="totalTrades">0</div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-icon danger">
+                            <i class="bi bi-percent"></i>
+                        </div>
+                        <div class="stat-label">Комиссии</div>
+                        <div class="stat-value" id="totalFees">$0.00</div>
+                    </div>
+                </div>
+                
+                <div class="portfolio-grid">
+                    <!-- Portfolio Chart -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">
+                                <i class="bi bi-graph-up"></i>
+                                История портфеля
+                            </h3>
+                        </div>
+                        <div class="card-body">
+                            <div id="portfolioChart"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Allocation -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">
+                                <i class="bi bi-pie-chart"></i>
+                                Распределение
+                            </h3>
+                        </div>
+                        <div class="allocation-chart" id="allocationChart">
+                            <!-- Pie chart или circular progress -->
+                        </div>
+                        <div class="allocation-list" id="allocationList">
+                            <!-- Заполняется через JS -->
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Holdings Table -->
+                <div class="card" style="margin-top: 24px;">
+                    <div class="card-header">
+                        <h3 class="card-title">
+                            <i class="bi bi-collection"></i>
+                            Активы
+                        </h3>
+                    </div>
+                    <div class="card-body" style="padding: 0;">
+                        <div class="asset-row header">
+                            <div>Актив</div>
+                            <div>Количество</div>
+                            <div class="hide-mobile">Цена</div>
+                            <div class="hide-mobile">Стоимость</div>
+                            <div style="text-align: right;">P&L</div>
+                        </div>
+                        <div id="holdingsList">
+                            <!-- Загрузка... -->
+                            <div style="padding: 40px; text-align: center;">
+                                <div class="spinner"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <script src="js/app.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/api.js"></script>
+    <script>
+        let portfolioChart = null;
+        let portfolioData = null;
+        
+        const allocationColors = [
+            '#6366f1', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6',
+            '#ec4899', '#14b8a6', '#f97316', '#06b6d4', '#84cc16'
+        ];
+        
+        document.addEventListener('DOMContentLoaded', async () => {
+            const isAuth = await Auth.requireAuth();
+            if (!isAuth) return;
+            
+            Auth.updateUI();
+            
+            await loadPortfolio();
+            initPortfolioChart();
+            await loadChartHistory('30d');
+            
+            // Обработчики периодов
+            document.querySelectorAll('.chart-timeframe').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    document.querySelectorAll('.chart-timeframe').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    await loadChartHistory(btn.dataset.period);
+                });
+            });
+        });
+        
+        async function loadPortfolio() {
+            try {
+                const result = await API.get('/portfolio.php?action=summary');
+                
+                if (result.success) {
+                    portfolioData = result;
+                    renderPortfolio(result);
+                }
+            } catch (error) {
+                console.error('Error loading portfolio:', error);
+            }
+        }
+        
+        function renderPortfolio(data) {
+            // Summary
+            document.getElementById('totalValue').textContent = NovaTrade.formatCurrency(data.total_value);
+            
+            const pnl = data.stats.profit_loss;
+            const pnlEl = document.getElementById('totalPnL');
+            pnlEl.textContent = (pnl >= 0 ? '+' : '') + NovaTrade.formatCurrency(pnl);
+            pnlEl.style.color = pnl >= 0 ? 'var(--success-text)' : 'var(--danger-text)';
+            
+            document.getElementById('totalTrades').textContent = data.stats.total_trades.toLocaleString();
+            document.getElementById('totalFees').textContent = NovaTrade.formatCurrency(data.stats.total_fees);
+            
+            // Header balance
+            const usd = data.portfolio.find(p => p.currency === 'USD');
+            if (usd) {
+                document.getElementById('headerBalance').textContent = 
+                    usd.available.toLocaleString('en-US', { minimumFractionDigits: 2 });
+            }
+            
+            // Allocation
+            renderAllocation(data.portfolio);
+            
+            // Holdings
+            renderHoldings(data.portfolio);
+        }
+        
+        function renderAllocation(portfolio) {
+            const container = document.getElementById('allocationList');
+            const chartContainer = document.getElementById('allocationChart');
+            
+            // Filter out zero balances
+            const nonZero = portfolio.filter(p => p.value > 0);
+            
+            if (nonZero.length === 0) {
+                chartContainer.innerHTML = `
+                    <div style="text-align: center; color: var(--text-secondary);">
+                        <i class="bi bi-pie-chart" style="font-size: 3rem; margin-bottom: 16px; display: block; opacity: 0.3;"></i>
+                        Нет активов
+                    </div>
+                `;
+                container.innerHTML = '';
+                return;
+            }
+            
+            // Simple donut chart using CSS
+            const total = nonZero.reduce((sum, p) => sum + p.value, 0);
+            let gradient = 'conic-gradient(';
+            let currentAngle = 0;
+            
+            nonZero.forEach((item, index) => {
+                const angle = (item.value / total) * 360;
+                const color = allocationColors[index % allocationColors.length];
+                gradient += `${color} ${currentAngle}deg ${currentAngle + angle}deg, `;
+                currentAngle += angle;
+            });
+            
+            gradient = gradient.slice(0, -2) + ')';
+            
+            chartContainer.innerHTML = `
+                <div style="width: 180px; height: 180px; border-radius: 50%; background: ${gradient}; position: relative;">
+                    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 100px; height: 100px; background: var(--bg-secondary); border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                        <div style="font-size: 0.75rem; color: var(--text-tertiary);">Всего</div>
+                        <div style="font-size: 1rem; font-weight: 700; font-family: var(--font-primary);">${NovaTrade.formatCurrency(total)}</div>
+                    </div>
+                </div>
+            `;
+            
+            // Allocation list
+            container.innerHTML = nonZero.map((item, index) => `
+                <div class="allocation-item">
+                    <div class="allocation-color" style="background: ${allocationColors[index % allocationColors.length]};"></div>
+                    <div class="allocation-info">
+                        <div class="allocation-name">${item.currency}</div>
+                        <div class="allocation-amount">${formatAmount(item.amount, item.currency)}</div>
+                    </div>
+                    <div class="allocation-percent">${item.percentage.toFixed(1)}%</div>
+                </div>
+            `).join('');
+        }
+        
+        function renderHoldings(portfolio) {
+            const container = document.getElementById('holdingsList');
+            
+            const nonZero = portfolio.filter(p => p.amount > 0);
+            
+            if (nonZero.length === 0) {
+                container.innerHTML = `
+                    <div style="padding: 40px; text-align: center; color: var(--text-secondary);">
+                        Нет активов в портфеле
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = nonZero.map(item => {
+                const pnlValue = item.value * (item.change / 100);
+                const isPositive = item.change >= 0;
+                
+                return `
+                    <div class="asset-row">
+                        <div class="asset-info">
+                            <div class="asset-icon">${item.currency.slice(0, 2)}</div>
+                            <div>
+                                <div class="asset-symbol">${item.currency}</div>
+                                <div class="asset-name">${getCurrencyName(item.currency)}</div>
+                            </div>
+                        </div>
+                        <div class="font-mono">${formatAmount(item.amount, item.currency)}</div>
+                        <div class="font-mono hide-mobile">${item.currency === 'USD' ? '$1.00' : NovaTrade.formatCurrency(item.price)}</div>
+                        <div class="font-mono hide-mobile">${NovaTrade.formatCurrency(item.value)}</div>
+                        <div style="text-align: right;">
+                            <div class="pnl ${isPositive ? 'positive' : 'negative'}">
+                                ${isPositive ? '+' : ''}${item.change.toFixed(2)}%
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        function initPortfolioChart() {
+            const container = document.getElementById('portfolioChart');
+            if (!container) return;
+            
+            const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+            
+            portfolioChart = LightweightCharts.createChart(container, {
+                layout: {
+                    background: { type: 'solid', color: 'transparent' },
+                    textColor: isDark ? '#a1a1aa' : '#495057',
+                },
+                grid: {
+                    vertLines: { visible: false },
+                    horzLines: { color: isDark ? '#1f1f25' : '#e9ecef' },
+                },
+                rightPriceScale: {
+                    borderVisible: false,
+                },
+                timeScale: {
+                    borderVisible: false,
+                    timeVisible: true,
+                },
+                handleScroll: false,
+                handleScale: false,
+            });
+            
+            const resizeChart = () => {
+                portfolioChart.applyOptions({
+                    width: container.clientWidth,
+                    height: container.clientHeight || 300,
+                });
+            };
+            
+            resizeChart();
+            window.addEventListener('resize', resizeChart);
+        }
+        
+        async function loadChartHistory(period) {
+            try {
+                const result = await API.get('/portfolio.php?action=history', { period });
+                
+                if (result.success && portfolioChart) {
+                    const series = portfolioChart.addAreaSeries({
+                        lineColor: '#6366f1',
+                        topColor: 'rgba(99, 102, 241, 0.3)',
+                        bottomColor: 'rgba(99, 102, 241, 0)',
+                        lineWidth: 2,
+                    });
+                    
+                    const data = result.history.map(item => ({
+                        time: item.date,
+                        value: item.value
+                    }));
+                    
+                    series.setData(data);
+                    portfolioChart.timeScale().fitContent();
+                }
+            } catch (error) {
+                console.error('Error loading chart history:', error);
+            }
+        }
+        
+        function formatAmount(amount, currency) {
+            const num = parseFloat(amount) || 0;
+            if (currency === 'USD') {
+                return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            }
+            return num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 8 });
+        }
+        
+        function getCurrencyName(currency) {
+            const names = {
+                USD: 'US Dollar',
+                BTC: 'Bitcoin',
+                ETH: 'Ethereum',
+                BNB: 'Binance Coin',
+                XRP: 'Ripple',
+                SOL: 'Solana',
+                ADA: 'Cardano',
+                DOGE: 'Dogecoin'
+            };
+            return names[currency] || currency;
+        }
+    </script>
+</body>
+</html>

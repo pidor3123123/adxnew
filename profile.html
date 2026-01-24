@@ -1,0 +1,1944 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Профиль — ADX Finance</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .profile-layout {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 24px;
+        }
+        
+        @media (max-width: 1024px) {
+            .profile-layout {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .profile-sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+        
+        .profile-card {
+            text-align: center;
+            padding: 32px 24px;
+        }
+        
+        .profile-avatar {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: var(--gradient-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: white;
+            margin: 0 auto 20px;
+        }
+        
+        .profile-name {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+        
+        .profile-email {
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+        }
+        
+        .profile-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: var(--success-soft);
+            color: var(--success-text);
+            border-radius: var(--radius-sm);
+            font-size: 0.8125rem;
+            font-weight: 500;
+        }
+        
+        .profile-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-top: 24px;
+            padding-top: 24px;
+            border-top: 1px solid var(--border-color);
+        }
+        
+        .profile-stat {
+            text-align: center;
+        }
+        
+        .profile-stat-value {
+            font-size: 1.25rem;
+            font-weight: 700;
+            font-family: var(--font-primary);
+        }
+        
+        .profile-stat-label {
+            font-size: 0.8125rem;
+            color: var(--text-tertiary);
+        }
+        
+        .profile-nav {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        
+        .profile-nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            border-radius: var(--radius-md);
+            color: var(--text-secondary);
+            transition: all var(--transition-fast);
+        }
+        
+        .profile-nav-item:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+        
+        .profile-nav-item.active {
+            background: var(--accent-primary-soft);
+            color: var(--accent-primary);
+        }
+        
+        .profile-nav-item i {
+            font-size: 1.25rem;
+            width: 24px;
+        }
+        
+        .settings-section {
+            margin-bottom: 32px;
+        }
+        
+        .settings-section-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .settings-section-title i {
+            color: var(--accent-primary);
+        }
+        
+        .settings-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .settings-row:last-child {
+            border-bottom: none;
+        }
+        
+        .settings-label {
+            font-weight: 500;
+        }
+        
+        .settings-desc {
+            font-size: 0.8125rem;
+            color: var(--text-tertiary);
+            margin-top: 4px;
+        }
+        
+        .toggle-switch {
+            position: relative;
+            width: 48px;
+            height: 26px;
+        }
+        
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            inset: 0;
+            background: var(--bg-tertiary);
+            border-radius: 13px;
+            transition: all var(--transition-fast);
+        }
+        
+        .toggle-slider::before {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            left: 3px;
+            bottom: 3px;
+            background: var(--text-secondary);
+            border-radius: 50%;
+            transition: all var(--transition-fast);
+        }
+        
+        .toggle-switch input:checked + .toggle-slider {
+            background: var(--accent-primary);
+        }
+        
+        .toggle-switch input:checked + .toggle-slider::before {
+            transform: translateX(22px);
+            background: white;
+        }
+        
+        .danger-zone {
+            border: 1px solid var(--danger);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            background: var(--danger-soft);
+        }
+        
+        .danger-zone h3 {
+            color: var(--danger);
+            margin-bottom: 8px;
+        }
+        
+        .danger-zone p {
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+            font-size: 0.9375rem;
+        }
+        
+        /* ====== Секции профиля ====== */
+        .profile-section {
+            display: none;
+        }
+        
+        .profile-section.active {
+            display: block;
+        }
+        
+        /* Мобильная адаптивность */
+        @media (max-width: 768px) {
+            .profile-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 16px;
+            }
+            
+            .profile-avatar {
+                width: 80px;
+                height: 80px;
+            }
+            
+            .profile-nav {
+                flex-direction: row;
+                overflow-x: auto;
+                padding-bottom: 8px;
+            }
+            
+            .profile-nav-item {
+                white-space: nowrap;
+                padding: 10px 16px;
+            }
+            
+            .form-row {
+                flex-direction: column;
+            }
+            
+            .form-row .form-group {
+                width: 100%;
+            }
+            
+            .danger-zone {
+                padding: 16px;
+            }
+            
+            .qr-code-container {
+                padding: 16px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .profile-header {
+                gap: 12px;
+            }
+            
+            .profile-avatar {
+                width: 64px;
+                height: 64px;
+            }
+            
+            .profile-nav {
+                gap: 8px;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                padding-bottom: 8px;
+            }
+            
+            .profile-nav-item {
+                padding: 8px 12px;
+                font-size: 0.875rem;
+                white-space: nowrap;
+            }
+            
+            .form-group {
+                margin-bottom: 16px;
+            }
+            
+            .form-row {
+                flex-direction: column;
+                gap: 16px;
+            }
+            
+            .form-row .form-group {
+                width: 100%;
+            }
+            
+            .danger-zone {
+                padding: 12px;
+            }
+            
+            .qr-code-container {
+                padding: 12px;
+            }
+            
+            .btn-group {
+                flex-direction: column;
+            }
+            
+            .btn-group .btn {
+                width: 100%;
+            }
+        }
+        
+        /* ====== Поле пароля ====== */
+        .password-input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+        
+        .password-input-wrapper .form-input {
+            padding-right: 48px;
+        }
+        
+        .password-toggle {
+            position: absolute;
+            right: 12px;
+            background: none;
+            border: none;
+            color: var(--text-tertiary);
+            cursor: pointer;
+            padding: 4px;
+            transition: color var(--transition-fast);
+        }
+        
+        .password-toggle:hover {
+            color: var(--text-primary);
+        }
+        
+        /* ====== Индикатор силы пароля ====== */
+        .password-strength {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-top: 8px;
+        }
+        
+        .password-strength-bar {
+            flex: 1;
+            height: 4px;
+            background: var(--bg-tertiary);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        
+        .password-strength-fill {
+            height: 100%;
+            width: 0;
+            border-radius: 2px;
+            transition: all 0.3s ease;
+            background: var(--text-tertiary);
+        }
+        
+        .password-strength-fill.weak { background: var(--danger); }
+        .password-strength-fill.medium { background: #f59e0b; }
+        .password-strength-fill.good { background: #10b981; }
+        .password-strength-fill.strong { background: #22c55e; }
+        
+        .password-strength-text {
+            font-size: 0.75rem;
+            color: var(--text-tertiary);
+            min-width: 120px;
+        }
+        
+        .password-strength-text.weak { color: var(--danger); }
+        .password-strength-text.medium { color: #f59e0b; }
+        .password-strength-text.good { color: #10b981; }
+        .password-strength-text.strong { color: #22c55e; }
+        
+        /* ====== Требования к паролю ====== */
+        .password-requirements {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 8px;
+            margin-top: 12px;
+            padding: 12px;
+            background: var(--bg-secondary);
+            border-radius: var(--radius-md);
+        }
+        
+        .requirement {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.8125rem;
+            color: var(--text-tertiary);
+            transition: color 0.2s;
+        }
+        
+        .requirement i {
+            font-size: 0.875rem;
+        }
+        
+        .requirement.met {
+            color: var(--success);
+        }
+        
+        .requirement.met i {
+            color: var(--success);
+        }
+        
+        /* ====== Совпадение паролей ====== */
+        .password-match {
+            font-size: 0.8125rem;
+            margin-top: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .password-match.match {
+            color: var(--success);
+        }
+        
+        .password-match.no-match {
+            color: var(--danger);
+        }
+        
+        /* ====== 2FA секция ====== */
+        .tfa-status {
+            margin-left: auto;
+        }
+        
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: var(--radius-sm);
+            font-size: 0.8125rem;
+            font-weight: 500;
+        }
+        
+        .status-badge.status-enabled {
+            background: var(--success-soft);
+            color: var(--success-text);
+        }
+        
+        .status-badge.status-disabled {
+            background: var(--danger-soft);
+            color: var(--danger);
+        }
+        
+        .tfa-info {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+            margin-bottom: 24px;
+        }
+        
+        .tfa-icon {
+            width: 64px;
+            height: 64px;
+            border-radius: var(--radius-lg);
+            background: var(--accent-primary-soft);
+            color: var(--accent-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.75rem;
+            flex-shrink: 0;
+        }
+        
+        .tfa-description h4 {
+            font-size: 1.125rem;
+            margin-bottom: 8px;
+        }
+        
+        .tfa-description p {
+            color: var(--text-secondary);
+            font-size: 0.9375rem;
+            line-height: 1.6;
+        }
+        
+        .tfa-setup {
+            padding: 24px;
+            background: var(--bg-secondary);
+            border-radius: var(--radius-lg);
+            margin-bottom: 20px;
+        }
+        
+        .tfa-steps {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+        
+        .tfa-step {
+            display: flex;
+            gap: 16px;
+            align-items: flex-start;
+        }
+        
+        .step-number {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--accent-primary);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+        
+        .step-content h5 {
+            font-size: 1rem;
+            margin-bottom: 8px;
+        }
+        
+        .step-content p {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+        
+        .qr-container {
+            margin-top: 12px;
+        }
+        
+        .qr-placeholder {
+            width: 200px;
+            height: 200px;
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-md);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            color: var(--text-tertiary);
+        }
+        
+        .qr-placeholder i {
+            font-size: 3rem;
+        }
+        
+        .qr-placeholder span {
+            font-size: 0.8125rem;
+        }
+        
+        .qr-code-image {
+            width: 200px;
+            height: 200px;
+            border-radius: var(--radius-md);
+            background: white;
+            padding: 8px;
+        }
+        
+        .secret-key {
+            margin-top: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        
+        .secret-label {
+            font-size: 0.8125rem;
+            color: var(--text-tertiary);
+        }
+        
+        .secret-code {
+            font-family: var(--font-mono);
+            font-size: 0.875rem;
+            padding: 6px 10px;
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-sm);
+            letter-spacing: 0.1em;
+            user-select: all;
+        }
+        
+        .btn-copy {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 6px;
+            border-radius: var(--radius-sm);
+            transition: all var(--transition-fast);
+        }
+        
+        .btn-copy:hover {
+            background: var(--bg-hover);
+            color: var(--accent-primary);
+        }
+        
+        .tfa-input {
+            max-width: 160px;
+            text-align: center;
+            font-size: 1.5rem;
+            font-family: var(--font-mono);
+            letter-spacing: 0.5em;
+            padding: 12px 16px;
+        }
+        
+        .tfa-code-input {
+            margin-top: 12px;
+        }
+        
+        .tfa-actions {
+            display: flex;
+            gap: 12px;
+        }
+        
+        /* ====== История входов ====== */
+        .login-history {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .login-entry {
+            display: flex;
+            gap: 16px;
+            padding: 16px;
+            background: var(--bg-secondary);
+            border-radius: var(--radius-md);
+            transition: all var(--transition-fast);
+        }
+        
+        .login-entry:hover {
+            background: var(--bg-hover);
+        }
+        
+        .login-entry.current {
+            border: 1px solid var(--accent-primary);
+            background: var(--accent-primary-soft);
+        }
+        
+        .login-entry.suspicious {
+            border: 1px solid var(--danger);
+            background: var(--danger-soft);
+        }
+        
+        .login-device {
+            width: 44px;
+            height: 44px;
+            border-radius: var(--radius-md);
+            background: var(--bg-tertiary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            color: var(--text-secondary);
+            flex-shrink: 0;
+        }
+        
+        .login-entry.current .login-device {
+            background: var(--accent-primary);
+            color: white;
+        }
+        
+        .login-entry.suspicious .login-device {
+            background: var(--danger);
+            color: white;
+        }
+        
+        .login-info {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .login-details {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 6px;
+            flex-wrap: wrap;
+        }
+        
+        .login-browser {
+            font-weight: 500;
+        }
+        
+        .login-current-badge {
+            font-size: 0.75rem;
+            padding: 2px 8px;
+            background: var(--accent-primary);
+            color: white;
+            border-radius: var(--radius-sm);
+        }
+        
+        .login-warning {
+            font-size: 0.75rem;
+            padding: 2px 8px;
+            background: var(--danger);
+            color: white;
+            border-radius: var(--radius-sm);
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        .login-meta {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            font-size: 0.8125rem;
+            color: var(--text-tertiary);
+        }
+        
+        .login-meta span {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        /* ====== Активные сессии ====== */
+        .sessions-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .session-item {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 16px;
+            background: var(--bg-secondary);
+            border-radius: var(--radius-md);
+            transition: all 0.3s ease;
+        }
+        
+        .session-item.current {
+            border: 1px solid var(--accent-primary);
+            background: var(--accent-primary-soft);
+        }
+        
+        .session-device {
+            width: 44px;
+            height: 44px;
+            border-radius: var(--radius-md);
+            background: var(--bg-tertiary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            color: var(--text-secondary);
+            flex-shrink: 0;
+        }
+        
+        .session-item.current .session-device {
+            background: var(--accent-primary);
+            color: white;
+        }
+        
+        .session-info {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .session-name {
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 4px;
+        }
+        
+        .session-current {
+            font-size: 0.75rem;
+            font-weight: 400;
+            padding: 2px 8px;
+            background: var(--accent-primary);
+            color: white;
+            border-radius: var(--radius-sm);
+        }
+        
+        .session-meta {
+            font-size: 0.8125rem;
+            color: var(--text-tertiary);
+        }
+        
+        .session-actions {
+            flex-shrink: 0;
+        }
+        
+        .btn-sm {
+            padding: 8px 12px;
+            font-size: 0.8125rem;
+        }
+        
+        /* ====== Адаптивность для секции безопасности ====== */
+        @media (max-width: 768px) {
+            .tfa-info {
+                flex-direction: column;
+            }
+            
+            .login-meta {
+                flex-direction: column;
+                gap: 4px;
+            }
+            
+            .session-item {
+                flex-wrap: wrap;
+            }
+            
+            .session-actions {
+                width: 100%;
+                margin-top: 12px;
+            }
+            
+            .session-actions .btn {
+                width: 100%;
+            }
+            
+            .password-requirements {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="page-wrapper">
+        <!-- Header -->
+        <header class="header">
+            <div class="container">
+                <div class="header-inner">
+                    <a href="index.html" class="logo">
+                        <div class="logo-icon">
+                            <i class="bi bi-lightning-charge-fill"></i>
+                        </div>
+                        <span>ADX Finance</span>
+                    </a>
+                    
+                    <nav class="nav-main">
+                        <a href="index.html" class="nav-link">
+                            <i class="bi bi-house"></i>
+                            Главная
+                        </a>
+                        <a href="trade.html?mode=normal" class="nav-link">
+                            <i class="bi bi-graph-up"></i>
+                            Обычная торговля
+                        </a>
+                        <a href="trade.html?mode=quick" class="nav-link">
+                            <i class="bi bi-lightning-charge"></i>
+                            Быстрая торговля
+                        </a>
+                        <a href="wallet.html" class="nav-link">
+                            <i class="bi bi-wallet2"></i>
+                            Кошелёк
+                        </a>
+                        <a href="portfolio.html" class="nav-link">
+                            <i class="bi bi-pie-chart"></i>
+                            Портфель
+                        </a>
+                        <a href="positions.html" class="nav-link">
+                            <i class="bi bi-list-check"></i>
+                            Позиции
+                        </a>
+                        <a href="history.html" class="nav-link">
+                            <i class="bi bi-clock-history"></i>
+                            История
+                        </a>
+                    </nav>
+                    
+                    <div class="header-actions">
+                        <button class="theme-toggle" onclick="toggleTheme()" title="Переключить тему">
+                            <i class="bi bi-moon-stars"></i>
+                        </button>
+                        
+                        <div class="user-menu" data-auth="true">
+                            <button class="user-menu-trigger">
+                                <div class="user-avatar" data-user-avatar>U</div>
+                                <div class="user-info">
+                                    <div class="user-name" data-user-name>Пользователь</div>
+                                    <div class="user-balance">$<span id="headerBalance">0.00</span></div>
+                                </div>
+                                <i class="bi bi-chevron-down"></i>
+                            </button>
+                            <div class="user-dropdown">
+                                <a href="profile.html" class="dropdown-item">
+                                    <i class="bi bi-person"></i>
+                                    Профиль
+                                </a>
+                                <a href="wallet.html" class="dropdown-item">
+                                    <i class="bi bi-wallet2"></i>
+                                    Кошелёк
+                                </a>
+                                <div class="dropdown-divider"></div>
+                                <a href="#" class="dropdown-item" onclick="Auth.logout(); return false;">
+                                    <i class="bi bi-box-arrow-right"></i>
+                                    Выйти
+                                </a>
+                            </div>
+                        </div>
+                        
+                        <button class="mobile-menu-toggle">
+                            <i class="bi bi-list"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+        
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="container">
+                <div class="profile-layout">
+                    <!-- Sidebar -->
+                    <div class="profile-sidebar">
+                        <div class="card profile-card">
+                            <div class="profile-avatar" id="profileAvatar">U</div>
+                            <div class="profile-name" id="profileName">Пользователь</div>
+                            <div class="profile-email" id="profileEmail">user@example.com</div>
+                            <div class="profile-stats">
+                                <div class="profile-stat">
+                                    <div class="profile-stat-value" id="profileTrades">0</div>
+                                    <div class="profile-stat-label">Сделок</div>
+                                </div>
+                                <div class="profile-stat">
+                                    <div class="profile-stat-value" id="profileDays">0</div>
+                                    <div class="profile-stat-label">Дней</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card" style="padding: 8px;">
+                            <nav class="profile-nav">
+                                <a href="#settings" class="profile-nav-item active" data-section="settings" onclick="switchSection('settings'); return false;">
+                                    <i class="bi bi-gear"></i>
+                                    Настройки
+                                </a>
+                                <a href="#security" class="profile-nav-item" data-section="security" onclick="switchSection('security'); return false;">
+                                    <i class="bi bi-shield-check"></i>
+                                    Безопасность
+                                </a>
+                                <a href="#notifications" class="profile-nav-item" data-section="notifications" onclick="switchSection('notifications'); return false;">
+                                    <i class="bi bi-bell"></i>
+                                    Уведомления
+                                </a>
+                            </nav>
+                        </div>
+                    </div>
+                    
+                    <!-- Main Content -->
+                    <div class="profile-content">
+                        <!-- Секция Настройки -->
+                        <div id="section-settings" class="profile-section active">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h2 class="card-title">
+                                        <i class="bi bi-person"></i>
+                                        Личные данные
+                                    </h2>
+                                </div>
+                                <div class="card-body">
+                                    <form id="profileForm">
+                                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                                            <div class="form-group">
+                                                <label class="form-label">Имя</label>
+                                                <input type="text" class="form-input" name="firstName" id="firstName" placeholder="Иван">
+                                            </div>
+                                            <div class="form-group">
+                                                <label class="form-label">Фамилия</label>
+                                                <input type="text" class="form-input" name="lastName" id="lastName" placeholder="Иванов">
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="form-group">
+                                            <label class="form-label">Email</label>
+                                            <input type="email" class="form-input" name="email" id="email" readonly style="opacity: 0.7;">
+                                            <div class="form-hint">Email нельзя изменить</div>
+                                        </div>
+                                        
+                                        <div class="form-group">
+                                            <label class="form-label">Телефон</label>
+                                            <input type="tel" class="form-input" name="phone" id="phone" placeholder="+7 (999) 123-45-67">
+                                        </div>
+                                        
+                                        <div class="form-group">
+                                            <label class="form-label">Страна</label>
+                                            <select class="form-input form-select" name="country" id="country">
+                                                <option value="">Выберите страну</option>
+                                                <option value="RU">Россия</option>
+                                                <option value="UA">Украина</option>
+                                                <option value="BY">Беларусь</option>
+                                                <option value="KZ">Казахстан</option>
+                                                <option value="US">США</option>
+                                                <option value="DE">Германия</option>
+                                                <option value="GB">Великобритания</option>
+                                            </select>
+                                        </div>
+                                        
+                                        <button type="submit" class="btn btn-primary">
+                                            <i class="bi bi-check-lg"></i>
+                                            Сохранить изменения
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                            
+                            <div class="card" style="margin-top: 24px;">
+                                <div class="card-header">
+                                    <h2 class="card-title">
+                                        <i class="bi bi-gear"></i>
+                                        Настройки
+                                    </h2>
+                                </div>
+                                <div class="card-body">
+                                    <div class="settings-section">
+                                        <h3 class="settings-section-title">
+                                            <i class="bi bi-palette"></i>
+                                            Внешний вид
+                                        </h3>
+                                        
+                                        <div class="settings-row">
+                                            <div>
+                                                <div class="settings-label">Тёмная тема</div>
+                                                <div class="settings-desc">Использовать тёмный интерфейс</div>
+                                            </div>
+                                            <label class="toggle-switch">
+                                                <input type="checkbox" id="darkModeToggle" checked>
+                                                <span class="toggle-slider"></span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="settings-section">
+                                        <h3 class="settings-section-title">
+                                            <i class="bi bi-bell"></i>
+                                            Уведомления
+                                        </h3>
+                                        
+                                        <div class="settings-row">
+                                            <div>
+                                                <div class="settings-label">Email-уведомления</div>
+                                                <div class="settings-desc">Получать уведомления на почту</div>
+                                            </div>
+                                            <label class="toggle-switch">
+                                                <input type="checkbox" id="emailNotifications" checked>
+                                                <span class="toggle-slider"></span>
+                                            </label>
+                                        </div>
+                                        
+                                        <div class="settings-row">
+                                            <div>
+                                                <div class="settings-label">Ценовые алерты</div>
+                                                <div class="settings-desc">Уведомления о достижении цены</div>
+                                            </div>
+                                            <label class="toggle-switch">
+                                                <input type="checkbox" id="priceAlerts" checked>
+                                                <span class="toggle-slider"></span>
+                                            </label>
+                                        </div>
+                                        
+                                        <div class="settings-row">
+                                            <div>
+                                                <div class="settings-label">Исполнение ордеров</div>
+                                                <div class="settings-desc">Уведомления об исполнении ордеров</div>
+                                            </div>
+                                            <label class="toggle-switch">
+                                                <input type="checkbox" id="orderNotifications" checked>
+                                                <span class="toggle-slider"></span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="card" style="margin-top: 24px;">
+                                <div class="card-header">
+                                    <h2 class="card-title" style="color: var(--danger);">
+                                        <i class="bi bi-exclamation-triangle"></i>
+                                        Опасная зона
+                                    </h2>
+                                </div>
+                                <div class="card-body">
+                                    <div class="danger-zone">
+                                        <h3>Удалить аккаунт</h3>
+                                        <p>Это действие необратимо. Все ваши данные будут удалены.</p>
+                                        <button class="btn btn-danger" onclick="confirmDeleteAccount()">
+                                            <i class="bi bi-trash"></i>
+                                            Удалить аккаунт
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Секция Безопасность -->
+                        <div id="section-security" class="profile-section">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h2 class="card-title">
+                                        <i class="bi bi-key"></i>
+                                        Смена пароля
+                                    </h2>
+                                </div>
+                                <div class="card-body">
+                                    <form id="passwordForm">
+                                        <div class="form-group">
+                                            <label class="form-label">Текущий пароль</label>
+                                            <div class="password-input-wrapper">
+                                                <input type="password" class="form-input" id="currentPassword" placeholder="Введите текущий пароль" required>
+                                                <button type="button" class="password-toggle" onclick="togglePasswordVisibility('currentPassword', this)">
+                                                    <i class="bi bi-eye"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="form-group">
+                                            <label class="form-label">Новый пароль</label>
+                                            <div class="password-input-wrapper">
+                                                <input type="password" class="form-input" id="newPassword" placeholder="Введите новый пароль" required oninput="updatePasswordStrength(this.value)">
+                                                <button type="button" class="password-toggle" onclick="togglePasswordVisibility('newPassword', this)">
+                                                    <i class="bi bi-eye"></i>
+                                                </button>
+                                            </div>
+                                            <div class="password-strength">
+                                                <div class="password-strength-bar">
+                                                    <div class="password-strength-fill" id="passwordStrengthFill"></div>
+                                                </div>
+                                                <span class="password-strength-text" id="passwordStrengthText">Введите пароль</span>
+                                            </div>
+                                            <div class="password-requirements">
+                                                <div class="requirement" id="req-length"><i class="bi bi-circle"></i> Минимум 8 символов</div>
+                                                <div class="requirement" id="req-upper"><i class="bi bi-circle"></i> Заглавная буква</div>
+                                                <div class="requirement" id="req-lower"><i class="bi bi-circle"></i> Строчная буква</div>
+                                                <div class="requirement" id="req-number"><i class="bi bi-circle"></i> Цифра</div>
+                                                <div class="requirement" id="req-special"><i class="bi bi-circle"></i> Спецсимвол (!@#$%^&*)</div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="form-group">
+                                            <label class="form-label">Подтверждение пароля</label>
+                                            <div class="password-input-wrapper">
+                                                <input type="password" class="form-input" id="confirmPassword" placeholder="Повторите новый пароль" required>
+                                                <button type="button" class="password-toggle" onclick="togglePasswordVisibility('confirmPassword', this)">
+                                                    <i class="bi bi-eye"></i>
+                                                </button>
+                                            </div>
+                                            <div class="password-match" id="passwordMatch"></div>
+                                        </div>
+                                        
+                                        <button type="submit" class="btn btn-primary">
+                                            <i class="bi bi-check-lg"></i>
+                                            Сменить пароль
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                            
+                            <div class="card" style="margin-top: 24px;">
+                                <div class="card-header">
+                                    <h2 class="card-title">
+                                        <i class="bi bi-shield-lock"></i>
+                                        Двухфакторная аутентификация
+                                    </h2>
+                                    <div class="tfa-status" id="tfaStatus">
+                                        <span class="status-badge status-disabled">
+                                            <i class="bi bi-x-circle"></i>
+                                            Отключено
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div class="tfa-info">
+                                        <div class="tfa-icon">
+                                            <i class="bi bi-phone"></i>
+                                        </div>
+                                        <div class="tfa-description">
+                                            <h4>Защитите свой аккаунт</h4>
+                                            <p>Двухфакторная аутентификация добавляет дополнительный уровень безопасности. При входе в систему вам потребуется ввести код из приложения-аутентификатора.</p>
+                                        </div>
+                                    </div>
+                                    
+                                    <div id="tfaSetup" class="tfa-setup" style="display: none;">
+                                        <div class="tfa-steps">
+                                            <div class="tfa-step">
+                                                <div class="step-number">1</div>
+                                                <div class="step-content">
+                                                    <h5>Скачайте приложение</h5>
+                                                    <p>Google Authenticator или Authy</p>
+                                                </div>
+                                            </div>
+                                            <div class="tfa-step">
+                                                <div class="step-number">2</div>
+                                                <div class="step-content">
+                                                    <h5>Отсканируйте QR-код</h5>
+                                                    <div class="qr-container" id="qrContainer">
+                                                        <div class="qr-placeholder" id="qrPlaceholder">
+                                                            <i class="bi bi-qr-code"></i>
+                                                            <span>Загрузка...</span>
+                                                        </div>
+                                                        <img src="" alt="QR-код" id="qrCodeImage" class="qr-code-image" style="display: none;">
+                                                    </div>
+                                                    <div class="secret-key" id="secretKeyContainer" style="display: none;">
+                                                        <span class="secret-label">Или введите вручную:</span>
+                                                        <code class="secret-code" id="secretCode"></code>
+                                                        <button type="button" class="btn-copy" onclick="copySecret()" title="Копировать">
+                                                            <i class="bi bi-clipboard"></i>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="tfa-step">
+                                                <div class="step-number">3</div>
+                                                <div class="step-content">
+                                                    <h5>Введите код</h5>
+                                                    <div class="tfa-code-input">
+                                                        <input type="text" class="form-input tfa-input" maxlength="6" placeholder="000000" id="tfaCode">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <button class="btn btn-success" onclick="verifyTFA()">
+                                            <i class="bi bi-check-lg"></i>
+                                            Подтвердить и включить
+                                        </button>
+                                        <button class="btn btn-secondary" onclick="cancelTFASetup()" style="margin-left: 12px;">
+                                            Отмена
+                                        </button>
+                                    </div>
+                                    
+                                    <div id="tfaActions" class="tfa-actions">
+                                        <button class="btn btn-primary" onclick="startTFASetup()" id="enableTFABtn">
+                                            <i class="bi bi-shield-plus"></i>
+                                            Включить 2FA
+                                        </button>
+                                        <button class="btn btn-danger" onclick="disableTFA()" id="disableTFABtn" style="display: none;">
+                                            <i class="bi bi-shield-x"></i>
+                                            Отключить 2FA
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="card" style="margin-top: 24px;">
+                                <div class="card-header">
+                                    <h2 class="card-title">
+                                        <i class="bi bi-clock-history"></i>
+                                        История входов
+                                    </h2>
+                                </div>
+                                <div class="card-body">
+                                    <div class="login-history">
+                                        <div class="login-entry current">
+                                            <div class="login-device">
+                                                <i class="bi bi-display"></i>
+                                            </div>
+                                            <div class="login-info">
+                                                <div class="login-details">
+                                                    <span class="login-browser">Chrome на Windows</span>
+                                                    <span class="login-current-badge">Текущий сеанс</span>
+                                                </div>
+                                                <div class="login-meta">
+                                                    <span><i class="bi bi-geo-alt"></i> Москва, Россия</span>
+                                                    <span><i class="bi bi-globe"></i> 95.173.xxx.xxx</span>
+                                                    <span><i class="bi bi-clock"></i> Сейчас</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="login-entry">
+                                            <div class="login-device">
+                                                <i class="bi bi-phone"></i>
+                                            </div>
+                                            <div class="login-info">
+                                                <div class="login-details">
+                                                    <span class="login-browser">Safari на iPhone</span>
+                                                </div>
+                                                <div class="login-meta">
+                                                    <span><i class="bi bi-geo-alt"></i> Москва, Россия</span>
+                                                    <span><i class="bi bi-globe"></i> 95.173.xxx.xxx</span>
+                                                    <span><i class="bi bi-clock"></i> 2 часа назад</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="login-entry">
+                                            <div class="login-device">
+                                                <i class="bi bi-display"></i>
+                                            </div>
+                                            <div class="login-info">
+                                                <div class="login-details">
+                                                    <span class="login-browser">Firefox на macOS</span>
+                                                </div>
+                                                <div class="login-meta">
+                                                    <span><i class="bi bi-geo-alt"></i> Санкт-Петербург, Россия</span>
+                                                    <span><i class="bi bi-globe"></i> 78.155.xxx.xxx</span>
+                                                    <span><i class="bi bi-clock"></i> Вчера, 15:32</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="login-entry suspicious">
+                                            <div class="login-device">
+                                                <i class="bi bi-display"></i>
+                                            </div>
+                                            <div class="login-info">
+                                                <div class="login-details">
+                                                    <span class="login-browser">Chrome на Linux</span>
+                                                    <span class="login-warning"><i class="bi bi-exclamation-triangle"></i> Неизвестное местоположение</span>
+                                                </div>
+                                                <div class="login-meta">
+                                                    <span><i class="bi bi-geo-alt"></i> Амстердам, Нидерланды</span>
+                                                    <span><i class="bi bi-globe"></i> 145.89.xxx.xxx</span>
+                                                    <span><i class="bi bi-clock"></i> 18 янв, 09:15</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="login-entry">
+                                            <div class="login-device">
+                                                <i class="bi bi-tablet"></i>
+                                            </div>
+                                            <div class="login-info">
+                                                <div class="login-details">
+                                                    <span class="login-browser">Chrome на Android</span>
+                                                </div>
+                                                <div class="login-meta">
+                                                    <span><i class="bi bi-geo-alt"></i> Москва, Россия</span>
+                                                    <span><i class="bi bi-globe"></i> 95.173.xxx.xxx</span>
+                                                    <span><i class="bi bi-clock"></i> 15 янв, 21:48</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="card" style="margin-top: 24px;">
+                                <div class="card-header">
+                                    <h2 class="card-title">
+                                        <i class="bi bi-laptop"></i>
+                                        Активные сессии
+                                    </h2>
+                                </div>
+                                <div class="card-body">
+                                    <div class="sessions-list">
+                                        <div class="session-item current">
+                                            <div class="session-device">
+                                                <i class="bi bi-display"></i>
+                                            </div>
+                                            <div class="session-info">
+                                                <div class="session-name">
+                                                    Chrome на Windows
+                                                    <span class="session-current">Текущая сессия</span>
+                                                </div>
+                                                <div class="session-meta">
+                                                    Москва, Россия • Активно сейчас
+                                                </div>
+                                            </div>
+                                            <div class="session-actions">
+                                                <!-- Текущую сессию нельзя завершить -->
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="session-item">
+                                            <div class="session-device">
+                                                <i class="bi bi-phone"></i>
+                                            </div>
+                                            <div class="session-info">
+                                                <div class="session-name">Safari на iPhone</div>
+                                                <div class="session-meta">
+                                                    Москва, Россия • 2 часа назад
+                                                </div>
+                                            </div>
+                                            <div class="session-actions">
+                                                <button class="btn btn-sm btn-danger" onclick="terminateSession('session-2')">
+                                                    <i class="bi bi-x-lg"></i>
+                                                    Завершить
+                                                </button>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="session-item">
+                                            <div class="session-device">
+                                                <i class="bi bi-tablet"></i>
+                                            </div>
+                                            <div class="session-info">
+                                                <div class="session-name">Chrome на Android</div>
+                                                <div class="session-meta">
+                                                    Москва, Россия • 1 день назад
+                                                </div>
+                                            </div>
+                                            <div class="session-actions">
+                                                <button class="btn btn-sm btn-danger" onclick="terminateSession('session-3')">
+                                                    <i class="bi bi-x-lg"></i>
+                                                    Завершить
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="sessions-actions" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border-color);">
+                                        <button class="btn btn-danger" onclick="terminateAllSessions()">
+                                            <i class="bi bi-box-arrow-right"></i>
+                                            Завершить все сессии кроме текущей
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Секция Уведомления -->
+                        <div id="section-notifications" class="profile-section">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h2 class="card-title">
+                                        <i class="bi bi-bell"></i>
+                                        Настройки уведомлений
+                                    </h2>
+                                </div>
+                                <div class="card-body">
+                                    <p style="color: var(--text-secondary);">Раздел уведомлений находится в разработке.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <script src="js/app.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/api.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const isAuth = await Auth.requireAuth();
+            if (!isAuth) return;
+            
+            Auth.updateUI();
+            
+            await loadProfile();
+            
+            // Загружаем статус 2FA
+            await loadTFAStatus();
+            
+            // Тема
+            const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+            document.getElementById('darkModeToggle').checked = isDark;
+            
+            document.getElementById('darkModeToggle').addEventListener('change', (e) => {
+                const theme = e.target.checked ? 'dark' : 'light';
+                document.documentElement.setAttribute('data-theme', theme);
+                localStorage.setItem('novatrade_theme', theme);
+            });
+            
+            // Сохранение профиля
+            document.getElementById('profileForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                NovaTrade.showToast('Успешно', 'Профиль сохранён', 'success');
+            });
+        });
+        
+        async function loadProfile() {
+            try {
+                const result = await Auth.fetchUser();
+                
+                if (result && result.user) {
+                    const user = result.user;
+                    
+                    // Заполняем данные
+                    document.getElementById('profileName').textContent = 
+                        [user.first_name, user.last_name].filter(Boolean).join(' ') || 'Пользователь';
+                    document.getElementById('profileEmail').textContent = user.email;
+                    document.getElementById('profileAvatar').textContent = 
+                        ((user.first_name?.[0] || '') + (user.last_name?.[0] || '')).toUpperCase() || user.email[0].toUpperCase();
+                    
+                    document.getElementById('firstName').value = user.first_name || '';
+                    document.getElementById('lastName').value = user.last_name || '';
+                    document.getElementById('email').value = user.email;
+                    document.getElementById('phone').value = user.phone || '';
+                    document.getElementById('country').value = user.country || '';
+                    
+                    // Дней с регистрации
+                    const created = new Date(user.created_at);
+                    const days = Math.floor((Date.now() - created.getTime()) / (1000 * 60 * 60 * 24));
+                    document.getElementById('profileDays').textContent = days;
+                    
+                    // Загружаем статистику
+                    loadStats();
+                    
+                    // Баланс в шапке
+                    if (result.balances) {
+                        const usd = result.balances.find(b => b.currency === 'USD');
+                        if (usd) {
+                            document.getElementById('headerBalance').textContent = 
+                                parseFloat(usd.available).toLocaleString('en-US', { minimumFractionDigits: 2 });
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading profile:', error);
+            }
+        }
+        
+        async function loadStats() {
+            try {
+                const result = await API.get('/portfolio.php?action=summary');
+                if (result.success) {
+                    document.getElementById('profileTrades').textContent = result.stats.total_trades;
+                }
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+        
+        async function confirmDeleteAccount() {
+            if (!confirm('Вы уверены, что хотите удалить аккаунт? Это действие необратимо! Все ваши данные будут безвозвратно удалены.')) {
+                return;
+            }
+            
+            const password = prompt('Для подтверждения введите ваш пароль:');
+            if (!password) {
+                return;
+            }
+            
+            try {
+                const result = await API.post('/user.php?action=delete_account', { password });
+                
+                if (result.success) {
+                    NovaTrade.showToast('Успешно', 'Аккаунт удалён', 'success');
+                    // Выходим из аккаунта и редирект на главную
+                    setTimeout(() => {
+                        Auth.logout();
+                        window.location.href = 'index.html';
+                    }, 1500);
+                } else {
+                    throw new Error(result.error || 'Ошибка удаления аккаунта');
+                }
+            } catch (error) {
+                NovaTrade.showToast('Ошибка', error.message || 'Неверный пароль или ошибка удаления', 'error');
+            }
+        }
+        
+        // ====== Навигация между секциями ======
+        function switchSection(sectionName) {
+            // Скрываем все секции
+            document.querySelectorAll('.profile-section').forEach(section => {
+                section.classList.remove('active');
+            });
+            
+            // Убираем active со всех пунктов меню
+            document.querySelectorAll('.profile-nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            
+            // Показываем выбранную секцию
+            const targetSection = document.getElementById('section-' + sectionName);
+            if (targetSection) {
+                targetSection.classList.add('active');
+            }
+            
+            // Активируем пункт меню
+            const menuItem = document.querySelector(`.profile-nav-item[data-section="${sectionName}"]`);
+            if (menuItem) {
+                menuItem.classList.add('active');
+            }
+            
+            // Обновляем URL
+            history.replaceState(null, '', '#' + sectionName);
+        }
+        
+        // Проверяем hash при загрузке
+        document.addEventListener('DOMContentLoaded', () => {
+            const hash = window.location.hash.slice(1);
+            if (hash && ['settings', 'security', 'notifications'].includes(hash)) {
+                switchSection(hash);
+            }
+        });
+        
+        // ====== Функции безопасности ======
+        
+        // Показ/скрытие пароля
+        function togglePasswordVisibility(inputId, button) {
+            const input = document.getElementById(inputId);
+            const icon = button.querySelector('i');
+            
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.remove('bi-eye');
+                icon.classList.add('bi-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.remove('bi-eye-slash');
+                icon.classList.add('bi-eye');
+            }
+        }
+        
+        // Проверка силы пароля
+        function updatePasswordStrength(password) {
+            const fill = document.getElementById('passwordStrengthFill');
+            const text = document.getElementById('passwordStrengthText');
+            
+            let strength = 0;
+            let checks = {
+                length: password.length >= 8,
+                upper: /[A-Z]/.test(password),
+                lower: /[a-z]/.test(password),
+                number: /[0-9]/.test(password),
+                special: /[!@#$%^&*(),.?":{}|<>]/.test(password)
+            };
+            
+            // Обновляем индикаторы требований
+            updateRequirement('req-length', checks.length);
+            updateRequirement('req-upper', checks.upper);
+            updateRequirement('req-lower', checks.lower);
+            updateRequirement('req-number', checks.number);
+            updateRequirement('req-special', checks.special);
+            
+            // Считаем силу
+            strength = Object.values(checks).filter(Boolean).length;
+            
+            // Обновляем визуал
+            const percentage = (strength / 5) * 100;
+            fill.style.width = percentage + '%';
+            
+            if (strength === 0) {
+                fill.className = 'password-strength-fill';
+                text.textContent = 'Введите пароль';
+                text.className = 'password-strength-text';
+            } else if (strength <= 2) {
+                fill.className = 'password-strength-fill weak';
+                text.textContent = 'Слабый пароль';
+                text.className = 'password-strength-text weak';
+            } else if (strength <= 3) {
+                fill.className = 'password-strength-fill medium';
+                text.textContent = 'Средний пароль';
+                text.className = 'password-strength-text medium';
+            } else if (strength <= 4) {
+                fill.className = 'password-strength-fill good';
+                text.textContent = 'Хороший пароль';
+                text.className = 'password-strength-text good';
+            } else {
+                fill.className = 'password-strength-fill strong';
+                text.textContent = 'Отличный пароль';
+                text.className = 'password-strength-text strong';
+            }
+            
+            // Проверяем совпадение паролей
+            checkPasswordMatch();
+        }
+        
+        function updateRequirement(id, met) {
+            const el = document.getElementById(id);
+            const icon = el.querySelector('i');
+            
+            if (met) {
+                el.classList.add('met');
+                icon.className = 'bi bi-check-circle-fill';
+            } else {
+                el.classList.remove('met');
+                icon.className = 'bi bi-circle';
+            }
+        }
+        
+        function checkPasswordMatch() {
+            const newPass = document.getElementById('newPassword').value;
+            const confirmPass = document.getElementById('confirmPassword').value;
+            const matchEl = document.getElementById('passwordMatch');
+            
+            if (!confirmPass) {
+                matchEl.textContent = '';
+                matchEl.className = 'password-match';
+                return;
+            }
+            
+            if (newPass === confirmPass) {
+                matchEl.innerHTML = '<i class="bi bi-check-circle-fill"></i> Пароли совпадают';
+                matchEl.className = 'password-match match';
+            } else {
+                matchEl.innerHTML = '<i class="bi bi-x-circle-fill"></i> Пароли не совпадают';
+                matchEl.className = 'password-match no-match';
+            }
+        }
+        
+        // Слушатель для подтверждения пароля
+        document.getElementById('confirmPassword')?.addEventListener('input', checkPasswordMatch);
+        
+        // Отправка формы смены пароля
+        document.getElementById('passwordForm')?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const currentPass = document.getElementById('currentPassword').value;
+            const newPass = document.getElementById('newPassword').value;
+            const confirmPass = document.getElementById('confirmPassword').value;
+            
+            if (!currentPass || !newPass || !confirmPass) {
+                NovaTrade.showToast('Ошибка', 'Заполните все поля', 'error');
+                return;
+            }
+            
+            if (newPass !== confirmPass) {
+                NovaTrade.showToast('Ошибка', 'Пароли не совпадают', 'error');
+                return;
+            }
+            
+            if (newPass.length < 8) {
+                NovaTrade.showToast('Ошибка', 'Пароль должен быть минимум 8 символов', 'error');
+                return;
+            }
+            
+            try {
+                const result = await API.post('/user.php?action=password', {
+                    currentPassword: currentPass,
+                    newPassword: newPass
+                });
+                
+                if (result.success) {
+                    NovaTrade.showToast('Успешно', 'Пароль успешно изменён', 'success');
+                    document.getElementById('passwordForm').reset();
+                    document.getElementById('passwordStrengthFill').style.width = '0';
+                    document.getElementById('passwordStrengthText').textContent = 'Введите пароль';
+                    document.getElementById('passwordMatch').textContent = '';
+                    document.querySelectorAll('.requirement').forEach(el => {
+                        el.classList.remove('met');
+                        el.querySelector('i').className = 'bi bi-circle';
+                    });
+                } else {
+                    throw new Error(result.error || 'Ошибка изменения пароля');
+                }
+            } catch (error) {
+                NovaTrade.showToast('Ошибка', error.message || 'Неверный текущий пароль', 'error');
+            }
+            document.getElementById('passwordForm').reset();
+            document.getElementById('passwordStrengthFill').style.width = '0';
+            document.getElementById('passwordStrengthText').textContent = 'Введите пароль';
+            document.getElementById('passwordMatch').textContent = '';
+            document.querySelectorAll('.requirement').forEach(el => {
+                el.classList.remove('met');
+                el.querySelector('i').className = 'bi bi-circle';
+            });
+        });
+        
+        // ====== 2FA функции ======
+        let tfaSecret = null;
+        
+        // Загрузка статуса 2FA
+        async function loadTFAStatus() {
+            try {
+                const result = await API.get('/auth.php?action=tfa_status');
+                if (result.success) {
+                    updateTFAUI(result.enabled);
+                }
+            } catch (error) {
+                console.error('Error loading 2FA status:', error);
+            }
+        }
+        
+        // Обновление UI 2FA
+        function updateTFAUI(enabled) {
+            if (enabled) {
+                document.getElementById('tfaStatus').innerHTML = `
+                    <span class="status-badge status-enabled">
+                        <i class="bi bi-check-circle"></i>
+                        Включено
+                    </span>
+                `;
+                document.getElementById('enableTFABtn').style.display = 'none';
+                document.getElementById('disableTFABtn').style.display = 'inline-flex';
+            } else {
+                document.getElementById('tfaStatus').innerHTML = `
+                    <span class="status-badge status-disabled">
+                        <i class="bi bi-x-circle"></i>
+                        Отключено
+                    </span>
+                `;
+                document.getElementById('enableTFABtn').style.display = 'inline-flex';
+                document.getElementById('disableTFABtn').style.display = 'none';
+            }
+        }
+        
+        // Начало настройки 2FA
+        async function startTFASetup() {
+            document.getElementById('tfaSetup').style.display = 'block';
+            document.getElementById('tfaActions').style.display = 'none';
+            
+            // Показываем загрузку
+            document.getElementById('qrPlaceholder').style.display = 'flex';
+            document.getElementById('qrCodeImage').style.display = 'none';
+            document.getElementById('secretKeyContainer').style.display = 'none';
+            
+            try {
+                const result = await API.post('/auth.php?action=tfa_setup');
+                
+                if (result.success) {
+                    tfaSecret = result.secret;
+                    
+                    // Показываем QR-код
+                    const qrImage = document.getElementById('qrCodeImage');
+                    qrImage.src = result.qr_code_url;
+                    qrImage.onload = () => {
+                        document.getElementById('qrPlaceholder').style.display = 'none';
+                        qrImage.style.display = 'block';
+                    };
+                    qrImage.onerror = () => {
+                        // Если Google Charts не работает, показываем только секрет
+                        document.getElementById('qrPlaceholder').innerHTML = `
+                            <i class="bi bi-exclamation-triangle"></i>
+                            <span>QR-код недоступен</span>
+                        `;
+                    };
+                    
+                    // Показываем секретный ключ
+                    document.getElementById('secretCode').textContent = result.secret;
+                    document.getElementById('secretKeyContainer').style.display = 'flex';
+                } else {
+                    throw new Error(result.error || 'Ошибка настройки 2FA');
+                }
+            } catch (error) {
+                NovaTrade.showToast('Ошибка', error.message || 'Не удалось начать настройку 2FA', 'error');
+                cancelTFASetup();
+            }
+        }
+        
+        // Отмена настройки 2FA
+        function cancelTFASetup() {
+            document.getElementById('tfaSetup').style.display = 'none';
+            document.getElementById('tfaActions').style.display = 'flex';
+            document.getElementById('tfaCode').value = '';
+            tfaSecret = null;
+        }
+        
+        // Копирование секретного ключа
+        function copySecret() {
+            const secret = document.getElementById('secretCode').textContent;
+            navigator.clipboard.writeText(secret).then(() => {
+                NovaTrade.showToast('Успешно', 'Ключ скопирован в буфер обмена', 'success');
+            }).catch(() => {
+                NovaTrade.showToast('Ошибка', 'Не удалось скопировать', 'error');
+            });
+        }
+        
+        // Подтверждение 2FA
+        async function verifyTFA() {
+            const code = document.getElementById('tfaCode').value;
+            
+            if (code.length !== 6 || !/^\d+$/.test(code)) {
+                NovaTrade.showToast('Ошибка', 'Введите 6-значный код', 'error');
+                return;
+            }
+            
+            try {
+                const result = await API.post('/auth.php?action=tfa_verify', { code });
+                
+                if (result.success) {
+                    updateTFAUI(true);
+                    document.getElementById('tfaSetup').style.display = 'none';
+                    document.getElementById('tfaActions').style.display = 'flex';
+                    document.getElementById('tfaCode').value = '';
+                    tfaSecret = null;
+                    
+                    NovaTrade.showToast('Успешно', 'Двухфакторная аутентификация включена!', 'success');
+                } else {
+                    throw new Error(result.error || 'Неверный код');
+                }
+            } catch (error) {
+                NovaTrade.showToast('Ошибка', error.message || 'Неверный код', 'error');
+            }
+        }
+        
+        // Отключение 2FA
+        async function disableTFA() {
+            const password = prompt('Введите пароль для подтверждения отключения 2FA:');
+            
+            if (!password) {
+                return;
+            }
+            
+            try {
+                const result = await API.post('/auth.php?action=tfa_disable', { password });
+                
+                if (result.success) {
+                    updateTFAUI(false);
+                    NovaTrade.showToast('Информация', 'Двухфакторная аутентификация отключена', 'info');
+                } else {
+                    throw new Error(result.error || 'Ошибка отключения 2FA');
+                }
+            } catch (error) {
+                NovaTrade.showToast('Ошибка', error.message || 'Неверный пароль', 'error');
+            }
+        }
+        
+        // ====== Сессии ======
+        function terminateSession(sessionId) {
+            if (!confirm('Завершить эту сессию? Устройство будет отключено.')) {
+                return;
+            }
+            
+            // Находим и удаляем элемент сессии
+            const sessionItem = event.target.closest('.session-item');
+            if (sessionItem) {
+                sessionItem.style.opacity = '0';
+                sessionItem.style.transform = 'translateX(20px)';
+                setTimeout(() => {
+                    sessionItem.remove();
+                }, 300);
+            }
+            
+            NovaTrade.showToast('Успешно', 'Сессия завершена', 'success');
+        }
+        
+        function terminateAllSessions() {
+            if (!confirm('Завершить все сессии кроме текущей? Все устройства будут отключены.')) {
+                return;
+            }
+            
+            // Удаляем все сессии кроме текущей
+            document.querySelectorAll('.session-item:not(.current)').forEach(item => {
+                item.style.opacity = '0';
+                item.style.transform = 'translateX(20px)';
+                setTimeout(() => {
+                    item.remove();
+                }, 300);
+            });
+            
+            NovaTrade.showToast('Успешно', 'Все сессии завершены', 'success');
+        }
+    </script>
+</body>
+</html>

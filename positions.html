@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Позиции — ADX Finance</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .positions-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+        
+        .position-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+            border-bottom: 2px solid var(--border-color);
+        }
+        
+        .position-tab {
+            padding: 12px 24px;
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid transparent;
+            color: var(--text-secondary);
+            font-size: 0.9375rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            margin-bottom: -2px;
+        }
+        
+        .position-tab:hover {
+            color: var(--text-primary);
+        }
+        
+        .position-tab.active {
+            color: var(--accent-primary);
+            border-bottom-color: var(--accent-primary);
+        }
+        
+        .position-tab-content {
+            display: none;
+        }
+        
+        .position-tab-content.active {
+            display: block;
+        }
+        
+        .filters {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        
+        .filter-select {
+            padding: 10px 16px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            color: var(--text-primary);
+            font-size: 0.875rem;
+            min-width: 150px;
+        }
+        
+        .position-row {
+            display: grid;
+            grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr 120px;
+            align-items: center;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border-color);
+            transition: background-color var(--transition-fast);
+        }
+        
+        .position-row:hover {
+            background: var(--bg-hover);
+        }
+        
+        .position-row:last-child {
+            border-bottom: none;
+        }
+        
+        .position-row.header {
+            background: var(--bg-tertiary);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            color: var(--text-tertiary);
+            font-weight: 600;
+        }
+        
+        .position-row.header:hover {
+            background: var(--bg-tertiary);
+        }
+        
+        .pnl {
+            font-weight: 600;
+        }
+        
+        .pnl.positive {
+            color: var(--success-text);
+        }
+        
+        .pnl.negative {
+            color: var(--danger-text);
+        }
+        
+        .close-btn {
+            padding: 6px 12px;
+            background: var(--danger-soft);
+            color: var(--danger-text);
+            border: none;
+            border-radius: var(--radius-sm);
+            font-size: 0.8125rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+        }
+        
+        .close-btn:hover {
+            background: var(--danger);
+            color: white;
+        }
+        
+        .profit-summary {
+            display: flex;
+            gap: 24px;
+            margin-bottom: 24px;
+            padding: 20px;
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-lg);
+        }
+        
+        .profit-item {
+            flex: 1;
+        }
+        
+        .profit-label {
+            font-size: 0.8125rem;
+            color: var(--text-tertiary);
+            margin-bottom: 8px;
+        }
+        
+        .profit-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        
+        @media (max-width: 1024px) {
+            .position-row {
+                grid-template-columns: 1fr auto auto;
+            }
+            
+            .position-row .hide-tablet {
+                display: none;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .positions-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .filters {
+                width: 100%;
+            }
+            
+            .filter-select {
+                flex: 1;
+                min-width: 0;
+            }
+            
+            .position-row {
+                padding: 12px;
+                gap: 8px;
+            }
+            
+            .profit-summary {
+                flex-direction: column;
+                gap: 16px;
+            }
+            
+            .position-actions {
+                flex-direction: column;
+                width: 100%;
+                gap: 8px;
+            }
+            
+            .position-actions .btn {
+                width: 100%;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .position-row {
+                grid-template-columns: 1fr;
+                padding: 10px;
+            }
+            
+            .position-asset {
+                width: 100%;
+            }
+            
+            .position-info {
+                width: 100%;
+            }
+            
+            .position-value {
+                width: 100%;
+                text-align: left;
+                margin-top: 8px;
+            }
+        }
+        
+        .position-asset {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .position-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+        
+        .position-icon.buy {
+            background: var(--success-soft);
+            color: var(--success);
+        }
+        
+        .position-icon.sell {
+            background: var(--danger-soft);
+            color: var(--danger);
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-secondary);
+        }
+        
+        .empty-state i {
+            font-size: 4rem;
+            margin-bottom: 24px;
+            opacity: 0.3;
+        }
+        
+        .empty-state h3 {
+            margin-bottom: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="page-wrapper">
+        <!-- Header -->
+        <header class="header">
+            <div class="container">
+                <div class="header-inner">
+                    <a href="index.html" class="logo">
+                        <div class="logo-icon">
+                            <i class="bi bi-lightning-charge-fill"></i>
+                        </div>
+                        <span>ADX Finance</span>
+                    </a>
+                    
+                    <nav class="nav-main">
+                        <a href="index.html" class="nav-link">
+                            <i class="bi bi-house"></i>
+                            Главная
+                        </a>
+                        <a href="trade.html?mode=normal" class="nav-link">
+                            <i class="bi bi-graph-up"></i>
+                            Обычная торговля
+                        </a>
+                        <a href="trade.html?mode=quick" class="nav-link">
+                            <i class="bi bi-lightning-charge"></i>
+                            Быстрая торговля
+                        </a>
+                        <a href="wallet.html" class="nav-link">
+                            <i class="bi bi-wallet2"></i>
+                            Кошелёк
+                        </a>
+                        <a href="portfolio.html" class="nav-link">
+                            <i class="bi bi-pie-chart"></i>
+                            Портфель
+                        </a>
+                        <a href="positions.html" class="nav-link active">
+                            <i class="bi bi-list-check"></i>
+                            Позиции
+                        </a>
+                        <a href="history.html" class="nav-link">
+                            <i class="bi bi-clock-history"></i>
+                            История
+                        </a>
+                    </nav>
+                    
+                    <div class="header-actions">
+                        <button class="theme-toggle" onclick="toggleTheme()" title="Переключить тему">
+                            <i class="bi bi-moon-stars"></i>
+                        </button>
+                        
+                        <div class="user-menu" data-auth="true">
+                            <button class="user-menu-trigger">
+                                <div class="user-avatar" data-user-avatar>U</div>
+                                <div class="user-info">
+                                    <div class="user-name" data-user-name>Пользователь</div>
+                                    <div class="user-balance">$<span id="headerBalance">0.00</span></div>
+                                </div>
+                                <i class="bi bi-chevron-down"></i>
+                            </button>
+                            <div class="user-dropdown">
+                                <a href="profile.html" class="dropdown-item">
+                                    <i class="bi bi-person"></i>
+                                    Профиль
+                                </a>
+                                <a href="wallet.html" class="dropdown-item">
+                                    <i class="bi bi-wallet2"></i>
+                                    Кошелёк
+                                </a>
+                                <div class="dropdown-divider"></div>
+                                <a href="#" class="dropdown-item" onclick="Auth.logout(); return false;">
+                                    <i class="bi bi-box-arrow-right"></i>
+                                    Выйти
+                                </a>
+                            </div>
+                        </div>
+                        
+                        <button class="mobile-menu-toggle">
+                            <i class="bi bi-list"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+        
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="container">
+                <div class="positions-header">
+                    <div>
+                        <h1 style="margin-bottom: 8px;">Позиции</h1>
+                        <p style="color: var(--text-secondary);">Управление открытыми и закрытыми позициями</p>
+                    </div>
+                </div>
+                
+                <div class="position-tabs">
+                    <button class="position-tab active" data-tab="open">Открытые позиции</button>
+                    <button class="position-tab" data-tab="closed">Закрытые позиции</button>
+                </div>
+                
+                <!-- Открытые позиции -->
+                <div class="position-tab-content active" id="openPositions">
+                    <div class="card">
+                        <div class="card-body" style="padding: 0;">
+                            <div class="position-row header">
+                                <div>Актив</div>
+                                <div>Сторона</div>
+                                <div class="hide-tablet">Количество</div>
+                                <div class="hide-tablet">Цена входа / Текущая</div>
+                                <div class="hide-tablet">P&L</div>
+                                <div style="text-align: right;">Действие</div>
+                            </div>
+                            
+                            <div id="openPositionsList">
+                                <div style="padding: 40px; text-align: center;">
+                                    <div class="spinner"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Закрытые позиции -->
+                <div class="position-tab-content" id="closedPositions">
+                    <div class="filters" style="margin-bottom: 24px;">
+                        <select class="filter-select" id="periodFilter">
+                            <option value="all">Все время</option>
+                            <option value="week">Неделя</option>
+                            <option value="month">Месяц</option>
+                            <option value="quarter">Квартал</option>
+                            <option value="year">Год</option>
+                        </select>
+                    </div>
+                    
+                    <div class="profit-summary" id="profitSummary" style="display: none;">
+                        <div class="profit-item">
+                            <div class="profit-label">Итоговая прибыль</div>
+                            <div class="profit-value" id="totalProfit">$0.00</div>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-body" style="padding: 0;">
+                            <div class="position-row header">
+                                <div>Актив</div>
+                                <div>Сторона</div>
+                                <div class="hide-tablet">Количество</div>
+                                <div class="hide-tablet">Цена входа / Выхода</div>
+                                <div class="hide-tablet">P&L</div>
+                                <div class="hide-tablet">Дата закрытия</div>
+                            </div>
+                            
+                            <div id="closedPositionsList">
+                                <div style="padding: 40px; text-align: center;">
+                                    <div class="spinner"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <script src="js/app.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/api.js"></script>
+    <script>
+        let currentTab = 'open';
+        
+        document.addEventListener('DOMContentLoaded', async () => {
+            const isAuth = await Auth.requireAuth();
+            if (!isAuth) return;
+            
+            Auth.updateUI();
+            
+            // Переключение вкладок
+            document.querySelectorAll('.position-tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    const tabName = tab.dataset.tab;
+                    switchTab(tabName);
+                });
+            });
+            
+            // Фильтр периода для закрытых позиций
+            const periodFilter = document.getElementById('periodFilter');
+            if (periodFilter) {
+                periodFilter.addEventListener('change', async (e) => {
+                    await loadClosedPositions(e.target.value);
+                });
+            }
+            
+            await loadOpenPositions();
+            await loadClosedPositions('all');
+            
+            // Автообновление открытых позиций каждые 5 секунд
+            setInterval(loadOpenPositions, 5000);
+        });
+        
+        function switchTab(tabName) {
+            currentTab = tabName;
+            
+            // Обновляем вкладки
+            document.querySelectorAll('.position-tab').forEach(tab => {
+                tab.classList.toggle('active', tab.dataset.tab === tabName);
+            });
+            
+            // Обновляем контент
+            document.querySelectorAll('.position-tab-content').forEach(content => {
+                content.classList.toggle('active', content.id === (tabName === 'open' ? 'openPositions' : 'closedPositions'));
+            });
+        }
+        
+        async function loadOpenPositions() {
+            try {
+                const result = await TradingAPI.getOpenPositions();
+                
+                if (result.success) {
+                    const positions = result.positions || [];
+                    renderOpenPositions(positions);
+                } else {
+                    throw new Error(result.error || 'Failed to load positions');
+                }
+            } catch (error) {
+                console.error('Error loading open positions:', error);
+                document.getElementById('openPositionsList').innerHTML = `
+                    <div class="empty-state">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <h3>Ошибка загрузки</h3>
+                        <p>${error.message || 'Неизвестная ошибка'}</p>
+                    </div>
+                `;
+            }
+        }
+        
+        function renderOpenPositions(positions) {
+            const container = document.getElementById('openPositionsList');
+            
+            if (positions.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <i class="bi bi-inbox"></i>
+                        <h3>Нет открытых позиций</h3>
+                        <p>У вас нет открытых позиций</p>
+                        <a href="trade.html" class="btn btn-primary" style="margin-top: 16px;">
+                            <i class="bi bi-graph-up"></i>
+                            Начать торговлю
+                        </a>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = positions.map(pos => {
+                const pnl = parseFloat(pos.unrealized_pnl || 0) || 0;
+                const pnlPercent = parseFloat(pos.unrealized_pnl_percent || 0) || 0;
+                const pnlClass = pnl >= 0 ? 'positive' : 'negative';
+                
+                return `
+                    <div class="position-row">
+                        <div class="position-asset">
+                            <div class="position-icon ${pos.side}">
+                                <i class="bi bi-${pos.side === 'buy' ? 'arrow-down' : 'arrow-up'}"></i>
+                            </div>
+                            <div>
+                                <div style="font-weight: 600;">${pos.symbol}/USD</div>
+                            </div>
+                        </div>
+                        <div>
+                            <span class="order-side ${pos.side}">${pos.side === 'buy' ? 'Покупка' : 'Продажа'}</span>
+                        </div>
+                        <div class="font-mono hide-tablet">${formatQuantity(pos.remaining_quantity, pos.symbol)}</div>
+                        <div class="hide-tablet">
+                            <div class="font-mono">${NovaTrade.formatCurrency(pos.average_price)}</div>
+                            <div style="font-size: 0.8125rem; color: var(--text-tertiary);">${NovaTrade.formatCurrency(pos.current_price)}</div>
+                        </div>
+                        <div class="hide-tablet">
+                            <div class="pnl ${pnlClass}">${pnl >= 0 ? '+' : ''}${NovaTrade.formatCurrency(pnl)}</div>
+                            <div style="font-size: 0.8125rem; color: var(--text-tertiary);">${pnlPercent >= 0 ? '+' : ''}${(isNaN(pnlPercent) || !isFinite(pnlPercent) ? 0 : pnlPercent).toFixed(2)}%</div>
+                        </div>
+                        <div style="text-align: right;">
+                            <button class="close-btn" onclick="closePosition(${pos.id})">
+                                <i class="bi bi-x-circle"></i>
+                                Закрыть
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        async function closePosition(orderId) {
+            if (!confirm('Вы уверены, что хотите закрыть эту позицию?')) {
+                return;
+            }
+            
+            try {
+                const result = await TradingAPI.closePosition(orderId);
+                
+                if (result.success) {
+                    NovaTrade.showToast('Позиция закрыта', 'Позиция успешно закрыта', 'success');
+                    await loadOpenPositions();
+                    const periodFilter = document.getElementById('periodFilter');
+                    await loadClosedPositions(periodFilter ? periodFilter.value : 'all');
+                } else {
+                    throw new Error(result.error || 'Failed to close position');
+                }
+            } catch (error) {
+                console.error('Error closing position:', error);
+                NovaTrade.showToast('Ошибка', error.message || 'Не удалось закрыть позицию', 'error');
+            }
+        }
+        
+        async function loadClosedPositions(period = 'all') {
+            try {
+                const result = await TradingAPI.getClosedPositions(period);
+                
+                if (result.success) {
+                    const positions = result.positions || [];
+                    const totalPnl = parseFloat(result.total_pnl || 0);
+                    renderClosedPositions(positions, totalPnl);
+                } else {
+                    throw new Error(result.error || 'Failed to load positions');
+                }
+            } catch (error) {
+                console.error('Error loading closed positions:', error);
+                document.getElementById('closedPositionsList').innerHTML = `
+                    <div class="empty-state">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <h3>Ошибка загрузки</h3>
+                        <p>${error.message || 'Неизвестная ошибка'}</p>
+                    </div>
+                `;
+            }
+        }
+        
+        function renderClosedPositions(positions, totalPnl) {
+            const container = document.getElementById('closedPositionsList');
+            const summary = document.getElementById('profitSummary');
+            
+            if (!container) return;
+            
+            // Обновляем итоговую прибыль
+            const profitValue = document.getElementById('totalProfit');
+            const safeTotalPnl = isNaN(totalPnl) || !isFinite(totalPnl) ? 0 : totalPnl;
+            const pnlClass = safeTotalPnl >= 0 ? 'positive' : 'negative';
+            
+            if (profitValue) {
+                profitValue.textContent = `${safeTotalPnl >= 0 ? '+' : ''}${NovaTrade.formatCurrency(safeTotalPnl)}`;
+                profitValue.className = `profit-value ${pnlClass}`;
+            }
+            
+            if (summary) {
+                summary.style.display = positions.length > 0 ? 'flex' : 'none';
+            }
+            
+            if (positions.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <i class="bi bi-check-circle"></i>
+                        <h3>Нет закрытых позиций</h3>
+                        <p>У вас нет закрытых позиций за выбранный период</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = positions.map(pos => {
+                const pnl = parseFloat(pos.pnl || 0) || 0;
+                const pnlPercent = parseFloat(pos.pnl_percent || 0) || 0;
+                const pnlClass = pnl >= 0 ? 'positive' : 'negative';
+                
+                return `
+                    <div class="position-row">
+                        <div class="position-asset">
+                            <div class="position-icon ${pos.open_side}">
+                                <i class="bi bi-${pos.open_side === 'buy' ? 'arrow-down' : 'arrow-up'}"></i>
+                            </div>
+                            <div>
+                                <div style="font-weight: 600;">${pos.symbol}/USD</div>
+                            </div>
+                        </div>
+                        <div>
+                            <span class="order-side ${pos.open_side}">${pos.open_side === 'buy' ? 'Покупка' : 'Продажа'}</span>
+                        </div>
+                        <div class="font-mono hide-tablet">${formatQuantity(pos.close_quantity, pos.symbol)}</div>
+                        <div class="hide-tablet">
+                            <div class="font-mono">${NovaTrade.formatCurrency(pos.entry_price)}</div>
+                            <div style="font-size: 0.8125rem; color: var(--text-tertiary);">${NovaTrade.formatCurrency(pos.exit_price)}</div>
+                        </div>
+                        <div class="hide-tablet">
+                            <div class="pnl ${pnlClass}">${pnl >= 0 ? '+' : ''}${NovaTrade.formatCurrency(pnl)}</div>
+                            <div style="font-size: 0.8125rem; color: var(--text-tertiary);">${pnlPercent >= 0 ? '+' : ''}${(isNaN(pnlPercent) || !isFinite(pnlPercent) ? 0 : pnlPercent).toFixed(2)}%</div>
+                        </div>
+                        <div class="hide-tablet">
+                            <div>${NovaTrade.formatDate(pos.close_time)}</div>
+                            <div style="font-size: 0.8125rem; color: var(--text-tertiary);">${formatTime(pos.close_time)}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        function formatQuantity(quantity, symbol) {
+            const num = parseFloat(quantity) || 0;
+            return num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 8 }) + ' ' + symbol;
+        }
+        
+        function formatTime(dateStr) {
+            const date = new Date(dateStr);
+            return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+        }
+    </script>
+</body>
+</html>

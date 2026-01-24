@@ -1,0 +1,1419 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Торговля — ADX Finance</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+    <style>
+        .trade-layout {
+            display: grid;
+            grid-template-columns: 1fr 320px;
+            grid-template-rows: auto 1fr;
+            gap: 20px;
+            height: calc(100vh - var(--header-height) - 48px);
+            padding: 24px 0;
+        }
+        
+        @media (max-width: 1200px) {
+            .trade-layout {
+                grid-template-columns: 1fr;
+                height: auto;
+            }
+        }
+        
+        .chart-section {
+            grid-row: span 2;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .chart-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+        
+        .asset-selector {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 16px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            transition: all var(--transition-fast);
+        }
+        
+        .asset-selector:hover {
+            border-color: var(--border-color-light);
+        }
+        
+        .asset-selector-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--accent-primary-soft);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .asset-selector-info h3 {
+            font-size: 1rem;
+            font-weight: 600;
+        }
+        
+        .asset-selector-info span {
+            font-size: 0.75rem;
+            color: var(--text-tertiary);
+        }
+        
+        .asset-selector-wrapper {
+            position: relative;
+        }
+        
+        .asset-selector #assetChevron {
+            transition: transform 0.2s ease;
+        }
+        
+        .asset-selector.open #assetChevron {
+            transform: rotate(180deg);
+        }
+        
+        .asset-dropdown {
+            position: absolute;
+            top: calc(100% + 8px);
+            left: 0;
+            width: 320px;
+            max-height: 400px;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-lg);
+            z-index: 1000;
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .asset-dropdown.show {
+            display: flex;
+        }
+        
+        .asset-dropdown-search {
+            padding: 12px;
+            border-bottom: 1px solid var(--border-color);
+            position: relative;
+        }
+        
+        .asset-dropdown-search i {
+            position: absolute;
+            left: 24px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+        }
+        
+        .asset-dropdown-search input {
+            width: 100%;
+            padding: 10px 12px 10px 36px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            color: var(--text-primary);
+            font-size: 0.875rem;
+        }
+        
+        .asset-dropdown-search input:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+        }
+        
+        .asset-dropdown-tabs {
+            display: flex;
+            padding: 8px 12px;
+            gap: 4px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .asset-dropdown-tab {
+            padding: 6px 12px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            background: transparent;
+            border-radius: var(--radius-sm);
+            transition: all 0.2s ease;
+        }
+        
+        .asset-dropdown-tab:hover {
+            background: var(--bg-tertiary);
+        }
+        
+        .asset-dropdown-tab.active {
+            background: var(--accent-primary);
+            color: white;
+        }
+        
+        .asset-dropdown-list {
+            flex: 1;
+            overflow-y: auto;
+            max-height: 280px;
+        }
+        
+        .asset-dropdown-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 12px;
+            cursor: pointer;
+            transition: background-color 0.15s ease;
+        }
+        
+        .asset-dropdown-item:hover {
+            background: var(--bg-hover);
+        }
+        
+        .asset-dropdown-item.active {
+            background: var(--accent-primary-soft);
+        }
+        
+        .asset-dropdown-item-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .asset-dropdown-item-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--bg-tertiary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+        
+        .asset-dropdown-item-icon.crypto { background: var(--warning-soft); color: var(--warning); }
+        .asset-dropdown-item-icon.stocks { background: var(--accent-primary-soft); color: var(--accent-primary); }
+        .asset-dropdown-item-icon.forex { background: var(--success-soft); color: var(--success); }
+        
+        .asset-dropdown-item-info {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .asset-dropdown-item-symbol {
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+        
+        .asset-dropdown-item-name {
+            font-size: 0.75rem;
+            color: var(--text-tertiary);
+        }
+        
+        .asset-dropdown-item-right {
+            text-align: right;
+        }
+        
+        .asset-dropdown-item-price {
+            font-weight: 500;
+            font-size: 0.875rem;
+            font-family: var(--font-mono);
+        }
+        
+        .asset-dropdown-item-change {
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        
+        .asset-dropdown-item-change.up { color: var(--success-text); }
+        .asset-dropdown-item-change.down { color: var(--danger-text); }
+        
+        .chart-price-display {
+            margin-left: auto;
+            text-align: right;
+        }
+        
+        .chart-price-display .price {
+            font-size: 1.5rem;
+            font-weight: 700;
+            font-family: var(--font-primary);
+        }
+        
+        .chart-price-display .change {
+            font-size: 0.9375rem;
+            font-weight: 500;
+        }
+        
+        .chart-price-display .change.up { color: var(--success-text); }
+        .chart-price-display .change.down { color: var(--danger-text); }
+        
+        #tradingChart {
+            flex: 1;
+            min-height: 450px;
+            height: 450px;
+            width: 100%;
+        }
+        
+        .trade-sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .asset-list-panel {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .asset-list-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: background-color var(--transition-fast);
+        }
+        
+        .asset-list-item:hover {
+            background: var(--bg-hover);
+        }
+        
+        .asset-list-item.active {
+            background: var(--accent-primary-soft);
+        }
+        
+        .asset-list-item:last-child {
+            border-bottom: none;
+        }
+        
+        .asset-list-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .asset-list-icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: var(--bg-tertiary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        
+        .asset-list-symbol {
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+        
+        .asset-list-price {
+            font-family: var(--font-primary);
+            font-size: 0.875rem;
+        }
+        
+        .asset-list-change {
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        
+        .asset-list-change.up { color: var(--success-text); }
+        .asset-list-change.down { color: var(--danger-text); }
+        
+        .search-input {
+            width: 100%;
+            padding: 10px 14px;
+            padding-left: 40px;
+            font-size: 0.875rem;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            color: var(--text-primary);
+        }
+        
+        .search-input:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+        }
+        
+        .search-wrapper {
+            position: relative;
+        }
+        
+        .search-wrapper i {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+        }
+        
+        .recent-trades {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .recent-trade-item {
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            gap: 12px;
+            align-items: center;
+            padding: 8px 0;
+            font-size: 0.8125rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .recent-trade-item:last-child {
+            border-bottom: none;
+        }
+        
+        .trade-type {
+            padding: 2px 8px;
+            border-radius: var(--radius-sm);
+            font-weight: 500;
+            font-size: 0.6875rem;
+            text-transform: uppercase;
+        }
+        
+        .trade-type.buy {
+            background: var(--success-soft);
+            color: var(--success-text);
+        }
+        
+        .trade-type.sell {
+            background: var(--danger-soft);
+            color: var(--danger-text);
+        }
+        
+        #quickTradeFields {
+            padding: 12px;
+            background: var(--bg-secondary);
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-color);
+        }
+        
+        #quickTradeFields .trade-input-group {
+            margin-top: 0;
+        }
+        
+        #quickTradeFields .trade-input-group:not(:first-child) {
+            margin-top: 12px;
+        }
+        
+        .trade-time-buttons {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-top: 8px;
+        }
+        
+        .trade-time-btn {
+            padding: 10px 12px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            color: var(--text-primary);
+            font-size: 0.8125rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            text-align: center;
+        }
+        
+        .trade-time-btn:hover {
+            background: var(--bg-hover);
+            border-color: var(--accent-primary);
+        }
+        
+        .trade-time-btn.active {
+            background: var(--accent-primary);
+            border-color: var(--accent-primary);
+            color: white;
+        }
+        
+        #quickProfitDisplay {
+            display: none;
+        }
+        
+        #quickProfitDisplay.show {
+            display: block;
+        }
+        
+        .trade-mode-tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 12px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 8px;
+        }
+        
+        .trade-mode-tab {
+            flex: 1;
+            padding: 10px 16px;
+            background: transparent;
+            border: none;
+            border-radius: var(--radius-md);
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        
+        .trade-mode-tab:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+        
+        .trade-mode-tab.active {
+            background: var(--accent-primary-soft);
+            color: var(--accent-primary);
+        }
+        
+        .trade-mode-tab i {
+            font-size: 1rem;
+        }
+        
+        /* Вкладки режима торговли */
+        .trade-mode-tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 16px;
+            background: var(--bg-tertiary);
+            padding: 4px;
+            border-radius: var(--radius-md);
+        }
+        
+        .trade-mode-tab {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px 16px;
+            background: transparent;
+            border: none;
+            border-radius: var(--radius-sm);
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+        }
+        
+        .trade-mode-tab:hover {
+            color: var(--text-primary);
+            background: var(--bg-hover);
+        }
+        
+        .trade-mode-tab.active {
+            background: var(--accent-primary);
+            color: white;
+        }
+        
+        .trade-mode-tab i {
+            font-size: 1rem;
+        }
+        
+        .trade-mode-content {
+            display: block;
+        }
+        
+        .trade-mode-content[style*="display: none"] {
+            display: none !important;
+        }
+        
+        /* Мобильная адаптивность */
+        @media (max-width: 768px) {
+            .trade-layout {
+                padding: 16px 0;
+                gap: 16px;
+            }
+            
+            #tradingChart {
+                min-height: 300px;
+                height: 300px;
+            }
+            
+            .chart-toolbar {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 12px;
+            }
+            
+            .asset-selector {
+                width: 100%;
+                justify-content: space-between;
+            }
+            
+            .chart-price-display {
+                margin-left: 0;
+                margin-top: 12px;
+                text-align: left;
+            }
+            
+            .trade-form {
+                padding: 16px;
+            }
+            
+            .trade-tabs {
+                gap: 8px;
+            }
+            
+            .trade-tab {
+                padding: 10px 16px;
+                font-size: 0.875rem;
+            }
+            
+            .trade-input-group {
+                flex-direction: column;
+                gap: 12px;
+            }
+            
+            .trade-input-group label {
+                width: 100%;
+            }
+            
+            .trade-input-group input,
+            .trade-input-group select {
+                width: 100%;
+            }
+            
+            .trade-time-buttons {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 8px;
+            }
+            
+            .trade-time-btn {
+                padding: 10px 8px;
+                font-size: 0.8125rem;
+            }
+            
+            .trade-mode-tabs {
+                gap: 8px;
+            }
+            
+            .trade-mode-tab {
+                padding: 10px 16px;
+                font-size: 0.875rem;
+            }
+            
+            .trade-summary {
+                padding: 12px;
+                gap: 12px;
+            }
+            
+            .trade-summary-item {
+                font-size: 0.875rem;
+            }
+            
+            .trade-summary-value {
+                font-size: 1rem;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .trade-layout {
+                padding: 12px 0;
+                gap: 12px;
+            }
+            
+            #tradingChart {
+                min-height: 250px;
+                height: 250px;
+            }
+            
+            .chart-toolbar {
+                gap: 8px;
+            }
+            
+            .asset-selector {
+                padding: 10px 12px;
+            }
+            
+            .asset-selector-icon {
+                width: 28px;
+                height: 28px;
+            }
+            
+            .asset-selector-info h3 {
+                font-size: 0.9375rem;
+            }
+            
+            .asset-dropdown {
+                width: 100%;
+                left: 0;
+                right: 0;
+            }
+            
+            .trade-form {
+                padding: 12px;
+            }
+            
+            .trade-time-buttons {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .trade-time-btn {
+                padding: 12px 8px;
+                font-size: 0.75rem;
+            }
+            
+            .trade-mode-tab {
+                padding: 8px 12px;
+                font-size: 0.8125rem;
+            }
+            
+            .trade-mode-tab i {
+                font-size: 0.875rem;
+            }
+            
+            .trade-summary {
+                padding: 10px;
+                gap: 10px;
+            }
+            
+            .order-panel {
+                order: 2;
+            }
+            
+            .chart-section {
+                order: 1;
+            }
+        }
+        
+        @media (max-width: 360px) {
+            #tradingChart {
+                min-height: 200px;
+                height: 200px;
+            }
+            
+            .trade-time-buttons {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="page-wrapper">
+        <!-- Header -->
+        <header class="header">
+            <div class="container">
+                <div class="header-inner">
+                    <a href="index.html" class="logo">
+                        <div class="logo-icon">
+                            <i class="bi bi-lightning-charge-fill"></i>
+                        </div>
+                        <span>ADX Finance</span>
+                    </a>
+                    
+                    <nav class="nav-main">
+                        <a href="index.html" class="nav-link">
+                            <i class="bi bi-house"></i>
+                            Главная
+                        </a>
+                        <a href="trade.html?mode=normal" class="nav-link" id="navNormalTrade">
+                            <i class="bi bi-graph-up"></i>
+                            Обычная торговля
+                        </a>
+                        <a href="trade.html?mode=quick" class="nav-link" id="navQuickTrade">
+                            <i class="bi bi-lightning-charge"></i>
+                            Быстрая торговля
+                        </a>
+                        <a href="wallet.html" class="nav-link">
+                            <i class="bi bi-wallet2"></i>
+                            Кошелёк
+                        </a>
+                        <a href="portfolio.html" class="nav-link">
+                            <i class="bi bi-pie-chart"></i>
+                            Портфель
+                        </a>
+                        <a href="positions.html" class="nav-link">
+                            <i class="bi bi-list-check"></i>
+                            Позиции
+                        </a>
+                        <a href="history.html" class="nav-link">
+                            <i class="bi bi-clock-history"></i>
+                            История
+                        </a>
+                    </nav>
+                    
+                    <div class="header-actions">
+                        <button class="theme-toggle" onclick="toggleTheme()" title="Переключить тему">
+                            <i class="bi bi-moon-stars"></i>
+                        </button>
+                        
+                        <div data-auth="false">
+                            <a href="login.html" class="btn btn-outline">Войти</a>
+                            <a href="register.html" class="btn btn-primary">Регистрация</a>
+                        </div>
+                        
+                        <div class="user-menu" data-auth="true" style="display: none;">
+                            <button class="user-menu-trigger">
+                                <div class="user-avatar" data-user-avatar>U</div>
+                                <div class="user-info">
+                                    <div class="user-name" data-user-name>Пользователь</div>
+                                    <div class="user-balance">$<span id="headerBalance">0.00</span></div>
+                                </div>
+                                <i class="bi bi-chevron-down"></i>
+                            </button>
+                            <div class="user-dropdown">
+                                <a href="profile.html" class="dropdown-item">
+                                    <i class="bi bi-person"></i>
+                                    Профиль
+                                </a>
+                                <a href="wallet.html" class="dropdown-item">
+                                    <i class="bi bi-wallet2"></i>
+                                    Кошелёк
+                                </a>
+                                <div class="dropdown-divider"></div>
+                                <a href="#" class="dropdown-item" onclick="Auth.logout(); return false;">
+                                    <i class="bi bi-box-arrow-right"></i>
+                                    Выйти
+                                </a>
+                            </div>
+                        </div>
+                        
+                        <button class="mobile-menu-toggle">
+                            <i class="bi bi-list"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+        
+        <!-- Main Content -->
+        <main class="main-content" style="padding: 0;">
+            <div class="container">
+                <div class="trade-layout">
+                    <!-- Chart Section -->
+                    <div class="chart-section">
+                        <div class="card" style="flex: 1; display: flex; flex-direction: column;">
+                            <div class="card-header">
+                                <div class="chart-toolbar">
+                                    <div class="asset-selector-wrapper">
+                                        <div class="asset-selector" id="assetSelector" onclick="toggleAssetDropdown()">
+                                            <div class="asset-selector-icon" id="assetIcon">
+                                                <i class="bi bi-currency-bitcoin"></i>
+                                            </div>
+                                            <div class="asset-selector-info">
+                                                <h3 id="currentAsset">BTC/USD</h3>
+                                                <span id="currentAssetName">Bitcoin</span>
+                                            </div>
+                                            <i class="bi bi-chevron-down" id="assetChevron"></i>
+                                        </div>
+                                        <div class="asset-dropdown" id="assetDropdown">
+                                            <div class="asset-dropdown-search">
+                                                <i class="bi bi-search"></i>
+                                                <input type="text" placeholder="Поиск актива..." id="dropdownSearch" oninput="filterDropdownAssets(this.value)">
+                                            </div>
+                                            <div class="asset-dropdown-tabs">
+                                                <button class="asset-dropdown-tab active" data-filter="all" onclick="filterByMarket('all')">Все</button>
+                                                <button class="asset-dropdown-tab" data-filter="crypto" onclick="filterByMarket('crypto')">Крипто</button>
+                                                <button class="asset-dropdown-tab" data-filter="stocks" onclick="filterByMarket('stocks')">Акции</button>
+                                                <button class="asset-dropdown-tab" data-filter="forex" onclick="filterByMarket('forex')">Форекс</button>
+                                            </div>
+                                            <div class="asset-dropdown-list" id="assetDropdownList">
+                                                <!-- Заполняется через JS -->
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="chart-timeframes">
+                                        <button class="chart-timeframe" data-interval="1m">1м</button>
+                                        <button class="chart-timeframe active" data-interval="5m">5м</button>
+                                        <button class="chart-timeframe" data-interval="15m">15м</button>
+                                        <button class="chart-timeframe" data-interval="1h">1ч</button>
+                                        <button class="chart-timeframe" data-interval="4h">4ч</button>
+                                        <button class="chart-timeframe" data-interval="1d">1д</button>
+                                        <button class="chart-timeframe" data-interval="1w">1н</button>
+                                    </div>
+                                    
+                                    <div class="chart-price-display">
+                                        <div class="price" id="currentPrice">$43,250.00</div>
+                                        <div class="change up" id="currentChange">
+                                            <i class="bi bi-caret-up-fill"></i>
+                                            +2.45% ($1,042.18)
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-body" style="flex: 1; padding: 0;">
+                                <div id="tradingChart"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Trade Sidebar -->
+                    <div class="trade-sidebar">
+                        <!-- Trade Panel -->
+                        <div class="trade-panel">
+                            <!-- Вкладки режима торговли -->
+                            <div class="trade-mode-tabs">
+                                <button class="trade-mode-tab active" data-mode="normal">
+                                    <i class="bi bi-graph-up"></i>
+                                    Обычная торговля
+                                </button>
+                                <button class="trade-mode-tab" data-mode="quick">
+                                    <i class="bi bi-lightning-charge"></i>
+                                    Быстрая торговля
+                                </button>
+                            </div>
+                            
+                            <!-- Обычная торговля -->
+                            <div id="normalTradeMode" class="trade-mode-content">
+                                <div class="trade-tabs">
+                                    <button class="trade-tab buy active" data-side="buy">Купить</button>
+                                    <button class="trade-tab sell" data-side="sell">Продать</button>
+                                </div>
+                                
+                                <form class="trade-form" id="tradeForm">
+                                <div class="tabs" style="margin-bottom: 16px;">
+                                    <button type="button" class="tab active" data-type="market">Рыночный</button>
+                                    <button type="button" class="tab" data-type="limit">Лимитный</button>
+                                </div>
+                                
+                                <div class="trade-input-group" id="limitPriceGroup" style="display: none;">
+                                    <label>Цена</label>
+                                    <input type="number" class="trade-input" id="limitPrice" placeholder="0.00" step="0.01">
+                                    <span class="trade-input-suffix">USD</span>
+                                </div>
+                                
+                                <div class="trade-input-group">
+                                    <label>Количество</label>
+                                    <input type="number" class="trade-input" id="quantity" placeholder="0.00" step="0.0001" required>
+                                    <span class="trade-input-suffix" id="quantitySuffix">BTC</span>
+                                </div>
+                                
+                                <div class="trade-percent-buttons">
+                                    <button type="button" class="trade-percent-btn" data-percent="25">25%</button>
+                                    <button type="button" class="trade-percent-btn" data-percent="50">50%</button>
+                                    <button type="button" class="trade-percent-btn" data-percent="75">75%</button>
+                                    <button type="button" class="trade-percent-btn" data-percent="100">100%</button>
+                                </div>
+                                
+                                <div class="trade-summary">
+                                    <div class="trade-summary-row">
+                                        <span class="trade-summary-label">Доступно</span>
+                                        <span class="trade-summary-value" id="availableBalance">$10,000.00</span>
+                                    </div>
+                                    <div class="trade-summary-row">
+                                        <span class="trade-summary-label">Цена</span>
+                                        <span class="trade-summary-value" id="tradePrice">$43,250.00</span>
+                                    </div>
+                                    <div class="trade-summary-row">
+                                        <span class="trade-summary-label">Комиссия (0.1%)</span>
+                                        <span class="trade-summary-value" id="tradeFee">$0.00</span>
+                                    </div>
+                                    <div class="trade-summary-row" style="font-weight: 600;">
+                                        <span class="trade-summary-label">Итого</span>
+                                        <span class="trade-summary-value" id="tradeTotal">$0.00</span>
+                                    </div>
+                                </div>
+                                
+                                <button type="submit" class="btn btn-buy btn-block btn-lg" id="submitTradeBtn">
+                                    <i class="bi bi-cart-plus"></i>
+                                    Купить BTC
+                                </button>
+                            </form>
+                            </div>
+                            
+                            <!-- Быстрая торговля -->
+                            <div id="quickTradeMode" class="trade-mode-content" style="display: none;">
+                                <div class="trade-tabs">
+                                    <button class="trade-tab buy active" data-side="buy">Купить</button>
+                                    <button class="trade-tab sell" data-side="sell">Продать</button>
+                                </div>
+                                
+                                <form class="trade-form" id="quickTradeForm">
+                                    <div class="tabs" style="margin-bottom: 16px;">
+                                        <button type="button" class="tab active" data-type="market">Рыночный</button>
+                                        <button type="button" class="tab" data-type="limit">Лимитный</button>
+                                    </div>
+                                    
+                                    <div class="trade-input-group" id="quickLimitPriceGroup" style="display: none;">
+                                        <label>Цена</label>
+                                        <input type="number" class="trade-input" id="quickLimitPrice" placeholder="0.00" step="0.01">
+                                        <span class="trade-input-suffix">USD</span>
+                                    </div>
+                                    
+                                    <div class="trade-input-group">
+                                        <label>Количество</label>
+                                        <input type="number" class="trade-input" id="quickQuantity" placeholder="0.00" step="0.0001" required>
+                                        <span class="trade-input-suffix" id="quickQuantitySuffix">BTC</span>
+                                    </div>
+                                    
+                                    <div class="trade-percent-buttons">
+                                        <button type="button" class="trade-percent-btn" data-percent="25">25%</button>
+                                        <button type="button" class="trade-percent-btn" data-percent="50">50%</button>
+                                        <button type="button" class="trade-percent-btn" data-percent="75">75%</button>
+                                        <button type="button" class="trade-percent-btn" data-percent="100">100%</button>
+                                    </div>
+                                    
+                                    <div id="quickTradeFields" style="margin-top: 16px; padding: 16px; background: var(--bg-secondary); border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                                        <div class="trade-input-group">
+                                            <label>Время сделки</label>
+                                            <div class="trade-time-buttons">
+                                                <button type="button" class="trade-time-btn" data-time="1m" data-profit="2">1 мин (+2%)</button>
+                                                <button type="button" class="trade-time-btn" data-time="5m" data-profit="6">5 мин (+6%)</button>
+                                                <button type="button" class="trade-time-btn" data-time="15m" data-profit="10">15 мин (+10%)</button>
+                                                <button type="button" class="trade-time-btn" data-time="30m" data-profit="12">30 мин (+12%)</button>
+                                                <button type="button" class="trade-time-btn" data-time="1h" data-profit="15">1 час (+15%)</button>
+                                                <button type="button" class="trade-time-btn" data-time="4h" data-profit="18">4 часа (+18%)</button>
+                                            </div>
+                                            <small style="color: var(--text-tertiary); font-size: 0.75rem; margin-top: 8px; display: block;" id="quickTimeInfo">Выберите время сделки для автоматического расчета прибыли</small>
+                                        </div>
+                                        
+                                        <div class="trade-input-group" style="margin-top: 16px;">
+                                            <label>Take Profit (Тейк Профит)</label>
+                                            <input type="number" class="trade-input" id="quickTakeProfit" placeholder="0.00" step="0.01">
+                                            <span class="trade-input-suffix">USD</span>
+                                            <small style="color: var(--text-tertiary); font-size: 0.75rem; margin-top: 4px; display: block;" id="quickTpInfo"></small>
+                                            <small style="color: var(--success-text); font-size: 0.8125rem; margin-top: 4px; display: block; font-weight: 500;" id="quickProfitDisplay"></small>
+                                        </div>
+                                        
+                                        <div class="trade-input-group" style="margin-top: 12px;">
+                                            <label>Stop Loss (Стоп Лосс)</label>
+                                            <input type="number" class="trade-input" id="quickStopLoss" placeholder="0.00" step="0.01">
+                                            <span class="trade-input-suffix">USD</span>
+                                            <small style="color: var(--text-tertiary); font-size: 0.75rem; margin-top: 4px; display: block;" id="quickSlInfo"></small>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="trade-summary">
+                                        <div class="trade-summary-row">
+                                            <span class="trade-summary-label">Доступно</span>
+                                            <span class="trade-summary-value" id="quickAvailableBalance">$10,000.00</span>
+                                        </div>
+                                        <div class="trade-summary-row">
+                                            <span class="trade-summary-label">Цена</span>
+                                            <span class="trade-summary-value" id="quickTradePrice">$43,250.00</span>
+                                        </div>
+                                        <div class="trade-summary-row">
+                                            <span class="trade-summary-label">Комиссия (0.1%)</span>
+                                            <span class="trade-summary-value" id="quickTradeFee">$0.00</span>
+                                        </div>
+                                        <div class="trade-summary-row" style="font-weight: 600;">
+                                            <span class="trade-summary-label">Итого</span>
+                                            <span class="trade-summary-value" id="quickTradeTotal">$0.00</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <button type="submit" class="btn btn-buy btn-block btn-lg" id="submitQuickTradeBtn">
+                                        <i class="bi bi-lightning-charge"></i>
+                                        Купить BTC
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                        
+                        <!-- Asset List -->
+                        <div class="card">
+                            <div class="card-header" style="padding: 12px 16px;">
+                                <div class="search-wrapper" style="width: 100%;">
+                                    <i class="bi bi-search"></i>
+                                    <input type="text" class="search-input" placeholder="Поиск актива..." id="assetSearch">
+                                </div>
+                            </div>
+                            <div class="asset-list-panel" id="assetList">
+                                <!-- Заполняется через JS -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <script src="js/app.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/charts.js"></script>
+    <script src="js/trading.js"></script>
+    <script>
+        // Инициализация торговой страницы
+        document.addEventListener('DOMContentLoaded', async () => {
+            Auth.updateUI();
+            
+            // Получение параметров из URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const symbol = urlParams.get('symbol') || 'BTC';
+            const mode = urlParams.get('mode') || 'normal'; // По умолчанию обычная торговля
+            
+            // Переключаем режим торговли на основе URL параметра
+            switchTradeMode(mode);
+            
+            // Обновляем активную ссылку в навигации
+            updateNavActiveState(mode);
+            
+            // Инициализация графика
+            await initChart();
+            
+            // Загрузка списка активов
+            await loadAssetList();
+            
+            // Сразу загружаем данные для графика
+            await loadChartData(symbol, currentInterval || '5m');
+            
+            // Выбор актива (обновит UI)
+            await selectAsset(symbol);
+            
+            // Обработчики вкладок режима торговли
+            document.querySelectorAll('.trade-mode-tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    const newMode = tab.dataset.mode;
+                    switchTradeMode(newMode);
+                    // Обновляем URL без перезагрузки страницы
+                    const newUrl = new URL(window.location);
+                    newUrl.searchParams.set('mode', newMode);
+                    window.history.pushState({}, '', newUrl);
+                    updateNavActiveState(newMode);
+                });
+            });
+            
+            // Функция переключения режима торговли
+            function switchTradeMode(mode) {
+                // Обновляем активную вкладку
+                document.querySelectorAll('.trade-mode-tab').forEach(t => {
+                    t.classList.toggle('active', t.dataset.mode === mode);
+                });
+                
+                // Показываем/скрываем соответствующие формы
+                const normalMode = document.getElementById('normalTradeMode');
+                const quickMode = document.getElementById('quickTradeMode');
+                if (normalMode && quickMode) {
+                    normalMode.style.display = mode === 'normal' ? 'block' : 'none';
+                    quickMode.style.display = mode === 'quick' ? 'block' : 'none';
+                }
+            }
+            
+            // Функция обновления активной ссылки в навигации
+            function updateNavActiveState(mode) {
+                const navNormal = document.getElementById('navNormalTrade');
+                const navQuick = document.getElementById('navQuickTrade');
+                
+                // Убираем active со всех ссылок торговли
+                if (navNormal) navNormal.classList.remove('active');
+                if (navQuick) navQuick.classList.remove('active');
+                
+                // Добавляем active к нужной ссылке
+                if (mode === 'normal' && navNormal) {
+                    navNormal.classList.add('active');
+                } else if (mode === 'quick' && navQuick) {
+                    navQuick.classList.add('active');
+                }
+            }
+            
+            // Обработчики табов торговли (Купить/Продать) для обеих форм
+            document.querySelectorAll('.trade-tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    // Находим родительскую секцию
+                    const parentSection = tab.closest('.trade-mode-content');
+                    // Обновляем только табы в этой секции
+                    parentSection.querySelectorAll('.trade-tab').forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    updateTradeUI(tab.dataset.side, parentSection);
+                    
+                    // Если это быстрая торговля и выбрано время, пересчитываем TP
+                    if (parentSection?.id === 'quickTradeMode') {
+                        const activeTimeBtn = document.querySelector('.trade-time-btn.active');
+                        if (activeTimeBtn && profitTable) {
+                            const profitPercent = profitTable[activeTimeBtn.dataset.time];
+                            if (profitPercent) {
+                                calculateTakeProfitFromTime(profitPercent);
+                            }
+                        }
+                    }
+                });
+            });
+            
+            // Обработчики типа ордера для обычной торговли
+            document.querySelectorAll('#tradeForm .tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    document.querySelectorAll('#tradeForm .tab').forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    document.getElementById('limitPriceGroup').style.display = 
+                        tab.dataset.type === 'limit' ? 'block' : 'none';
+                });
+            });
+            
+            // Обработчики типа ордера для быстрой торговли
+            document.querySelectorAll('#quickTradeForm .tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    document.querySelectorAll('#quickTradeForm .tab').forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    document.getElementById('quickLimitPriceGroup').style.display = 
+                        tab.dataset.type === 'limit' ? 'block' : 'none';
+                });
+            });
+            
+            // Обработчики процентных кнопок
+            document.querySelectorAll('.trade-percent-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const percent = parseInt(btn.dataset.percent) / 100;
+                    calculateQuantityByPercent(percent);
+                });
+            });
+            
+            // Обработчик изменения количества для обычной торговли
+            document.getElementById('quantity').addEventListener('input', updateTradeSummary);
+            document.getElementById('limitPrice')?.addEventListener('input', updateTradeSummary);
+            
+            // Обработчик изменения количества для быстрой торговли
+            document.getElementById('quickQuantity')?.addEventListener('input', () => {
+                if (typeof updateQuickTradeSummary === 'function') updateQuickTradeSummary();
+                if (typeof updateQuickTPSLInfo === 'function') updateQuickTPSLInfo();
+            });
+            document.getElementById('quickLimitPrice')?.addEventListener('input', () => {
+                if (typeof updateQuickTradeSummary === 'function') updateQuickTradeSummary();
+                if (typeof updateQuickTPSLInfo === 'function') updateQuickTPSLInfo();
+            });
+            
+            // Обработчики таймфреймов
+            document.querySelectorAll('.chart-timeframe').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.chart-timeframe').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    updateChartInterval(btn.dataset.interval);
+                });
+            });
+            
+            // Поиск активов
+            document.getElementById('assetSearch').addEventListener('input', (e) => {
+                filterAssetList(e.target.value);
+            });
+            
+            // Таблица процентов прибыли по времени сделки
+            const profitTable = {
+                '1m': 2,   // 1 минута → 2%
+                '5m': 6,   // 5 минут → 6%
+                '15m': 10, // 15 минут → 10%
+                '30m': 12, // 30 минут → 12%
+                '1h': 15,  // 1 час → 15%
+                '4h': 18   // 4 часа → 18%
+            };
+            
+            // Обработчики кнопок выбора времени сделки
+            document.querySelectorAll('.trade-time-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    // Убираем active со всех кнопок времени
+                    document.querySelectorAll('.trade-time-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    
+                    // Получаем процент прибыли
+                    const time = btn.dataset.time;
+                    const profitPercent = profitTable[time];
+                    
+                    // Автоматически рассчитываем Take Profit
+                    calculateTakeProfitFromTime(profitPercent);
+                });
+            });
+            
+            // Функция расчета Take Profit на основе времени сделки
+            function calculateTakeProfitFromTime(profitPercent) {
+                const currentPrice = window.currentAsset?.price || parseFloat(document.getElementById('quickTradePrice')?.textContent.replace(/[$,]/g, '') || document.getElementById('tradePrice')?.textContent.replace(/[$,]/g, ''));
+                const quantity = parseFloat(document.getElementById('quickQuantity')?.value) || 0;
+                const activeTab = document.querySelector('#quickTradeMode .trade-tab.active');
+                const side = activeTab?.dataset.side || 'buy';
+                
+                if (!currentPrice) return;
+                
+                // Рассчитываем Take Profit цену
+                let takeProfitPrice;
+                if (side === 'buy') {
+                    // Для покупки: TP = текущая_цена * (1 + процент_прибыли / 100)
+                    takeProfitPrice = currentPrice * (1 + profitPercent / 100);
+                } else {
+                    // Для продажи: TP = текущая_цена * (1 - процент_прибыли / 100)
+                    takeProfitPrice = currentPrice * (1 - profitPercent / 100);
+                }
+                
+                // Устанавливаем Take Profit
+                const tpInput = document.getElementById('quickTakeProfit');
+                if (tpInput) {
+                    tpInput.value = takeProfitPrice.toFixed(2);
+                }
+                
+                // Автоматически рассчитываем Stop Loss (-3% для buy, +3% для sell)
+                const stopLossPercent = 3; // Фиксированный процент для SL
+                let stopLossPrice;
+                if (side === 'buy') {
+                    // Для покупки: SL = текущая_цена * (1 - 3 / 100) = текущая_цена * 0.97
+                    stopLossPrice = currentPrice * (1 - stopLossPercent / 100);
+                } else {
+                    // Для продажи: SL = текущая_цена * (1 + 3 / 100) = текущая_цена * 1.03
+                    stopLossPrice = currentPrice * (1 + stopLossPercent / 100);
+                }
+                
+                // Устанавливаем Stop Loss
+                const slInput = document.getElementById('quickStopLoss');
+                if (slInput) {
+                    slInput.value = stopLossPrice.toFixed(2);
+                }
+                
+                // Рассчитываем прибыль в валюте
+                const dealAmount = quantity * currentPrice;
+                const profitAmount = dealAmount * (profitPercent / 100);
+                
+                // Отображаем информацию о прибыли
+                updateProfitDisplay(profitPercent, profitAmount, quantity);
+                
+                // Обновляем информацию о TP/SL
+                if (typeof updateQuickTPSLInfo === 'function') {
+                    updateQuickTPSLInfo();
+                }
+            }
+            
+            // Функция обновления отображения прибыли
+            function updateProfitDisplay(profitPercent, profitAmount, quantity) {
+                const profitDisplay = document.getElementById('quickProfitDisplay');
+                if (profitDisplay && quantity > 0) {
+                    profitDisplay.textContent = `Ожидаемая прибыль: ${profitAmount.toFixed(2)} USD (${profitPercent}% от суммы сделки)`;
+                    profitDisplay.classList.add('show');
+                } else if (profitDisplay) {
+                    profitDisplay.classList.remove('show');
+                }
+            }
+            
+            // Обновление информации о TP/SL для быстрой торговли
+            document.getElementById('quickTakeProfit')?.addEventListener('input', () => {
+                if (typeof updateQuickTPSLInfo === 'function') updateQuickTPSLInfo();
+                // Если TP изменен вручную, проверяем, не нужно ли обновить расчет
+                const tpValue = parseFloat(document.getElementById('quickTakeProfit')?.value);
+                if (tpValue && tpValue > 0) {
+                    // Показываем, что TP установлен вручную
+                    const profitDisplay = document.getElementById('quickProfitDisplay');
+                    if (profitDisplay) {
+                        profitDisplay.classList.remove('show');
+                    }
+                }
+            });
+            document.getElementById('quickStopLoss')?.addEventListener('input', () => {
+                if (typeof updateQuickTPSLInfo === 'function') updateQuickTPSLInfo();
+            });
+            document.getElementById('quickQuantity')?.addEventListener('input', () => {
+                if (typeof updateQuickTPSLInfo === 'function') updateQuickTPSLInfo();
+                // Пересчитываем прибыль при изменении количества
+                const activeTimeBtn = document.querySelector('.trade-time-btn.active');
+                if (activeTimeBtn) {
+                    const profitPercent = profitTable[activeTimeBtn.dataset.time];
+                    if (profitPercent) {
+                        calculateTakeProfitFromTime(profitPercent);
+                    }
+                }
+            });
+            
+            // Обработчики процентных кнопок для обеих форм
+            document.querySelectorAll('.trade-percent-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const percent = parseInt(btn.dataset.percent) / 100;
+                    const parentForm = btn.closest('form');
+                    if (parentForm.id === 'quickTradeForm') {
+                        calculateQuantityByPercent(percent, 'quick');
+                    } else {
+                        calculateQuantityByPercent(percent);
+                    }
+                });
+            });
+            
+            // Отправка ордера для обычной торговли
+            document.getElementById('tradeForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                await submitOrder(false);
+            });
+            
+            // Отправка ордера для быстрой торговли
+            document.getElementById('quickTradeForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                await submitOrder(true);
+            });
+            
+            // Функция обновления информации о TP/SL для быстрой торговли
+            function updateQuickTPSLInfo() {
+                const currentPrice = window.currentAsset?.price || parseFloat(document.getElementById('tradePrice')?.textContent.replace(/[$,]/g, '') || document.getElementById('quickTradePrice')?.textContent.replace(/[$,]/g, ''));
+                const tpInput = document.getElementById('quickTakeProfit');
+                const slInput = document.getElementById('quickStopLoss');
+                const tpInfo = document.getElementById('quickTpInfo');
+                const slInfo = document.getElementById('quickSlInfo');
+                
+                if (tpInput && slInput && tpInfo && slInfo && currentPrice) {
+                    const tp = parseFloat(tpInput.value);
+                    const sl = parseFloat(slInput.value);
+                    const tradeSide = document.querySelector('#quickTradeMode .trade-tab.active')?.dataset.side || 'buy';
+                    
+                    if (tp) {
+                        const diff = tp - currentPrice;
+                        const percent = (diff / currentPrice) * 100;
+                        if (tradeSide === 'buy') {
+                            tpInfo.textContent = percent > 0 ? `+${percent.toFixed(2)}% выше текущей цены` : `${percent.toFixed(2)}% ниже текущей цены`;
+                            tpInfo.style.color = percent > 0 ? 'var(--success-text)' : 'var(--danger-text)';
+                        } else {
+                            tpInfo.textContent = percent < 0 ? `${Math.abs(percent).toFixed(2)}% ниже текущей цены` : `+${percent.toFixed(2)}% выше текущей цены`;
+                            tpInfo.style.color = percent < 0 ? 'var(--success-text)' : 'var(--danger-text)';
+                        }
+                    } else {
+                        tpInfo.textContent = '';
+                    }
+                    
+                    if (sl) {
+                        const diff = sl - currentPrice;
+                        const percent = (diff / currentPrice) * 100;
+                        if (tradeSide === 'buy') {
+                            slInfo.textContent = percent < 0 ? `${Math.abs(percent).toFixed(2)}% ниже текущей цены` : `+${percent.toFixed(2)}% выше текущей цены`;
+                            slInfo.style.color = percent < 0 ? 'var(--success-text)' : 'var(--danger-text)';
+                        } else {
+                            slInfo.textContent = percent > 0 ? `+${percent.toFixed(2)}% выше текущей цены` : `${percent.toFixed(2)}% ниже текущей цены`;
+                            slInfo.style.color = percent > 0 ? 'var(--success-text)' : 'var(--danger-text)';
+                        }
+                    } else {
+                        slInfo.textContent = '';
+                    }
+                }
+            }
+            
+            // Периодическая проверка TP/SL (каждые 5 секунд)
+            if (Auth.isAuthenticated()) {
+                setInterval(async () => {
+                    try {
+                        const result = await TradingAPI.checkTPSL();
+                        if (result.success && result.closed_orders && result.closed_orders.length > 0) {
+                            result.closed_orders.forEach(order => {
+                                NovaTrade.showToast(
+                                    `Позиция закрыта (${order.reason})`,
+                                    `${order.symbol}: ${order.quantity} по ${order.price.toFixed(2)}`,
+                                    'info'
+                                );
+                            });
+                            // Обновляем балансы после закрытия позиций
+                            await loadUserBalances();
+                        }
+                    } catch (error) {
+                        console.error('Error checking TP/SL:', error);
+                    }
+                }, 5000); // Каждые 5 секунд
+            }
+        });
+    </script>
+</body>
+</html>

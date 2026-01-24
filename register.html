@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Регистрация — ADX Finance</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .auth-background {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            background: 
+                radial-gradient(ellipse at 20% 20%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 80%, rgba(139, 92, 246, 0.1) 0%, transparent 50%),
+                var(--bg-primary);
+        }
+        
+        .auth-background::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%236366f1' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+        }
+        
+        .password-toggle {
+            position: absolute;
+            right: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 4px;
+            font-size: 1.125rem;
+        }
+        
+        .password-toggle:hover {
+            color: var(--text-secondary);
+        }
+        
+        .form-input-password {
+            padding-right: 48px;
+        }
+        
+        .password-strength {
+            margin-top: 8px;
+            display: flex;
+            gap: 4px;
+        }
+        
+        .strength-bar {
+            height: 4px;
+            flex: 1;
+            border-radius: 2px;
+            background: var(--bg-tertiary);
+            transition: all 0.3s ease;
+        }
+        
+        .strength-bar.active.weak { background: var(--danger); }
+        .strength-bar.active.medium { background: var(--warning); }
+        .strength-bar.active.strong { background: var(--success); }
+        
+        .strength-text {
+            font-size: 0.75rem;
+            margin-top: 4px;
+            color: var(--text-tertiary);
+        }
+        
+        .name-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        
+        @media (max-width: 480px) {
+            .name-row {
+                grid-template-columns: 1fr;
+            }
+            
+            .auth-page {
+                padding: 12px;
+            }
+            
+            .auth-card {
+                padding: 24px 16px;
+            }
+            
+            .auth-title {
+                font-size: 1.25rem;
+            }
+            
+            .auth-subtitle {
+                font-size: 0.875rem;
+            }
+            
+            .bonus-banner {
+                flex-direction: column;
+                text-align: center;
+                padding: 16px;
+            }
+            
+            .bonus-banner i {
+                font-size: 1.5rem;
+            }
+            
+            .social-buttons {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .auth-page {
+                padding: 16px;
+            }
+            
+            .auth-container {
+                max-width: 100% !important;
+            }
+            
+            .auth-card {
+                padding: 32px 24px;
+            }
+            
+            .auth-title {
+                font-size: 1.5rem;
+            }
+            
+            .auth-subtitle {
+                font-size: 0.875rem;
+            }
+            
+            .bonus-banner {
+                padding: 16px;
+            }
+        }
+        
+        .bonus-banner {
+            background: var(--gradient-primary);
+            border-radius: var(--radius-md);
+            padding: 16px 20px;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            color: white;
+        }
+        
+        .bonus-banner i {
+            font-size: 2rem;
+        }
+        
+        .bonus-text {
+            font-size: 0.9375rem;
+        }
+        
+        .bonus-text strong {
+            display: block;
+            font-size: 1.125rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="auth-background"></div>
+    
+    <div class="auth-page">
+        <div class="auth-container" style="max-width: 480px;">
+            <div class="auth-card">
+                <div class="auth-header">
+                    <a href="index.html" class="auth-logo">
+                        <div class="logo-icon">
+                            <i class="bi bi-lightning-charge-fill"></i>
+                        </div>
+                        <span style="font-size: 1.5rem; font-weight: 700;">ADX Finance</span>
+                    </a>
+                    <h1 class="auth-title">Создать аккаунт</h1>
+                    <p class="auth-subtitle">Начните торговать за несколько минут</p>
+                </div>
+                
+                <form id="registerForm" class="auth-form">
+                    <div class="name-row">
+                        <div class="form-group">
+                            <label class="form-label" for="firstName">Имя</label>
+                            <input 
+                                type="text" 
+                                id="firstName" 
+                                name="firstName" 
+                                class="form-input" 
+                                placeholder="Иван"
+                                required
+                                autocomplete="given-name"
+                            >
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label" for="lastName">Фамилия</label>
+                            <input 
+                                type="text" 
+                                id="lastName" 
+                                name="lastName" 
+                                class="form-input" 
+                                placeholder="Иванов"
+                                required
+                                autocomplete="family-name"
+                            >
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="email">Email</label>
+                        <div class="form-input-icon">
+                            <i class="bi bi-envelope"></i>
+                            <input 
+                                type="email" 
+                                id="email" 
+                                name="email" 
+                                class="form-input" 
+                                placeholder="your@email.com"
+                                required
+                                autocomplete="email"
+                            >
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="password">Пароль</label>
+                        <div class="form-input-icon">
+                            <i class="bi bi-lock"></i>
+                            <input 
+                                type="password" 
+                                id="password" 
+                                name="password" 
+                                class="form-input form-input-password" 
+                                placeholder="Минимум 8 символов"
+                                required
+                                minlength="8"
+                                autocomplete="new-password"
+                            >
+                            <button type="button" class="password-toggle" onclick="togglePassword('password')">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </div>
+                        <div class="password-strength">
+                            <div class="strength-bar" id="str1"></div>
+                            <div class="strength-bar" id="str2"></div>
+                            <div class="strength-bar" id="str3"></div>
+                            <div class="strength-bar" id="str4"></div>
+                        </div>
+                        <div class="strength-text" id="strengthText"></div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="confirmPassword">Подтвердите пароль</label>
+                        <div class="form-input-icon">
+                            <i class="bi bi-lock-fill"></i>
+                            <input 
+                                type="password" 
+                                id="confirmPassword" 
+                                name="confirmPassword" 
+                                class="form-input form-input-password" 
+                                placeholder="Повторите пароль"
+                                required
+                                autocomplete="new-password"
+                            >
+                            <button type="button" class="password-toggle" onclick="togglePassword('confirmPassword')">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-check">
+                            <input type="checkbox" class="form-check-input" name="terms" required>
+                            <span>Я согласен с <a href="#">Условиями использования</a> и <a href="#">Политикой конфиденциальности</a></span>
+                        </label>
+                    </div>
+                    
+                    <div id="formError" class="alert alert-danger hidden">
+                        <i class="bi bi-exclamation-circle"></i>
+                        <span id="errorMessage"></span>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary btn-block btn-lg">
+                        <span>Создать аккаунт</span>
+                        <i class="bi bi-arrow-right"></i>
+                    </button>
+                </form>
+                
+                <div class="auth-divider">
+                    <span>или</span>
+                </div>
+                
+                <div class="social-buttons">
+                    <button class="social-btn">
+                        <i class="bi bi-google"></i>
+                        Google
+                    </button>
+                    <button class="social-btn">
+                        <i class="bi bi-github"></i>
+                        GitHub
+                    </button>
+                </div>
+                
+                <p class="auth-footer">
+                    Уже есть аккаунт? <a href="login.html">Войти</a>
+                </p>
+            </div>
+            
+            <div style="text-align: center; margin-top: 24px;">
+                <button class="theme-toggle" onclick="toggleTheme()" title="Переключить тему">
+                    <i class="bi bi-moon-stars"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="js/app.js"></script>
+    <script src="js/auth.js"></script>
+    <script>
+        function togglePassword(inputId) {
+            const input = document.getElementById(inputId);
+            const icon = input.parentElement.querySelector('.password-toggle i');
+            
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.replace('bi-eye', 'bi-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.replace('bi-eye-slash', 'bi-eye');
+            }
+        }
+        
+        // Password strength indicator
+        document.getElementById('password').addEventListener('input', function(e) {
+            const password = e.target.value;
+            const bars = [
+                document.getElementById('str1'),
+                document.getElementById('str2'),
+                document.getElementById('str3'),
+                document.getElementById('str4')
+            ];
+            const strengthText = document.getElementById('strengthText');
+            
+            let strength = 0;
+            let strengthClass = '';
+            let text = '';
+            
+            if (password.length >= 8) strength++;
+            if (password.match(/[a-z]/) && password.match(/[A-Z]/)) strength++;
+            if (password.match(/\d/)) strength++;
+            if (password.match(/[^a-zA-Z\d]/)) strength++;
+            
+            bars.forEach((bar, index) => {
+                bar.classList.remove('active', 'weak', 'medium', 'strong');
+            });
+            
+            if (strength === 0) {
+                text = '';
+            } else if (strength <= 1) {
+                strengthClass = 'weak';
+                text = 'Слабый пароль';
+            } else if (strength <= 2) {
+                strengthClass = 'medium';
+                text = 'Средний пароль';
+            } else if (strength <= 3) {
+                strengthClass = 'medium';
+                text = 'Хороший пароль';
+            } else {
+                strengthClass = 'strong';
+                text = 'Отличный пароль!';
+            }
+            
+            for (let i = 0; i < strength; i++) {
+                bars[i].classList.add('active', strengthClass);
+            }
+            
+            strengthText.textContent = text;
+            strengthText.style.color = strengthClass === 'weak' ? 'var(--danger)' : 
+                                        strengthClass === 'medium' ? 'var(--warning)' : 
+                                        strengthClass === 'strong' ? 'var(--success)' : '';
+        });
+        
+        document.getElementById('registerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formError = document.getElementById('formError');
+            const errorMessage = document.getElementById('errorMessage');
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            
+            if (password !== confirmPassword) {
+                formError.classList.remove('hidden');
+                errorMessage.textContent = 'Пароли не совпадают';
+                return;
+            }
+            
+            formError.classList.add('hidden');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner" style="width:20px;height:20px;border-width:2px;"></span>';
+            
+            const formData = new FormData(e.target);
+            
+            try {
+                const result = await Auth.register({
+                    firstName: formData.get('firstName'),
+                    lastName: formData.get('lastName'),
+                    email: formData.get('email'),
+                    password: formData.get('password')
+                });
+                
+                if (result.success) {
+                    window.location.href = 'index.html';
+                } else {
+                    formError.classList.remove('hidden');
+                    errorMessage.textContent = result.error || 'Ошибка регистрации. Попробуйте снова.';
+                }
+            } catch (error) {
+                formError.classList.remove('hidden');
+                errorMessage.textContent = 'Ошибка сервера. Попробуйте позже.';
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<span>Создать аккаунт</span><i class="bi bi-arrow-right"></i>';
+            }
+        });
+    </script>
+</body>
+</html>

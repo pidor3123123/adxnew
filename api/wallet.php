@@ -1,0 +1,307 @@
+<?php
+/**
+ * ADX Finance - API кошелька
+ */
+
+require_once __DIR__ . '/../config/database.php';
+
+header('Content-Type: application/json');
+setCorsHeaders();
+header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
+
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit;
+}
+
+require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../config/supabase.php';
+require_once __DIR__ . '/auth.php';
+
+// Получение рыночных цен для конвертации в USD
+function getUsdPrices(): array {
+    return [
+        'USD' => 1.0,
+        'BTC' => 43250.00,
+        'ETH' => 2285.50,
+        'BNB' => 312.40,
+        'XRP' => 0.62,
+        'SOL' => 98.75,
+        'ADA' => 0.58,
+        'DOGE' => 0.082,
+        'DOT' => 7.85,
+        'MATIC' => 0.92,
+        'LTC' => 72.30,
+    ];
+}
+
+$method = $_SERVER['REQUEST_METHOD'];
+$action = $_GET['action'] ?? '';
+
+try {
+    $user = getAuthUser();
+    
+    switch ($action) {
+        case 'balances':
+            if (!$user) {
+                throw new Exception('Unauthorized', 401);
+            }
+            
+            $db = getDB();
+            $stmt = $db->prepare('
+                SELECT currency, available, reserved 
+                FROM balances 
+                WHERE user_id = ?
+                ORDER BY 
+                    CASE currency 
+                        WHEN "USD" THEN 0 
+                        WHEN "BTC" THEN 1 
+                        WHEN "ETH" THEN 2 
+                        ELSE 3 
+                    END,
+                    currency
+            ');
+            $stmt->execute([$user['id']]);
+            $balances = $stmt->fetchAll();
+            
+            // Добавляем USD эквивалент
+            $prices = getUsdPrices();
+            $totalUsd = 0;
+            
+            foreach ($balances as &$balance) {
+                $price = $prices[$balance['currency']] ?? 0;
+                $balance['usd_value'] = (float)$balance['available'] * $price;
+                $totalUsd += $balance['usd_value'];
+            }
+            
+            echo json_encode([
+                'success' => true,
+                'balances' => $balances,
+                'total_usd' => $totalUsd
+            ]);
+            break;
+            
+        case 'deposit':
+            if ($method !== 'POST') {
+                throw new Exception('Method not allowed', 405);
+            }
+            
+            if (!$user) {
+                throw new Exception('Unauthorized', 401);
+            }
+            
+            $data = json_decode(file_get_contents('php://input'), true);
+            
+            $currency = strtoupper(trim($data['currency'] ?? ''));
+            $amount = (float)($data['amount'] ?? 0);
+            
+            if (!$currency) {
+                throw new Exception('Currency required', 400);
+            }
+            
+            if ($amount <= 0) {
+                throw new Exception('Invalid amount', 400);
+            }
+            
+            $db = getDB();
+            $db->beginTransaction();
+            
+            try {
+                // Проверяем/создаём баланс
+                $stmt = $db->prepare('SELECT id, available FROM balances WHERE user_id = ? AND currency = ?');
+                $stmt->execute([$user['id'], $currency]);
+                $balance = $stmt->fetch();
+                
+                if ($balance) {
+                    $stmt = $db->prepare('UPDATE balances SET available = available + ? WHERE id = ?');
+                    $stmt->execute([$amount, $balance['id']]);
+                } else {
+                    $stmt = $db->prepare('INSERT INTO balances (user_id, currency, available) VALUES (?, ?, ?)');
+                    $stmt->execute([$user['id'], $currency, $amount]);
+                }
+                
+                // Создаём транзакцию
+                $stmt = $db->prepare('
+                    INSERT INTO transactions (user_id, type, currency, amount, status, description, completed_at)
+                    VALUES (?, "deposit", ?, ?, "completed", ?, NOW())
+                ');
+                $stmt->execute([
+                    $user['id'],
+                    $currency,
+                    $amount,
+                    "Пополнение {$amount} {$currency}"
+                ]);
+                
+                $db->commit();
+                
+                // Синхронизация баланса с Supabase (в фоне)
+                try {
+                    $syncData = [
+                        'user_id' => $user['id'],
+                        'currency' => $currency
+                    ];
+                    
+                    $ch = curl_init('http' . (isset($_SERVER['HTTPS']) ? 's' : '') . '://' . $_SERVER['HTTP_HOST'] . '/api/sync.php?action=balance');
+                    curl_setopt_array($ch, [
+                        CURLOPT_POST => true,
+                        CURLOPT_POSTFIELDS => json_encode($syncData),
+                        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                        CURLOPT_RETURNTRANSFER => false,
+                        CURLOPT_TIMEOUT => 1,
+                        CURLOPT_NOSIGNAL => 1,
+                    ]);
+                    curl_exec($ch);
+                    curl_close($ch);
+                } catch (Exception $e) {
+                    error_log('Supabase balance sync error: ' . $e->getMessage());
+                }
+                
+                echo json_encode([
+                    'success' => true,
+                    'message' => 'Deposit successful'
+                ]);
+                
+            } catch (Exception $e) {
+                $db->rollBack();
+                throw $e;
+            }
+            break;
+            
+        case 'withdraw':
+            if ($method !== 'POST') {
+                throw new Exception('Method not allowed', 405);
+            }
+            
+            if (!$user) {
+                throw new Exception('Unauthorized', 401);
+            }
+            
+            $data = json_decode(file_get_contents('php://input'), true);
+            
+            $currency = strtoupper(trim($data['currency'] ?? ''));
+            $amount = (float)($data['amount'] ?? 0);
+            $address = trim($data['address'] ?? '');
+            
+            if (!$currency) {
+                throw new Exception('Currency required', 400);
+            }
+            
+            if ($amount <= 0) {
+                throw new Exception('Invalid amount', 400);
+            }
+            
+            $db = getDB();
+            
+            // Проверяем баланс
+            $stmt = $db->prepare('SELECT available FROM balances WHERE user_id = ? AND currency = ?');
+            $stmt->execute([$user['id'], $currency]);
+            $balance = $stmt->fetch();
+            
+            if (!$balance || (float)$balance['available'] < $amount) {
+                throw new Exception('Insufficient balance', 400);
+            }
+            
+            $db->beginTransaction();
+            
+            try {
+                // Списываем средства
+                $stmt = $db->prepare('UPDATE balances SET available = available - ? WHERE user_id = ? AND currency = ?');
+                $stmt->execute([$amount, $user['id'], $currency]);
+                
+                // Создаём транзакцию
+                $stmt = $db->prepare('
+                    INSERT INTO transactions (user_id, type, currency, amount, status, description)
+                    VALUES (?, "withdrawal", ?, ?, "pending", ?)
+                ');
+                $stmt->execute([
+                    $user['id'],
+                    $currency,
+                    -$amount,
+                    "Вывод {$amount} {$currency}" . ($address ? " на {$address}" : '')
+                ]);
+                
+                $db->commit();
+                
+                // Синхронизация баланса с Supabase (в фоне)
+                try {
+                    $syncData = [
+                        'user_id' => $user['id'],
+                        'currency' => $currency
+                    ];
+                    
+                    $ch = curl_init('http' . (isset($_SERVER['HTTPS']) ? 's' : '') . '://' . $_SERVER['HTTP_HOST'] . '/api/sync.php?action=balance');
+                    curl_setopt_array($ch, [
+                        CURLOPT_POST => true,
+                        CURLOPT_POSTFIELDS => json_encode($syncData),
+                        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                        CURLOPT_RETURNTRANSFER => false,
+                        CURLOPT_TIMEOUT => 1,
+                        CURLOPT_NOSIGNAL => 1,
+                    ]);
+                    curl_exec($ch);
+                    curl_close($ch);
+                } catch (Exception $e) {
+                    error_log('Supabase balance sync error: ' . $e->getMessage());
+                }
+                
+                echo json_encode([
+                    'success' => true,
+                    'message' => 'Withdrawal request submitted'
+                ]);
+                
+            } catch (Exception $e) {
+                $db->rollBack();
+                throw $e;
+            }
+            break;
+            
+        case 'transactions':
+            if (!$user) {
+                throw new Exception('Unauthorized', 401);
+            }
+            
+            $limit = min((int)($_GET['limit'] ?? 50), 100);
+            $type = $_GET['type'] ?? null;
+            
+            $db = getDB();
+            
+            $sql = 'SELECT * FROM transactions WHERE user_id = ?';
+            $params = [$user['id']];
+            
+            if ($type && in_array($type, ['deposit', 'withdrawal', 'trade', 'fee'])) {
+                $sql .= ' AND type = ?';
+                $params[] = $type;
+            }
+            
+            $sql .= ' ORDER BY created_at DESC LIMIT ?';
+            $params[] = $limit;
+            
+            $stmt = $db->prepare($sql);
+            $stmt->execute($params);
+            $transactions = $stmt->fetchAll();
+            
+            echo json_encode([
+                'success' => true,
+                'transactions' => $transactions
+            ]);
+            break;
+            
+        default:
+            throw new Exception('Unknown action', 400);
+    }
+    
+} catch (Exception $e) {
+    $code = $e->getCode();
+    // Валидация и приведение к int
+    if (!is_numeric($code) || $code < 100 || $code > 599) {
+        $code = 500;
+    }
+    $code = (int)$code;
+    http_response_code($code);
+    
+    echo json_encode([
+        'success' => false,
+        'error' => $e->getMessage()
+    ]);
+}

@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Кошелёк — ADX Finance</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .wallet-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+        
+        .wallet-total {
+            padding: 32px;
+            background: var(--gradient-primary);
+            border-radius: var(--radius-lg);
+            color: white;
+            margin-bottom: 32px;
+        }
+        
+        .wallet-total-label {
+            font-size: 0.9375rem;
+            opacity: 0.8;
+            margin-bottom: 8px;
+        }
+        
+        .wallet-total-value {
+            font-size: 3rem;
+            font-weight: 700;
+            font-family: var(--font-primary);
+            line-height: 1;
+        }
+        
+        .wallet-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+        }
+        
+        .wallet-grid {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            gap: 24px;
+        }
+        
+        @media (max-width: 1024px) {
+            .wallet-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .wallet-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .currency-card {
+                padding: 16px;
+            }
+            
+            .currency-icon {
+                width: 40px;
+                height: 40px;
+                font-size: 1.125rem;
+            }
+            
+            .transaction-item {
+                padding: 12px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .wallet-header {
+                gap: 12px;
+            }
+            
+            .currency-card {
+                padding: 12px;
+            }
+            
+            .currency-balance {
+                font-size: 1.5rem;
+            }
+            
+            .transaction-item {
+                flex-direction: column;
+                gap: 8px;
+            }
+        }
+        
+        .currency-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+        
+        .currency-icon.btc { background: #f7931a20; color: #f7931a; }
+        .currency-icon.eth { background: #627eea20; color: #627eea; }
+        .currency-icon.usd { background: #22c55e20; color: #22c55e; }
+        .currency-icon.bnb { background: #f3ba2f20; color: #f3ba2f; }
+        .currency-icon.default { background: var(--accent-primary-soft); color: var(--accent-primary); }
+        
+        .transaction-item {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 16px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .transaction-item:last-child {
+            border-bottom: none;
+        }
+        
+        .transaction-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+        }
+        
+        .transaction-icon.deposit {
+            background: var(--success-soft);
+            color: var(--success);
+        }
+        
+        .transaction-icon.withdrawal {
+            background: var(--danger-soft);
+            color: var(--danger);
+        }
+        
+        .transaction-icon.trade {
+            background: var(--accent-primary-soft);
+            color: var(--accent-primary);
+        }
+        
+        .transaction-info {
+            flex: 1;
+        }
+        
+        .transaction-title {
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+        
+        .transaction-date {
+            font-size: 0.8125rem;
+            color: var(--text-tertiary);
+        }
+        
+        .transaction-amount {
+            text-align: right;
+            font-family: var(--font-primary);
+            font-weight: 600;
+        }
+        
+        .transaction-amount.positive { color: var(--success-text); }
+        .transaction-amount.negative { color: var(--danger-text); }
+        
+        .transaction-status {
+            font-size: 0.75rem;
+            color: var(--text-tertiary);
+        }
+        
+        /* Wallet Address Block Styles */
+        .wallet-address-card {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .wallet-address-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        
+        .wallet-address-header .form-label {
+            margin: 0;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        
+        .wallet-address-header i {
+            color: var(--accent-primary);
+            font-size: 1.125rem;
+        }
+        
+        .wallet-address-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+        
+        .wallet-address-value {
+            flex: 1;
+            font-family: var(--font-primary);
+            font-size: 0.875rem;
+            word-break: break-all;
+            background: var(--bg-secondary);
+            padding: 12px 16px;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            line-height: 1.5;
+        }
+        
+        .wallet-address-copy {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 20px;
+            background: var(--accent-primary);
+            color: white;
+            border: none;
+            border-radius: var(--radius-md);
+            font-size: 0.9375rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            white-space: nowrap;
+            min-height: 44px;
+        }
+        
+        .wallet-address-copy:hover {
+            background: var(--accent-primary-hover);
+            transform: translateY(-1px);
+        }
+        
+        .wallet-address-copy:active {
+            transform: translateY(0);
+        }
+        
+        .wallet-address-copy i {
+            font-size: 1rem;
+        }
+        
+        .wallet-address-copy.copied {
+            background: var(--success);
+        }
+        
+        .wallet-address-copy.copied .copy-text::before {
+            content: 'Скопировано!';
+        }
+        
+        .wallet-address-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 12px;
+            background: var(--info-soft);
+            border-radius: var(--radius-sm);
+            margin-bottom: 8px;
+            font-size: 0.875rem;
+            color: var(--info);
+        }
+        
+        .wallet-address-info i {
+            font-size: 1rem;
+        }
+        
+        .wallet-address-info strong {
+            color: var(--text-primary);
+        }
+        
+        .wallet-address-warning {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            padding: 10px 12px;
+            background: var(--warning-soft);
+            border-radius: var(--radius-sm);
+            font-size: 0.8125rem;
+            color: var(--warning);
+            line-height: 1.4;
+        }
+        
+        .wallet-address-warning i {
+            font-size: 0.9375rem;
+            margin-top: 2px;
+            flex-shrink: 0;
+        }
+        
+        /* Mobile адаптация для блока адреса */
+        @media (max-width: 768px) {
+            .wallet-address-card {
+                padding: 16px;
+            }
+            
+            .wallet-address-container {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .wallet-address-value {
+                font-size: 0.8125rem;
+                padding: 10px 12px;
+                word-break: break-all;
+                text-align: center;
+            }
+            
+            .wallet-address-copy {
+                width: 100%;
+                justify-content: center;
+                padding: 14px 20px;
+            }
+            
+            .wallet-address-info,
+            .wallet-address-warning {
+                font-size: 0.8125rem;
+                padding: 8px 10px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .wallet-address-card {
+                padding: 12px;
+            }
+            
+            .wallet-address-value {
+                font-size: 0.75rem;
+                padding: 8px 10px;
+            }
+            
+            .wallet-address-copy {
+                padding: 12px 16px;
+                font-size: 0.875rem;
+            }
+            
+            .wallet-address-copy .copy-text {
+                display: none;
+            }
+            
+            .wallet-address-copy .copy-text::before {
+                content: '';
+            }
+            
+            .wallet-address-copy.copied::after {
+                content: '✓';
+                margin-left: 4px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="page-wrapper">
+        <!-- Header -->
+        <header class="header">
+            <div class="container">
+                <div class="header-inner">
+                    <a href="index.html" class="logo">
+                        <div class="logo-icon">
+                            <i class="bi bi-lightning-charge-fill"></i>
+                        </div>
+                        <span>ADX Finance</span>
+                    </a>
+                    
+                    <nav class="nav-main">
+                        <a href="index.html" class="nav-link">
+                            <i class="bi bi-house"></i>
+                            Главная
+                        </a>
+                        <a href="trade.html?mode=normal" class="nav-link">
+                            <i class="bi bi-graph-up"></i>
+                            Обычная торговля
+                        </a>
+                        <a href="trade.html?mode=quick" class="nav-link">
+                            <i class="bi bi-lightning-charge"></i>
+                            Быстрая торговля
+                        </a>
+                        <a href="wallet.html" class="nav-link active">
+                            <i class="bi bi-wallet2"></i>
+                            Кошелёк
+                        </a>
+                        <a href="portfolio.html" class="nav-link">
+                            <i class="bi bi-pie-chart"></i>
+                            Портфель
+                        </a>
+                        <a href="positions.html" class="nav-link">
+                            <i class="bi bi-list-check"></i>
+                            Позиции
+                        </a>
+                        <a href="history.html" class="nav-link">
+                            <i class="bi bi-clock-history"></i>
+                            История
+                        </a>
+                    </nav>
+                    
+                    <div class="header-actions">
+                        <button class="theme-toggle" onclick="toggleTheme()" title="Переключить тему">
+                            <i class="bi bi-moon-stars"></i>
+                        </button>
+                        
+                        <div class="user-menu" data-auth="true">
+                            <button class="user-menu-trigger">
+                                <div class="user-avatar" data-user-avatar>U</div>
+                                <div class="user-info">
+                                    <div class="user-name" data-user-name>Пользователь</div>
+                                    <div class="user-balance">$<span id="headerBalance">0.00</span></div>
+                                </div>
+                                <i class="bi bi-chevron-down"></i>
+                            </button>
+                            <div class="user-dropdown">
+                                <a href="profile.html" class="dropdown-item">
+                                    <i class="bi bi-person"></i>
+                                    Профиль
+                                </a>
+                                <a href="wallet.html" class="dropdown-item">
+                                    <i class="bi bi-wallet2"></i>
+                                    Кошелёк
+                                </a>
+                                <div class="dropdown-divider"></div>
+                                <a href="#" class="dropdown-item" onclick="Auth.logout(); return false;">
+                                    <i class="bi bi-box-arrow-right"></i>
+                                    Выйти
+                                </a>
+                            </div>
+                        </div>
+                        
+                        <button class="mobile-menu-toggle">
+                            <i class="bi bi-list"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+        
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="container">
+                <div class="wallet-header">
+                    <div>
+                        <h1 style="margin-bottom: 8px;">Кошелёк</h1>
+                        <p style="color: var(--text-secondary);">Управление балансами и транзакциями</p>
+                    </div>
+                </div>
+                
+                <!-- Total Balance -->
+                <div class="wallet-total">
+                    <div class="wallet-total-label">Общий баланс</div>
+                    <div class="wallet-total-value" id="totalBalance">$0.00</div>
+                    <div class="wallet-actions">
+                        <button class="btn btn-success" onclick="showDepositModal()">
+                            <i class="bi bi-plus-circle"></i>
+                            Пополнить
+                        </button>
+                        <button class="btn btn-outline" style="background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); color: white;" onclick="showWithdrawModal()">
+                            <i class="bi bi-dash-circle"></i>
+                            Вывести
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="wallet-grid">
+                    <!-- Balances List -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">
+                                <i class="bi bi-wallet2"></i>
+                                Балансы
+                            </h3>
+                        </div>
+                        <div class="card-body" style="padding: 0;">
+                            <div class="balance-list" id="balanceList">
+                                <!-- Загрузка... -->
+                                <div style="padding: 40px; text-align: center;">
+                                    <div class="spinner"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Recent Transactions -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">
+                                <i class="bi bi-clock-history"></i>
+                                Последние транзакции
+                            </h3>
+                            <a href="history.html" class="btn btn-ghost btn-sm">Все</a>
+                        </div>
+                        <div class="card-body" style="padding: 0 20px;">
+                            <div id="transactionsList">
+                                <!-- Загрузка... -->
+                                <div style="padding: 40px; text-align: center;">
+                                    <div class="spinner"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <!-- Deposit Modal -->
+    <div class="modal-overlay" id="depositModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">Пополнение баланса</h3>
+                <button class="modal-close" onclick="closeModal('depositModal')">
+                    <i class="bi bi-x"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="depositForm">
+                    <div class="form-group">
+                        <label class="form-label">Валюта</label>
+                        <select class="form-input form-select" name="currency" id="depositCurrency" required onchange="updateDepositAddress()">
+                            <option value="USD">USD - Доллар США</option>
+                            <option value="BTC">BTC - Bitcoin</option>
+                            <option value="ETH">ETH - Ethereum</option>
+                            <option value="USDT">USDT - TRC20</option>
+                            <option value="USDC">USDC - TRC20</option>
+                            <option value="LTC">LTC - Litecoin</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Блок с адресом кошелька (показывается для криптовалют) -->
+                    <div id="walletAddressBlock" style="display: none;">
+                        <div class="wallet-address-card">
+                            <div class="wallet-address-header">
+                                <label class="form-label">
+                                    <i class="bi bi-wallet2"></i>
+                                    Адрес кошелька для пополнения
+                                </label>
+                            </div>
+                            <div class="wallet-address-container">
+                                <div class="wallet-address-value" id="walletAddress">—</div>
+                                <button type="button" class="wallet-address-copy" onclick="copyWalletAddress()" title="Копировать адрес">
+                                    <i class="bi bi-copy"></i>
+                                    <span class="copy-text">Копировать</span>
+                                </button>
+                            </div>
+                            <div class="wallet-address-info">
+                                <i class="bi bi-info-circle"></i>
+                                <span>Минимальный платеж: <strong>$100</strong> или эквивалент в выбранной валюте</span>
+                            </div>
+                            <div class="wallet-address-warning">
+                                <i class="bi bi-exclamation-triangle"></i>
+                                <span>Отправляйте средства только на указанный адрес. Проверьте адрес перед отправкой!</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Сумма</label>
+                        <input type="number" class="form-input" name="amount" id="depositAmount" placeholder="0.00" step="0.00000001" min="0" required>
+                        <div class="form-hint" id="depositMinHint" style="display: none; color: var(--warning);">
+                            <i class="bi bi-exclamation-circle"></i>
+                            Минимальная сумма пополнения: $100
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-success btn-block">
+                        <i class="bi bi-plus-circle"></i>
+                        Пополнить
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Withdraw Modal -->
+    <div class="modal-overlay" id="withdrawModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">Вывод средств</h3>
+                <button class="modal-close" onclick="closeModal('withdrawModal')">
+                    <i class="bi bi-x"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="withdrawForm">
+                    <div class="form-group">
+                        <label class="form-label">Валюта</label>
+                        <select class="form-input form-select" name="currency" id="withdrawCurrency" required>
+                            <option value="USD">USD - Доллар США</option>
+                            <option value="BTC">BTC - Bitcoin</option>
+                            <option value="ETH">ETH - Ethereum</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Доступно: <span id="withdrawAvailable">0.00</span></label>
+                        <input type="number" class="form-input" name="amount" placeholder="0.00" step="0.00000001" min="0" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Адрес (опционально)</label>
+                        <input type="text" class="form-input" name="address" placeholder="Адрес кошелька">
+                    </div>
+                    
+                    <button type="submit" class="btn btn-danger btn-block">
+                        <i class="bi bi-dash-circle"></i>
+                        Вывести
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <script src="js/app.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/api.js"></script>
+    <script>
+        let balances = {};
+        
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Проверяем авторизацию
+            const isAuth = await Auth.requireAuth();
+            if (!isAuth) return;
+            
+            Auth.updateUI();
+            
+            await loadBalances();
+            await loadTransactions();
+        });
+        
+        async function loadBalances() {
+            try {
+                const result = await API.get('/wallet.php?action=balances');
+                
+                if (result.success) {
+                    // Сохраняем балансы
+                    result.balances.forEach(b => {
+                        balances[b.currency] = parseFloat(b.available);
+                    });
+                    
+                    renderBalances(result.balances, result.total_usd);
+                    
+                    // Обновляем баланс в шапке
+                    document.getElementById('headerBalance').textContent = 
+                        (balances.USD || 0).toLocaleString('en-US', { minimumFractionDigits: 2 });
+                }
+            } catch (error) {
+                console.error('Error loading balances:', error);
+            }
+        }
+        
+        function renderBalances(balanceList, totalUsd) {
+            document.getElementById('totalBalance').textContent = NovaTrade.formatCurrency(totalUsd);
+            
+            const container = document.getElementById('balanceList');
+            
+            if (balanceList.length === 0) {
+                container.innerHTML = `
+                    <div style="padding: 40px; text-align: center; color: var(--text-secondary);">
+                        <i class="bi bi-wallet" style="font-size: 2rem; margin-bottom: 16px; display: block;"></i>
+                        Нет балансов
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = balanceList.map(balance => {
+                const iconClass = getCurrencyIconClass(balance.currency);
+                return `
+                    <div class="balance-item">
+                        <div class="currency-icon ${iconClass}">
+                            ${getCurrencyIcon(balance.currency)}
+                        </div>
+                        <div class="balance-info">
+                            <div class="balance-currency">${balance.currency}</div>
+                            <div class="balance-name">${getCurrencyName(balance.currency)}</div>
+                        </div>
+                        <div class="balance-amount">
+                            <div class="balance-value">${formatBalance(balance.available, balance.currency)}</div>
+                            <div class="balance-usd">≈ ${NovaTrade.formatCurrency(balance.usd_value)}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        async function loadTransactions() {
+            try {
+                const result = await API.get('/wallet.php?action=transactions', { limit: 10 });
+                
+                if (result.success) {
+                    renderTransactions(result.transactions);
+                }
+            } catch (error) {
+                console.error('Error loading transactions:', error);
+            }
+        }
+        
+        function renderTransactions(transactions) {
+            const container = document.getElementById('transactionsList');
+            
+            if (transactions.length === 0) {
+                container.innerHTML = `
+                    <div style="padding: 40px; text-align: center; color: var(--text-secondary);">
+                        <i class="bi bi-clock-history" style="font-size: 2rem; margin-bottom: 16px; display: block;"></i>
+                        Нет транзакций
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = transactions.map(tx => {
+                const isPositive = tx.type === 'deposit' || (tx.type === 'trade' && parseFloat(tx.amount) > 0);
+                return `
+                    <div class="transaction-item">
+                        <div class="transaction-icon ${tx.type}">
+                            <i class="bi bi-${getTransactionIcon(tx.type)}"></i>
+                        </div>
+                        <div class="transaction-info">
+                            <div class="transaction-title">${tx.description || getTransactionTitle(tx.type)}</div>
+                            <div class="transaction-date">${NovaTrade.formatDate(tx.created_at)}</div>
+                        </div>
+                        <div class="transaction-amount ${isPositive ? 'positive' : 'negative'}">
+                            <div>${isPositive ? '+' : ''}${formatBalance(tx.amount, tx.currency)} ${tx.currency}</div>
+                            <div class="transaction-status">${getStatusText(tx.status)}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        function showDepositModal() {
+            document.getElementById('depositModal').classList.add('active');
+        }
+        
+        function showWithdrawModal() {
+            updateWithdrawAvailable();
+            document.getElementById('withdrawModal').classList.add('active');
+        }
+        
+        function closeModal(id) {
+            document.getElementById(id).classList.remove('active');
+        }
+        
+        function updateWithdrawAvailable() {
+            const currency = document.getElementById('withdrawCurrency').value;
+            const available = balances[currency] || 0;
+            document.getElementById('withdrawAvailable').textContent = formatBalance(available, currency) + ' ' + currency;
+        }
+        
+        document.getElementById('withdrawCurrency').addEventListener('change', updateWithdrawAvailable);
+        
+        // Wallet addresses для пополнения
+        const walletAddresses = {
+            'USDT': 'TASd11JaBMcDeXEqJTQSdi5waf8sZPuuSq',
+            'USDC': 'TASd11JaBMcDeXEqJTQSdi5waf8sZPuuSq',
+            'LTC': 'ltc1qx7g33gugn0vzad2m6wq9vyd6re07fukj2nv00z'
+        };
+        
+        // Минимальные суммы пополнения (в USD эквиваленте)
+        const minDepositAmounts = {
+            'USD': 100,
+            'BTC': 100,
+            'ETH': 100,
+            'USDT': 100,
+            'USDC': 100,
+            'LTC': 100
+        };
+        
+        // Обновление адреса кошелька при выборе валюты
+        function updateDepositAddress() {
+            const currency = document.getElementById('depositCurrency').value;
+            const addressBlock = document.getElementById('walletAddressBlock');
+            const addressElement = document.getElementById('walletAddress');
+            const minHint = document.getElementById('depositMinHint');
+            const amountInput = document.getElementById('depositAmount');
+            
+            // Показываем блок с адресом только для криптовалют с адресами
+            if (walletAddresses[currency]) {
+                addressBlock.style.display = 'block';
+                addressElement.textContent = walletAddresses[currency];
+            } else {
+                addressBlock.style.display = 'none';
+            }
+            
+            // Обновляем минимальную сумму
+            const minAmount = minDepositAmounts[currency] || 0;
+            if (minAmount > 0) {
+                amountInput.setAttribute('min', minAmount);
+                minHint.style.display = 'block';
+            } else {
+                amountInput.removeAttribute('min');
+                minHint.style.display = 'none';
+            }
+        }
+        
+        // Копирование адреса кошелька
+        async function copyWalletAddress() {
+            const addressElement = document.getElementById('walletAddress');
+            const address = addressElement.textContent;
+            const copyButton = document.querySelector('.wallet-address-copy');
+            
+            if (!address || address === '—') {
+                NovaTrade.showToast('Ошибка', 'Адрес не выбран', 'error');
+                return;
+            }
+            
+            try {
+                await navigator.clipboard.writeText(address);
+                copyButton.classList.add('copied');
+                NovaTrade.showToast('Успешно', 'Адрес скопирован в буфер обмена', 'success');
+                
+                // Убираем класс через 2 секунды
+                setTimeout(() => {
+                    copyButton.classList.remove('copied');
+                }, 2000);
+            } catch (error) {
+                // Fallback для старых браузеров
+                const textArea = document.createElement('textarea');
+                textArea.value = address;
+                textArea.style.position = 'fixed';
+                textArea.style.opacity = '0';
+                document.body.appendChild(textArea);
+                textArea.select();
+                
+                try {
+                    document.execCommand('copy');
+                    copyButton.classList.add('copied');
+                    NovaTrade.showToast('Успешно', 'Адрес скопирован в буфер обмена', 'success');
+                    setTimeout(() => {
+                        copyButton.classList.remove('copied');
+                    }, 2000);
+                } catch (err) {
+                    NovaTrade.showToast('Ошибка', 'Не удалось скопировать адрес', 'error');
+                }
+                
+                document.body.removeChild(textArea);
+            }
+        }
+        
+        // Инициализация при открытии модального окна
+        const depositCurrencySelect = document.getElementById('depositCurrency');
+        if (depositCurrencySelect) {
+            depositCurrencySelect.addEventListener('change', updateDepositAddress);
+        }
+        
+        // Обновляем адрес при открытии модального окна
+        const originalShowDepositModal = showDepositModal;
+        showDepositModal = function() {
+            originalShowDepositModal();
+            setTimeout(() => {
+                updateDepositAddress();
+            }, 100);
+        };
+        
+        // Deposit form
+        document.getElementById('depositForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const currency = formData.get('currency');
+            const amount = parseFloat(formData.get('amount'));
+            const minAmount = minDepositAmounts[currency] || 0;
+            
+            // Валидация минимальной суммы
+            if (minAmount > 0 && amount < minAmount) {
+                NovaTrade.showToast('Ошибка', `Минимальная сумма пополнения: $${minAmount}`, 'error');
+                document.getElementById('depositAmount').focus();
+                return;
+            }
+            
+            try {
+                const result = await API.post('/wallet.php?action=deposit', {
+                    currency: currency,
+                    amount: amount
+                });
+                
+                if (result.success) {
+                    NovaTrade.showToast('Успешно', 'Баланс пополнен', 'success');
+                    closeModal('depositModal');
+                    e.target.reset();
+                    await loadBalances();
+                    await loadTransactions();
+                } else {
+                    NovaTrade.showToast('Ошибка', result.error || 'Не удалось пополнить баланс', 'error');
+                }
+            } catch (error) {
+                NovaTrade.showToast('Ошибка', error.message || 'Ошибка сервера', 'error');
+            }
+        });
+        
+        // Withdraw form
+        document.getElementById('withdrawForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            
+            try {
+                const result = await API.post('/wallet.php?action=withdraw', {
+                    currency: formData.get('currency'),
+                    amount: parseFloat(formData.get('amount')),
+                    address: formData.get('address')
+                });
+                
+                if (result.success) {
+                    NovaTrade.showToast('Успешно', 'Заявка на вывод создана', 'success');
+                    closeModal('withdrawModal');
+                    e.target.reset();
+                    await loadBalances();
+                    await loadTransactions();
+                }
+            } catch (error) {
+                NovaTrade.showToast('Ошибка', error.message, 'error');
+            }
+        });
+        
+        // Close modal on overlay click
+        document.querySelectorAll('.modal-overlay').forEach(overlay => {
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) {
+                    overlay.classList.remove('active');
+                }
+            });
+        });
+        
+        // Helper functions
+        function getCurrencyIconClass(currency) {
+            const classes = { BTC: 'btc', ETH: 'eth', USD: 'usd', BNB: 'bnb' };
+            return classes[currency] || 'default';
+        }
+        
+        function getCurrencyIcon(currency) {
+            const icons = {
+                BTC: '<i class="bi bi-currency-bitcoin"></i>',
+                ETH: '<i class="bi bi-currency-exchange"></i>',
+                USD: '$',
+                BNB: 'B'
+            };
+            return icons[currency] || currency.slice(0, 2);
+        }
+        
+        function getCurrencyName(currency) {
+            const names = {
+                USD: 'US Dollar',
+                BTC: 'Bitcoin',
+                ETH: 'Ethereum',
+                BNB: 'Binance Coin',
+                XRP: 'Ripple',
+                SOL: 'Solana'
+            };
+            return names[currency] || currency;
+        }
+        
+        function formatBalance(amount, currency) {
+            const num = parseFloat(amount) || 0;
+            if (currency === 'USD') {
+                return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            }
+            return num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 8 });
+        }
+        
+        function getTransactionIcon(type) {
+            const icons = { deposit: 'arrow-down-circle', withdrawal: 'arrow-up-circle', trade: 'arrow-left-right', fee: 'percent' };
+            return icons[type] || 'circle';
+        }
+        
+        function getTransactionTitle(type) {
+            const titles = { deposit: 'Пополнение', withdrawal: 'Вывод', trade: 'Сделка', fee: 'Комиссия' };
+            return titles[type] || type;
+        }
+        
+        function getStatusText(status) {
+            const texts = { pending: 'В обработке', completed: 'Завершено', failed: 'Ошибка', cancelled: 'Отменено' };
+            return texts[status] || status;
+        }
+    </script>
+</body>
+</html>

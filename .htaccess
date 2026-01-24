@@ -1,0 +1,36 @@
+# NovaTrade - Apache Configuration
+
+# Enable RewriteEngine
+RewriteEngine On
+
+# Pass Authorization header to PHP
+# Apache by default strips the Authorization header
+RewriteCond %{HTTP:Authorization} ^(.*)
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%1]
+
+# Also set it for CGI/FastCGI mode
+SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1
+
+# Prevent directory listing
+Options -Indexes
+
+# Default charset
+AddDefaultCharset UTF-8
+
+# Security headers
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set X-XSS-Protection "1; mode=block"
+</IfModule>
+
+# Deny access to sensitive files
+<FilesMatch "\.(ini|log|sql|md)$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+
+# Deny access to config directory
+<IfModule mod_rewrite.c>
+    RewriteRule ^config/ - [F,L]
+</IfModule>
