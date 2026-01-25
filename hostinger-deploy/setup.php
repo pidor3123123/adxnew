@@ -1,34 +1,24 @@
 <?php
 /**
  * ADX Finance - Установка базы данных
- * Запустите этот файл один раз для создания БД и таблиц
+ * Запустите этот файл один раз для создания таблиц
+ * База данных должна быть создана заранее в панели Hostinger
  */
 
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-$host = 'localhost';
-$user = 'root';
-$pass = 'M#LXcxB}1';  // Стандартный пароль Open Server
-$dbName = 'novatrade';
+// Загружаем конфигурацию базы данных
+require_once __DIR__ . '/config/database.php';
 
 echo "<h1>ADX Finance - Установка</h1>";
 echo "<style>body{font-family:sans-serif;padding:20px;background:#1a1a1f;color:#fff;}h1{color:#6366f1;}pre{background:#2a2a32;padding:15px;border-radius:8px;overflow-x:auto;}.success{color:#22c55e;}.error{color:#ef4444;}.info{color:#6366f1;}</style>";
 
 try {
-    // Подключаемся без выбора базы
-    $pdo = new PDO("mysql:host=$host;charset=utf8mb4", $user, $pass, [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION
-    ]);
+    // Используем функцию getDB() из config/database.php для подключения к существующей базе данных
+    $pdo = getDB();
     
-    echo "<p class='success'>✓ Подключение к MySQL успешно</p>";
-    
-    // Создаём базу данных
-    $pdo->exec("CREATE DATABASE IF NOT EXISTS `$dbName` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
-    echo "<p class='success'>✓ База данных '$dbName' создана/существует</p>";
-    
-    // Выбираем базу
-    $pdo->exec("USE `$dbName`");
+    echo "<p class='success'>✓ Подключение к базе данных '" . DB_NAME . "' успешно</p>";
     
     // SQL для создания таблиц
     $sql = "
@@ -258,8 +248,9 @@ try {
     echo "<p class='error'>✗ Ошибка: " . htmlspecialchars($e->getMessage()) . "</p>";
     echo "<h3>Возможные решения:</h3>";
     echo "<ul>";
-    echo "<li>Убедитесь, что MySQL запущен в Open Server Panel</li>";
-    echo "<li>Проверьте настройки в config/database.php</li>";
-    echo "<li>Попробуйте перезапустить Open Server</li>";
+    echo "<li>Проверьте настройки в config/database.php (DB_HOST, DB_NAME, DB_USER, DB_PASS)</li>";
+    echo "<li>Убедитесь, что база данных создана в панели Hostinger</li>";
+    echo "<li>Проверьте, что пользователь БД имеет права на доступ к базе данных</li>";
+    echo "<li>Проверьте логи ошибок PHP на сервере</li>";
     echo "</ul>";
 }
