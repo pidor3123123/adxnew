@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
 import { getServerSession } from "next-auth"
-import { authOptions, getAdminEmails } from "@/lib/auth"
+import { authOptions, isAdmin } from "@/lib/auth"
 import Sidebar from "@/components/admin/Sidebar"
 
 export default async function AdminLayout({
@@ -16,8 +16,8 @@ export default async function AdminLayout({
   }
 
   // ❌ не админ - редиректим на страницу входа
-  const admins = getAdminEmails()
-  if (admins.length === 0 || !admins.includes(session.user.email)) {
+  const userIsAdmin = await isAdmin(session.user.email)
+  if (!userIsAdmin) {
     redirect("/api/auth/signin")
   }
 

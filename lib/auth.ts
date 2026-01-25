@@ -14,6 +14,42 @@ export function getAdminEmails(): string[] {
   return admins.split(',').map(email => email.trim()).filter(email => email.length > 0)
 }
 
+/**
+ * Проверка, является ли пользователь админом
+ * Проверяет и переменную окружения ADMIN_EMAILS, и таблицу admins в Supabase
+ */
+export async function isAdmin(email: string | null | undefined): Promise<boolean> {
+  if (!email) {
+    return false
+  }
+
+  // Проверяем переменную окружения (для обратной совместимости)
+  const adminEmails = getAdminEmails()
+  if (adminEmails.length > 0 && adminEmails.includes(email)) {
+    return true
+  }
+
+  // Проверяем таблицу admins в Supabase
+  try {
+    const supabase = supabaseServer()
+    const { data, error } = await supabase
+      .from('admins')
+      .select('email')
+      .eq('email', email)
+      .maybeSingle()
+
+    if (error) {
+      console.error('Error checking admin in Supabase:', error)
+      return false
+    }
+
+    return !!data
+  } catch (error) {
+    console.error('Error checking admin:', error)
+    return false
+  }
+}
+
 export const authOptions: NextAuthOptions = {
   providers: [
     GitHubProvider({
@@ -66,19 +102,9 @@ export const authOptions: NextAuthOptions = {
           }
 
           // Проверяем, что пользователь является админом
-          const supabase = supabaseServer()
-          const { data: admin } = await supabase
-            .from("admins")
-            .select("*")
-            .eq("email", credentials.email)
-            .single()
-
-          if (!admin) {
-            // Проверяем также переменную окружения ADMIN_EMAILS
-            const adminEmails = getAdminEmails()
-            if (!adminEmails.includes(credentials.email)) {
-              return null
-            }
+          const userIsAdmin = await isAdmin(credentials.email)
+          if (!userIsAdmin) {
+            return null
           }
 
           return {

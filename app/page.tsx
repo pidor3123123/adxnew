@@ -1,15 +1,14 @@
 import { getServerSession } from "next-auth";
-import { authOptions, getAdminEmails } from "@/lib/auth";
+import { authOptions, isAdmin } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import AuthButtons from "@/components/AuthButtons";
 
 export default async function Home() {
   const session = await getServerSession(authOptions);
-  const admins = getAdminEmails();
-  const isAdmin = !!(session?.user?.email && admins.length > 0 && admins.includes(session.user.email));
+  const userIsAdmin = session?.user?.email ? await isAdmin(session.user.email) : false;
 
   // Если пользователь админ, редиректим на админ панель
-  if (isAdmin) {
+  if (userIsAdmin) {
     redirect("/admin");
   }
 
@@ -20,7 +19,7 @@ export default async function Home() {
           <h1 className="text-3xl font-bold text-black dark:text-zinc-50">
             ADX Finance Admin
           </h1>
-          <AuthButtons session={session} isAdmin={isAdmin} />
+          <AuthButtons session={session} isAdmin={userIsAdmin} />
         </div>
 
         <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left flex-1">

@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { authOptions, getAdminEmails } from '@/lib/auth'
+import { authOptions, isAdmin } from '@/lib/auth'
 import { getOrCreateAdminIdByEmail } from '@/lib/supabase-admin'
 import { supabaseServer } from '@/lib/supabase-server'
 import { randomUUID } from 'crypto'
 
 export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions)
-  const admins = getAdminEmails()
 
-  if (!session?.user?.email || admins.length === 0 || !admins.includes(session.user.email)) {
+  if (!session?.user?.email || !(await isAdmin(session.user.email))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
