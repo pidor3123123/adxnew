@@ -10,15 +10,15 @@ export default async function AdminLayout({
 }) {
   const session = await getServerSession(authOptions)
 
-  // ❌ не залогинен
+  // ❌ не залогинен - редиректим на страницу входа
   if (!session?.user?.email) {
-    redirect("/")
+    redirect("/api/auth/signin")
   }
 
-  // ❌ не админ
+  // ❌ не админ - редиректим на страницу входа
   const admins = getAdminEmails()
   if (admins.length === 0 || !admins.includes(session.user.email)) {
-    redirect("/")
+    redirect("/api/auth/signin")
   }
 
   return (
