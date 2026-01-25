@@ -8,6 +8,11 @@ export default async function Home() {
   const admins = getAdminEmails();
   const isAdmin = !!(session?.user?.email && admins.length > 0 && admins.includes(session.user.email));
 
+  // Если пользователь админ, редиректим на админ панель
+  if (isAdmin) {
+    redirect("/admin");
+  }
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
       <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
@@ -26,19 +31,7 @@ export default async function Home() {
                   Добро пожаловать, {session.user?.name || session.user?.email}!
                 </h2>
                 <p className="text-lg text-zinc-600 dark:text-zinc-400">
-                  {isAdmin ? (
-                    <>
-                      Вы вошли как администратор.{" "}
-                      <a
-                        href="/admin"
-                        className="font-medium text-blue-600 dark:text-blue-400 hover:underline"
-                      >
-                        Перейти в админ панель →
-                      </a>
-                    </>
-                  ) : (
-                    "У вас нет доступа к админ панели."
-                  )}
+                  У вас нет доступа к админ панели.
                 </p>
                 {session.user?.email && (
                   <p className="text-sm text-zinc-500 dark:text-zinc-500">
