@@ -4,6 +4,9 @@
  * Синхронизация данных между MySQL и Supabase для работы с админ панелью
  */
 
+// Включаем буферизацию вывода для предотвращения попадания предупреждений в JSON
+ob_start();
+
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../config/supabase.php';
 require_once __DIR__ . '/auth.php';
@@ -29,10 +32,12 @@ try {
             
             syncUserToSupabase($userId);
             
+            ob_end_clean();
             echo json_encode([
                 'success' => true,
                 'message' => 'User synced successfully'
             ]);
+            exit;
             break;
             
         case 'balance':
@@ -54,10 +59,12 @@ try {
                 syncAllBalancesToSupabase($userId);
             }
             
+            ob_end_clean();
             echo json_encode([
                 'success' => true,
                 'message' => 'Balance synced successfully'
             ]);
+            exit;
             break;
             
         case 'order':
@@ -74,10 +81,12 @@ try {
             
             syncOrderToSupabase($orderId);
             
+            ob_end_clean();
             echo json_encode([
                 'success' => true,
                 'message' => 'Order synced successfully'
             ]);
+            exit;
             break;
             
         case 'from_admin':
@@ -99,10 +108,12 @@ try {
             
             handleAdminWebhook($type, $payload);
             
+            ob_end_clean();
             echo json_encode([
                 'success' => true,
                 'message' => 'Webhook processed successfully'
             ]);
+            exit;
             break;
             
         default:
@@ -117,10 +128,12 @@ try {
     $code = (int)$code;
     http_response_code($code);
     
+    ob_end_clean();
     echo json_encode([
         'success' => false,
         'error' => $e->getMessage()
     ]);
+    exit;
 }
 
 /**

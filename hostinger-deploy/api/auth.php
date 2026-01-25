@@ -648,4 +648,3 @@ if (basename($_SERVER['SCRIPT_FILENAME']) === 'auth.php') {
     ]);
     exit;
 }
-}
