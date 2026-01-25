@@ -6,7 +6,64 @@
 // Включаем буферизацию вывода для предотвращения попадания предупреждений в JSON
 ob_start();
 
-require_once __DIR__ . '/../config/database.php';
+// Глобальная обработка ошибок для конвертации всех PHP ошибок в JSON
+set_error_handler(function($severity, $message, $file, $line) {
+    // Игнорируем ошибки, которые не являются критическими
+    if (!(error_reporting() & $severity)) {
+        return false;
+    }
+    
+    // Очищаем буфер и устанавливаем заголовки
+    if (ob_get_level() > 0) {
+        ob_end_clean();
+    }
+    
+    if (!headers_sent()) {
+        header('Content-Type: application/json');
+        http_response_code(500);
+    }
+    
+    echo json_encode([
+        'success' => false,
+        'error' => 'PHP Error: ' . $message . ' in ' . basename($file) . ':' . $line
+    ]);
+    exit;
+});
+
+// Обработка фатальных ошибок
+register_shutdown_function(function() {
+    $error = error_get_last();
+    if ($error !== null && in_array($error['type'], [E_ERROR, E_CORE_ERROR, E_COMPILE_ERROR, E_PARSE])) {
+        if (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        
+        if (!headers_sent()) {
+            header('Content-Type: application/json');
+            http_response_code(500);
+        }
+        
+        echo json_encode([
+            'success' => false,
+            'error' => 'Fatal Error: ' . $error['message'] . ' in ' . basename($error['file']) . ':' . $error['line']
+        ]);
+        exit;
+    }
+});
+
+// Безопасная загрузка конфигурационных файлов
+try {
+    require_once __DIR__ . '/../config/database.php';
+} catch (Exception $e) {
+    ob_end_clean();
+    header('Content-Type: application/json');
+    http_response_code(500);
+    echo json_encode([
+        'success' => false,
+        'error' => 'Ошибка загрузки конфигурации: ' . $e->getMessage()
+    ]);
+    exit;
+}
 
 header('Content-Type: application/json');
 setCorsHeaders();
@@ -19,12 +76,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
-// Функции синхронизации (если доступны)
-if (file_exists(__DIR__ . '/sync.php')) {
-    require_once __DIR__ . '/sync.php';
+// Безопасная загрузка дополнительных файлов
+try {
+    // Функции синхронизации (если доступны)
+    if (file_exists(__DIR__ . '/sync.php')) {
+        require_once __DIR__ . '/sync.php';
+    }
+    require_once __DIR__ . '/totp.php';
+    require_once __DIR__ . '/../config/supabase.php';
+} catch (Exception $e) {
+    ob_end_clean();
+    header('Content-Type: application/json');
+    http_response_code(500);
+    echo json_encode([
+        'success' => false,
+        'error' => 'Ошибка загрузки модулей: ' . $e->getMessage()
+    ]);
+    exit;
 }
-require_once __DIR__ . '/totp.php';
-require_once __DIR__ . '/../config/supabase.php';
 
 /**
  * Получение Authorization токена из разных источников

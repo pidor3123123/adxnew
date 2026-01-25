@@ -2,16 +2,18 @@
 
 ## Исправленные файлы
 
-Были исправлены следующие файлы для устранения ошибки JSON parsing:
+Были исправлены следующие файлы для устранения ошибки 500 и обеспечения корректных JSON ответов:
 
-1. **`api/auth.php`** - удалена лишняя закрывающая скобка, улучшена буферизация вывода
-2. **`api/sync.php`** - добавлена буферизация вывода для предотвращения попадания предупреждений в JSON
+1. **`api/auth.php`** - добавлена глобальная обработка ошибок, обернуты require_once в try-catch
+2. **`config/database.php`** - заменен die() на выброс исключений для корректной обработки ошибок
+3. **`api/sync.php`** - добавлена буферизация вывода для предотвращения попадания предупреждений в JSON
 
 ## Где находятся файлы на Hostinger
 
 На сервере Hostinger эти файлы находятся по пути:
 ```
 public_html/api/auth.php
+public_html/config/database.php
 public_html/api/sync.php
 ```
 
@@ -29,9 +31,10 @@ public_html/api/sync.php
 
 1. Войдите в панель Hostinger (hPanel)
 2. Перейдите в **"Файлы"** → **"File Manager"**
-3. Откройте папку `public_html/api/`
+3. Откройте папку `public_html/api/` и `public_html/config/`
 4. Загрузите новые версии файлов:
    - `api/auth.php` → замените существующий файл
+   - `config/database.php` → замените существующий файл
    - `api/sync.php` → замените существующий файл
 
 **Откуда брать файлы:**
@@ -43,9 +46,10 @@ public_html/api/sync.php
 Если используете FTP клиент (FileZilla, WinSCP и т.д.):
 
 1. Подключитесь к серверу Hostinger по FTP
-2. Перейдите в папку `/public_html/api/`
+2. Перейдите в папки `/public_html/api/` и `/public_html/config/`
 3. Загрузите файлы:
    - `hostinger-deploy/api/auth.php` → `/public_html/api/auth.php`
+   - `hostinger-deploy/config/database.php` → `/public_html/config/database.php`
    - `hostinger-deploy/api/sync.php` → `/public_html/api/sync.php`
 4. Замените существующие файлы
 
@@ -55,7 +59,8 @@ public_html/api/sync.php
 
 1. Откройте `https://adx.finance/register.html`
 2. Попробуйте зарегистрироваться
-3. Ошибка "Unexpected non-whitespace character after JSON" должна исчезнуть
+3. Ошибки "Unexpected end of JSON input" и "500 Internal Server Error" должны исчезнуть
+4. Если есть ошибки, они теперь будут отображаться в понятном JSON формате
 
 ## Важно
 
@@ -66,12 +71,21 @@ public_html/api/sync.php
 ## Что было исправлено
 
 ### `api/auth.php`:
-- ✅ Удалена лишняя закрывающая скобка `}` в конце файла (строка 651)
-- ✅ Уже была буферизация вывода (`ob_start()` и `ob_end_clean()`)
+- ✅ Добавлена глобальная обработка ошибок (`set_error_handler()`) для перехвата всех PHP ошибок
+- ✅ Добавлена обработка фатальных ошибок (`register_shutdown_function()`)
+- ✅ Обернуты все `require_once` в try-catch блоки для безопасной загрузки файлов
+- ✅ Улучшена буферизация вывода для предотвращения попадания предупреждений в JSON
+
+### `config/database.php`:
+- ✅ Заменен `die(json_encode(...))` на выброс исключения `PDOException`
+- ✅ Это позволяет `auth.php` перехватить ошибку и вернуть корректный JSON с правильными заголовками
 
 ### `api/sync.php`:
 - ✅ Добавлена буферизация вывода (`ob_start()`) в начале файла
 - ✅ Добавлен `ob_end_clean()` перед каждым `echo json_encode()`
 - ✅ Добавлен `exit` после каждого `echo json_encode()`
 
-Эти исправления гарантируют, что JSON ответы будут чистыми, без лишних символов или PHP предупреждений.
+Эти исправления гарантируют, что:
+- Все ошибки (включая фатальные PHP ошибки) будут возвращать валидный JSON
+- Ошибка 500 будет содержать понятное сообщение об ошибке в JSON формате
+- JSON ответы будут чистыми, без лишних символов или PHP предупреждений

@@ -60,8 +60,8 @@ function getDB(): PDO {
         try {
             $pdo = new PDO($dsn, DB_USER, DB_PASS, $options);
         } catch (PDOException $e) {
-            http_response_code(500);
-            die(json_encode(['error' => 'Ошибка подключения к базе данных']));
+            // Выбрасываем исключение вместо die(), чтобы auth.php мог перехватить и вернуть корректный JSON
+            throw new PDOException('Ошибка подключения к базе данных: ' . $e->getMessage(), (int)$e->getCode(), $e);
         }
     }
     
