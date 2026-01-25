@@ -474,6 +474,57 @@ export async function createAdmin(
   return { success: true, data }
 }
 
+// Create admin with password using Supabase Auth
+export async function createAdminWithPassword(
+  adminId: string,
+  email: string,
+  password: string,
+  role: string
+): Promise<{ success: boolean; error?: string; data?: Admin }> {
+  const supabase = getSupabase()
+  
+  try {
+    // Create user in Supabase Auth
+    const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true, // Auto-confirm email
+    })
+
+    if (authError) {
+      return { success: false, error: authError.message }
+    }
+
+    if (!authUser.user) {
+      return { success: false, error: 'Failed to create user in auth' }
+    }
+
+    // Create admin record in admins table
+    const { data: admin, error: adminError } = await supabase
+      .from('admins')
+      .insert({ 
+        id: authUser.user.id, // Use auth user ID
+        email, 
+        role 
+      })
+      .select()
+      .single()
+
+    if (adminError) {
+      // If admin record creation fails, try to delete the auth user
+      await supabase.auth.admin.deleteUser(authUser.user.id)
+      return { success: false, error: adminError.message }
+    }
+
+    await logAudit(adminId, 'create_admin', 'admins', admin.id, null, admin)
+    await logAdminAction(adminId, null, `Created admin with password: ${email}`)
+
+    return { success: true, data: admin }
+  } catch (error: any) {
+    return { success: false, error: error.message || 'Unknown error' }
+  }
+}
+
 // Sync users from auth.users to users table
 export async function syncUsersFromAuth(): Promise<{
   success: boolean

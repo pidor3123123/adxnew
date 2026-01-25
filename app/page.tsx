@@ -45,7 +45,7 @@ export default async function Home() {
                   Войдите для доступа к админ панели
                 </h2>
                 <p className="text-lg text-zinc-600 dark:text-zinc-400">
-                  Используйте GitHub для входа в систему
+                  Войдите по email/паролю или через GitHub
                 </p>
               </>
             )}

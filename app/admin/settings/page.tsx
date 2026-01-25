@@ -10,7 +10,9 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
   const [addModalOpen, setAddModalOpen] = useState(false)
   const [newAdminEmail, setNewAdminEmail] = useState('')
+  const [newAdminPassword, setNewAdminPassword] = useState('')
   const [newAdminRole, setNewAdminRole] = useState('admin')
+  const [adminType, setAdminType] = useState<'password' | 'github'>('password')
 
   useEffect(() => {
     fetchAdmins()
@@ -35,6 +37,16 @@ export default function SettingsPage() {
       return
     }
 
+    if (adminType === 'password' && !newAdminPassword) {
+      alert('Password is required for email/password admin')
+      return
+    }
+
+    if (adminType === 'password' && newAdminPassword.length < 8) {
+      alert('Password must be at least 8 characters')
+      return
+    }
+
     try {
       const res = await fetch('/api/admin/admins', {
         method: 'POST',
@@ -42,13 +54,16 @@ export default function SettingsPage() {
         body: JSON.stringify({
           email: newAdminEmail,
           role: newAdminRole,
+          password: adminType === 'password' ? newAdminPassword : undefined,
         }),
       })
 
       if (res.ok) {
         setAddModalOpen(false)
         setNewAdminEmail('')
+        setNewAdminPassword('')
         setNewAdminRole('admin')
+        setAdminType('password')
         fetchAdmins()
       } else {
         const error = await res.json()
@@ -147,11 +162,31 @@ export default function SettingsPage() {
         onClose={() => {
           setAddModalOpen(false)
           setNewAdminEmail('')
+          setNewAdminPassword('')
           setNewAdminRole('admin')
+          setAdminType('password')
         }}
         title="Add Administrator"
       >
         <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Admin Type
+            </label>
+            <select
+              value={adminType}
+              onChange={(e) => setAdminType(e.target.value as 'password' | 'github')}
+              className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="password">Email/Password</option>
+              <option value="github">GitHub OAuth (no password)</option>
+            </select>
+            <p className="text-xs text-gray-400 mt-1">
+              {adminType === 'password' 
+                ? 'Admin will be able to login with email and password'
+                : 'Admin will need to login via GitHub OAuth'}
+            </p>
+          </div>
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
               Email
@@ -162,8 +197,28 @@ export default function SettingsPage() {
               onChange={(e) => setNewAdminEmail(e.target.value)}
               className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="admin@example.com"
+              required
             />
           </div>
+          {adminType === 'password' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Password
+              </label>
+              <input
+                type="password"
+                value={newAdminPassword}
+                onChange={(e) => setNewAdminPassword(e.target.value)}
+                className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="••••••••"
+                minLength={8}
+                required
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                Minimum 8 characters
+              </p>
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
               Role
@@ -182,7 +237,9 @@ export default function SettingsPage() {
               onClick={() => {
                 setAddModalOpen(false)
                 setNewAdminEmail('')
+                setNewAdminPassword('')
                 setNewAdminRole('admin')
+                setAdminType('password')
               }}
               className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
             >

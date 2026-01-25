@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions, getAdminEmails } from '@/lib/auth'
-import { getAdmins, createAdmin, deleteAdmin } from '@/lib/supabase-admin'
+import { getAdmins, createAdmin, createAdminWithPassword, deleteAdmin } from '@/lib/supabase-admin'
 import { getOrCreateAdminIdByEmail } from '@/lib/supabase-admin'
 
 export async function GET() {
@@ -37,13 +37,23 @@ export async function POST(request: NextRequest) {
     const adminId = await getOrCreateAdminIdByEmail(session.user.email)
 
     const body = await request.json()
-    const { email, role } = body
+    const { email, role, password } = body
 
     if (!email || !role) {
       return NextResponse.json({ error: 'email and role are required' }, { status: 400 })
     }
 
-    const result = await createAdmin(adminId, email, role)
+    // If password is provided, create admin with password
+    let result
+    if (password) {
+      if (password.length < 8) {
+        return NextResponse.json({ error: 'Password must be at least 8 characters' }, { status: 400 })
+      }
+      result = await createAdminWithPassword(adminId, email, password, role)
+    } else {
+      // Create admin without password (for GitHub OAuth admins)
+      result = await createAdmin(adminId, email, role)
+    }
 
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: 400 })
