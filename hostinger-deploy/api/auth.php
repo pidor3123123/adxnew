@@ -291,17 +291,22 @@ if (basename($_SERVER['SCRIPT_FILENAME']) === 'auth.php') {
             
             $userId = (int) $db->lastInsertId();
             
-            // Создание начальных балансов
-            createInitialBalances($userId);
+            // Создание начальных балансов (оборачиваем в try-catch на случай ошибки)
+            try {
+                createInitialBalances($userId);
+            } catch (Exception $e) {
+                // Логируем ошибку, но не прерываем регистрацию
+                error_log('Error creating initial balances: ' . $e->getMessage());
+            }
             
             // Синхронизация с Supabase (в фоне, не блокируем ответ)
+            // Используем отдельный процесс, чтобы не блокировать ответ
             try {
                 $syncData = [
                     'user_id' => $userId
                 ];
                 
                 // Используем curl для асинхронного запроса (не ждем ответа)
-                // Используем CURLOPT_RETURNTRANSFER = true чтобы не выводить данные
                 $ch = curl_init('http' . (isset($_SERVER['HTTPS']) ? 's' : '') . '://' . $_SERVER['HTTP_HOST'] . '/api/sync.php?action=user');
                 curl_setopt_array($ch, [
                     CURLOPT_POST => true,
@@ -310,17 +315,26 @@ if (basename($_SERVER['SCRIPT_FILENAME']) === 'auth.php') {
                     CURLOPT_RETURNTRANSFER => true, // Возвращаем результат вместо вывода
                     CURLOPT_TIMEOUT => 1, // Таймаут 1 секунда, не ждем
                     CURLOPT_NOSIGNAL => 1,
+                    CURLOPT_CONNECTTIMEOUT => 1, // Таймаут подключения 1 секунда
                 ]);
                 // Игнорируем результат, чтобы не блокировать ответ
-                curl_exec($ch);
-                curl_close($ch);
+                @curl_exec($ch);
+                @curl_close($ch);
             } catch (Exception $e) {
                 // Игнорируем ошибки синхронизации при регистрации
                 error_log('Supabase sync error on registration: ' . $e->getMessage());
+            } catch (Throwable $e) {
+                // Перехватываем все ошибки, включая фатальные
+                error_log('Supabase sync fatal error on registration: ' . $e->getMessage());
             }
             
-            // Создание сессии
-            $token = createSession($userId, true);
+            // Создание сессии (оборачиваем в try-catch на случай ошибки)
+            try {
+                $token = createSession($userId, true);
+            } catch (Exception $e) {
+                // Если не удалось создать сессию, выбрасываем ошибку
+                throw new Exception('Ошибка создания сессии: ' . $e->getMessage(), 500);
+            }
             
             // Очищаем буфер перед выводом JSON
             ob_end_clean();

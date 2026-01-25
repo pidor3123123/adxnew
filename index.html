@@ -91,6 +91,21 @@
             font-weight: 600;
         }
         
+        .market-tab-header svg {
+            width: 20px;
+            height: 20px;
+            flex-shrink: 0;
+            transition: transform var(--transition-fast);
+        }
+        
+        .market-tab:hover .market-tab-header svg {
+            transform: scale(1.1);
+        }
+        
+        .market-tab.active .market-tab-header svg {
+            transform: scale(1.05);
+        }
+        
         .market-tab-stats {
             display: flex;
             gap: 12px;
@@ -574,7 +589,15 @@
                             <div class="market-tabs">
                                 <button class="market-tab active" data-market="crypto">
                                     <div class="market-tab-header">
-                                        <i class="bi bi-currency-bitcoin"></i>
+                                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink: 0;">
+                                            <path d="M10 2L12.5 8.5L19 10L12.5 11.5L10 18L7.5 11.5L1 10L7.5 8.5L10 2Z" fill="url(#crypto-gradient)"/>
+                                            <defs>
+                                                <linearGradient id="crypto-gradient" x1="0" y1="0" x2="20" y2="20" gradientUnits="userSpaceOnUse">
+                                                    <stop stop-color="#6366f1"/>
+                                                    <stop offset="1" stop-color="#8b5cf6"/>
+                                                </linearGradient>
+                                            </defs>
+                                        </svg>
                                         Криптовалюты
                                     </div>
                                     <div class="market-tab-stats">
@@ -590,7 +613,16 @@
                                 </button>
                                 <button class="market-tab" data-market="stocks">
                                     <div class="market-tab-header">
-                                        <i class="bi bi-graph-up-arrow"></i>
+                                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink: 0;">
+                                            <path d="M2 14L7 9L11 13L18 6" stroke="url(#stocks-gradient)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                            <path d="M14 6H18V10" stroke="url(#stocks-gradient)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                            <defs>
+                                                <linearGradient id="stocks-gradient" x1="0" y1="0" x2="20" y2="20" gradientUnits="userSpaceOnUse">
+                                                    <stop stop-color="#22c55e"/>
+                                                    <stop offset="1" stop-color="#16a34a"/>
+                                                </linearGradient>
+                                            </defs>
+                                        </svg>
                                         Акции
                                     </div>
                                     <div class="market-tab-stats">
@@ -606,7 +638,18 @@
                                 </button>
                                 <button class="market-tab" data-market="forex">
                                     <div class="market-tab-header">
-                                        <i class="bi bi-currency-exchange"></i>
+                                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink: 0;">
+                                            <circle cx="10" cy="10" r="8" stroke="url(#forex-gradient)" stroke-width="2"/>
+                                            <path d="M10 2C6 2 2 6 2 10" stroke="url(#forex-gradient)" stroke-width="2" stroke-linecap="round"/>
+                                            <path d="M10 18C14 18 18 14 18 10" stroke="url(#forex-gradient)" stroke-width="2" stroke-linecap="round"/>
+                                            <circle cx="10" cy="10" r="3" fill="url(#forex-gradient)"/>
+                                            <defs>
+                                                <linearGradient id="forex-gradient" x1="0" y1="0" x2="20" y2="20" gradientUnits="userSpaceOnUse">
+                                                    <stop stop-color="#f59e0b"/>
+                                                    <stop offset="1" stop-color="#d97706"/>
+                                                </linearGradient>
+                                            </defs>
+                                        </svg>
                                         Форекс
                                     </div>
                                     <div class="market-tab-stats">
@@ -622,7 +665,18 @@
                                 </button>
                                 <button class="market-tab" data-market="indices">
                                     <div class="market-tab-header">
-                                        <i class="bi bi-bar-chart"></i>
+                                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink: 0;">
+                                            <rect x="2" y="12" width="3" height="5" fill="url(#indices-gradient)"/>
+                                            <rect x="6" y="8" width="3" height="9" fill="url(#indices-gradient)"/>
+                                            <rect x="10" y="5" width="3" height="12" fill="url(#indices-gradient)"/>
+                                            <rect x="14" y="10" width="3" height="7" fill="url(#indices-gradient)"/>
+                                            <defs>
+                                                <linearGradient id="indices-gradient" x1="0" y1="0" x2="20" y2="20" gradientUnits="userSpaceOnUse">
+                                                    <stop stop-color="#3b82f6"/>
+                                                    <stop offset="1" stop-color="#2563eb"/>
+                                                </linearGradient>
+                                            </defs>
+                                        </svg>
                                         Индексы
                                     </div>
                                     <div class="market-tab-stats">
@@ -927,17 +981,20 @@
                 ethChange.className = `stat-change ${eth.price_change_percentage_24h >= 0 ? 'up' : 'down'}`;
             }
             
-            marketList.innerHTML = data.map(coin => `
-                <div class="market-item" onclick="window.location.href='trade.html?symbol=${coin.symbol.toUpperCase()}'">
+            marketList.innerHTML = data.map(coin => {
+                const coinSymbol = coin.symbol.toUpperCase();
+                const imageUrl = getCryptoImageUrl(coin.id, coin.symbol);
+                return `
+                <div class="market-item" onclick="window.location.href='trade.html?symbol=${coinSymbol}'">
                     <div class="market-row">
-                        <div class="market-icon">
-                            <img src="https://assets.coingecko.com/coins/images/${getCoinImageId(coin.id)}/small/${coin.symbol}.png" 
+                        <div class="market-icon" data-coin-symbol="${coinSymbol}">
+                            <img src="${imageUrl}" 
                                  alt="${coin.name}" 
-                                 style="width: 36px; height: 36px; border-radius: 50%;"
-                                 onerror="this.style.display='none'; this.parentElement.innerHTML='<i class=\\'bi bi-currency-bitcoin\\'></i>'">
+                                 style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover;"
+                                 onerror="this.onerror=null; this.src='https://cryptologos.cc/logos/${coinSymbol.toLowerCase()}-${coinSymbol.toLowerCase()}-logo.png'; this.onerror=function(){this.style.display='none'; this.parentElement.innerHTML='<div style=\\'width:36px;height:36px;border-radius:50%;background:var(--accent-primary-soft);color:var(--accent-primary);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:bold;\\'>${coinSymbol.slice(0,2)}</div>';};">
                         </div>
                         <div class="market-info">
-                            <div class="market-symbol">${coin.symbol.toUpperCase()}</div>
+                            <div class="market-symbol">${coinSymbol}</div>
                             <div class="market-name">${coin.name}</div>
                         </div>
                     </div>
@@ -951,7 +1008,8 @@
                         </span>
                     </div>
                 </div>
-            `).join('');
+            `;
+            }).join('');
         }
         
         // Рендер акций
@@ -965,11 +1023,17 @@
             document.getElementById('stocks-mcap').textContent = formatCompactNumber(stockMarketCap);
             document.getElementById('stocks-vol').textContent = formatCompactNumber(stockVolume);
             
-            marketList.innerHTML = data.map(stock => `
+            marketList.innerHTML = data.map(stock => {
+                const logoUrl = getStockLogoUrl(stock.symbol);
+                const fallbackIcon = getStockIconSVG(stock.symbol);
+                return `
                 <div class="market-item" onclick="window.location.href='trade.html?symbol=${stock.symbol}'">
                     <div class="market-row">
-                        <div class="market-icon" style="background: var(--accent-primary-soft); color: var(--accent-primary);">
-                            ${stock.symbol.slice(0, 2)}
+                        <div class="market-icon" style="width: 36px; height: 36px; border-radius: 8px; overflow: hidden; background: var(--bg-tertiary); display: flex; align-items: center; justify-content: center;">
+                            <img src="${logoUrl}" 
+                                 alt="${stock.name}" 
+                                 style="width: 100%; height: 100%; object-fit: contain; padding: 4px;"
+                                 onerror="this.onerror=null; this.style.display='none'; this.parentElement.innerHTML='${fallbackIcon.replace(/'/g, "\\'").replace(/"/g, '&quot;')}';">
                         </div>
                         <div class="market-info">
                             <div class="market-symbol">${stock.symbol}</div>
@@ -986,7 +1050,8 @@
                         </span>
                     </div>
                 </div>
-            `).join('');
+            `;
+            }).join('');
         }
         
         // Рендер форекс
@@ -1000,11 +1065,13 @@
             document.getElementById('forex-mcap').textContent = formatCompactNumber(forexTurnover);
             document.getElementById('forex-vol').textContent = formatCompactNumber(forexVolume);
             
-            marketList.innerHTML = data.map(pair => `
+            marketList.innerHTML = data.map(pair => {
+                const forexIcon = getForexIcon(pair.symbol);
+                return `
                 <div class="market-item" onclick="window.location.href='trade.html?symbol=${pair.symbol}'">
                     <div class="market-row">
-                        <div class="market-icon" style="background: var(--warning-soft); color: var(--warning);">
-                            <i class="bi bi-currency-exchange"></i>
+                        <div class="market-icon" style="width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;">
+                            ${forexIcon}
                         </div>
                         <div class="market-info">
                             <div class="market-symbol">${pair.symbol}</div>
@@ -1021,7 +1088,8 @@
                         </span>
                     </div>
                 </div>
-            `).join('');
+            `;
+            }).join('');
         }
         
         // Рендер индексов
@@ -1035,11 +1103,13 @@
             document.getElementById('indices-mcap').textContent = formatCompactNumber(avgValue);
             document.getElementById('indices-vol').textContent = `${avgChange >= 0 ? '+' : ''}${avgChange.toFixed(2)}%`;
             
-            marketList.innerHTML = data.map(index => `
+            marketList.innerHTML = data.map(index => {
+                const indexIcon = getIndexIcon(index.symbol);
+                return `
                 <div class="market-item" onclick="window.location.href='trade.html?symbol=${index.symbol}'">
                     <div class="market-row">
-                        <div class="market-icon" style="background: var(--accent-primary-soft); color: var(--accent-primary);">
-                            <i class="bi bi-bar-chart"></i>
+                        <div class="market-icon" style="width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;">
+                            ${indexIcon}
                         </div>
                         <div class="market-info">
                             <div class="market-symbol">${index.symbol}</div>
@@ -1056,7 +1126,8 @@
                         </span>
                     </div>
                 </div>
-            `).join('');
+            `;
+            }).join('');
         }
         
         // Загрузка тикера
@@ -1078,6 +1149,34 @@
             ticker.innerHTML = items + items;
         }
         
+        // Получение URL изображения криптовалюты с альтернативными источниками
+        function getCryptoImageUrl(coinId, symbol) {
+            return getCryptoIconUrl(symbol, coinId);
+        }
+        
+        // Получение URL изображения криптовалюты с альтернативными источниками
+        function getCryptoIconUrl(symbol, coinId) {
+            const symbolLower = symbol.toLowerCase();
+            const imageId = getCoinImageId(coinId);
+            
+            // Основной источник - CoinGecko
+            const primaryUrl = `https://assets.coingecko.com/coins/images/${imageId}/small/${symbolLower}.png`;
+            
+            // Альтернативные источники для популярных монет
+            const alternativeUrls = {
+                'btc': ['https://cryptoicons.org/api/icon/btc/200', 'https://coin-images.coingecko.com/coins/images/1/small/bitcoin.png'],
+                'eth': ['https://cryptoicons.org/api/icon/eth/200', 'https://coin-images.coingecko.com/coins/images/279/small/ethereum.png'],
+                'bnb': ['https://cryptoicons.org/api/icon/bnb/200', 'https://coin-images.coingecko.com/coins/images/825/small/bnb-icon2_2x.png'],
+                'xrp': ['https://cryptoicons.org/api/icon/xrp/200', 'https://coin-images.coingecko.com/coins/images/44/small/xrp-symbol-white-128.png'],
+                'sol': ['https://cryptoicons.org/api/icon/sol/200', 'https://coin-images.coingecko.com/coins/images/4128/small/solana.png'],
+                'ada': ['https://cryptoicons.org/api/icon/ada/200', 'https://coin-images.coingecko.com/coins/images/975/small/cardano.png'],
+                'doge': ['https://cryptoicons.org/api/icon/doge/200', 'https://coin-images.coingecko.com/coins/images/5/small/dogecoin.png'],
+                'ltc': ['https://cryptoicons.org/api/icon/ltc/200', 'https://coin-images.coingecko.com/coins/images/2/small/litecoin.png']
+            };
+            
+            return alternativeUrls[symbolLower] ? alternativeUrls[symbolLower][0] : primaryUrl;
+        }
+        
         // Получение ID изображения монеты
         function getCoinImageId(coinId) {
             const imageIds = {
@@ -1090,9 +1189,211 @@
                 'dogecoin': 5,
                 'polkadot': 12171,
                 'polygon': 4713,
-                'litecoin': 2
+                'litecoin': 2,
+                'chainlink': 877,
+                'avalanche-2': 12559,
+                'uniswap': 12504,
+                'tron': 1958,
+                'stellar': 512,
+                'monero': 69,
+                'ethereum-classic': 1321
             };
             return imageIds[coinId] || 1;
+        }
+        
+        // Получение URL логотипа акции
+        function getStockLogoUrl(symbol) {
+            // Используем бесплатные источники логотипов
+            const symbolLower = symbol.toLowerCase();
+            // Clearbit Logo API (бесплатный, но может не работать для всех)
+            return `https://logo.clearbit.com/${symbolLower}.com`;
+        }
+        
+        // Получение SVG иконки для акции в цветовой палитре
+        function getStockIconSVG(symbol) {
+            const colors = ['#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#3b82f6'];
+            const color = colors[symbol.charCodeAt(0) % colors.length];
+            const letters = symbol.slice(0, 2).toUpperCase();
+            return `<svg width="36" height="36" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+                <rect width="36" height="36" rx="8" fill="${color}" opacity="0.15"/>
+                <text x="18" y="24" font-family="Arial, sans-serif" font-size="14" font-weight="600" fill="${color}" text-anchor="middle">${letters}</text>
+            </svg>`;
+        }
+        
+        // Получение иконки для индекса
+        function getIndexIcon(symbol) {
+            const indexIcons = {
+                'SPX': `<svg width="36" height="36" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="36" height="36" rx="8" fill="#6366f1" opacity="0.15"/>
+                    <path d="M8 24 L12 18 L16 22 L20 16 L24 20 L28 14" stroke="#6366f1" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                    <text x="18" y="30" font-family="Arial, sans-serif" font-size="7" font-weight="600" fill="#6366f1" text-anchor="middle">S&P</text>
+                </svg>`,
+                'NDX': `<svg width="36" height="36" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="36" height="36" rx="8" fill="#8b5cf6" opacity="0.15"/>
+                    <path d="M6 26 L10 18 L14 22 L18 14 L22 18 L26 10 L30 14" stroke="#8b5cf6" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                    <text x="18" y="30" font-family="Arial, sans-serif" font-size="7" font-weight="600" fill="#8b5cf6" text-anchor="middle">NDX</text>
+                </svg>`,
+                'DJI': `<svg width="36" height="36" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="36" height="36" rx="8" fill="#ec4899" opacity="0.15"/>
+                    <path d="M8 22 L18 12 L28 22" stroke="#ec4899" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                    <text x="18" y="30" font-family="Arial, sans-serif" font-size="7" font-weight="600" fill="#ec4899" text-anchor="middle">DJI</text>
+                </svg>`,
+                'FTSE': `<svg width="36" height="36" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="36" height="36" rx="8" fill="#f59e0b" opacity="0.15"/>
+                    <path d="M8 24 L12 20 L16 24 L20 20 L24 24 L28 20" stroke="#f59e0b" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                    <text x="18" y="30" font-family="Arial, sans-serif" font-size="7" font-weight="600" fill="#f59e0b" text-anchor="middle">FTSE</text>
+                </svg>`,
+                'DAX': `<svg width="36" height="36" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="36" height="36" rx="8" fill="#10b981" opacity="0.15"/>
+                    <path d="M8 20 L18 10 L28 20" stroke="#10b981" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                    <text x="18" y="30" font-family="Arial, sans-serif" font-size="7" font-weight="600" fill="#10b981" text-anchor="middle">DAX</text>
+                </svg>`
+            };
+            return indexIcons[symbol] || `<svg width="36" height="36" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+                <rect width="36" height="36" rx="8" fill="#6366f1" opacity="0.15"/>
+                <path d="M8 20 L18 10 L28 20" stroke="#6366f1" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>`;
+        }
+        
+        // Получение иконки для валютной пары
+        function getForexIcon(symbol) {
+            const currencyIcons = {
+                'EUR': { flag: '🇪🇺', color: '#3b82f6' },
+                'USD': { flag: '🇺🇸', color: '#10b981' },
+                'GBP': { flag: '🇬🇧', color: '#ec4899' },
+                'JPY': { flag: '🇯🇵', color: '#f59e0b' },
+                'AUD': { flag: '🇦🇺', color: '#8b5cf6' },
+                'CAD': { flag: '🇨🇦', color: '#6366f1' },
+                'CHF': { flag: '🇨🇭', color: '#10b981' },
+                'CNY': { flag: '🇨🇳', color: '#ef4444' }
+            };
+            
+            const base = symbol.substring(0, 3);
+            const quote = symbol.substring(3, 6);
+            const baseInfo = currencyIcons[base] || { flag: '💱', color: '#6366f1' };
+            const quoteInfo = currencyIcons[quote] || { flag: '💱', color: '#6366f1' };
+            
+            return `<svg width="36" height="36" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+                <rect width="36" height="36" rx="18" fill="${baseInfo.color}" opacity="0.15"/>
+                <circle cx="12" cy="18" r="8" fill="${baseInfo.color}" opacity="0.3"/>
+                <circle cx="24" cy="18" r="8" fill="${quoteInfo.color}" opacity="0.3"/>
+                <text x="18" y="22" font-family="Arial, sans-serif" font-size="9" font-weight="600" fill="${baseInfo.color}" text-anchor="middle">${base}</text>
+            </svg>`;
+        }
+        
+        // Получение URL логотипа акции
+        function getStockLogoUrl(symbol) {
+            // Используем несколько источников для надежности
+            const companyDomain = symbol.toLowerCase();
+            return `https://logo.clearbit.com/${companyDomain}.com`;
+        }
+        
+        // Получение SVG иконки индекса в цветовой палитре проекта
+        function getIndexIcon(symbol) {
+            const uniqueId = `index-${symbol}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            const indexIcons = {
+                'SPX': `<svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="36" height="36" rx="8" fill="url(#${uniqueId}-gradient)"/>
+                    <path d="M10 18L15 12L18 15L26 7" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <defs>
+                        <linearGradient id="${uniqueId}-gradient" x1="0" y1="0" x2="36" y2="36" gradientUnits="userSpaceOnUse">
+                            <stop stop-color="#6366f1"/>
+                            <stop offset="1" stop-color="#8b5cf6"/>
+                        </linearGradient>
+                    </defs>
+                </svg>`,
+                'NDX': `<svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="36" height="36" rx="8" fill="url(#${uniqueId}-gradient)"/>
+                    <path d="M8 20L12 16L18 22L28 12" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <defs>
+                        <linearGradient id="${uniqueId}-gradient" x1="0" y1="0" x2="36" y2="36" gradientUnits="userSpaceOnUse">
+                            <stop stop-color="#22c55e"/>
+                            <stop offset="1" stop-color="#16a34a"/>
+                        </linearGradient>
+                    </defs>
+                </svg>`,
+                'DJI': `<svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="36" height="36" rx="8" fill="url(#${uniqueId}-gradient)"/>
+                    <path d="M9 18L14 13L18 17L27 8" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <defs>
+                        <linearGradient id="${uniqueId}-gradient" x1="0" y1="0" x2="36" y2="36" gradientUnits="userSpaceOnUse">
+                            <stop stop-color="#3b82f6"/>
+                            <stop offset="1" stop-color="#2563eb"/>
+                        </linearGradient>
+                    </defs>
+                </svg>`,
+                'FTSE': `<svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="36" height="36" rx="8" fill="url(#${uniqueId}-gradient)"/>
+                    <path d="M7 19L13 13L18 18L29 7" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <defs>
+                        <linearGradient id="${uniqueId}-gradient" x1="0" y1="0" x2="36" y2="36" gradientUnits="userSpaceOnUse">
+                            <stop stop-color="#ef4444"/>
+                            <stop offset="1" stop-color="#dc2626"/>
+                        </linearGradient>
+                    </defs>
+                </svg>`,
+                'DAX': `<svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="36" height="36" rx="8" fill="url(#${uniqueId}-gradient)"/>
+                    <path d="M8 20L14 14L18 18L28 8" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <defs>
+                        <linearGradient id="${uniqueId}-gradient" x1="0" y1="0" x2="36" y2="36" gradientUnits="userSpaceOnUse">
+                            <stop stop-color="#f59e0b"/>
+                            <stop offset="1" stop-color="#d97706"/>
+                        </linearGradient>
+                    </defs>
+                </svg>`
+            };
+            return indexIcons[symbol] || `<div style="width: 36px; height: 36px; border-radius: 8px; background: var(--accent-primary-soft); color: var(--accent-primary); display: flex; align-items: center; justify-content: center;"><i class="bi bi-bar-chart"></i></div>`;
+        }
+        
+        // Получение SVG иконки валюты для форекс
+        function getForexIcon(symbol) {
+            const uniqueId = `forex-${symbol.replace('/', '-')}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            const firstCurrency = symbol.split('/')[0];
+            const currencyIcons = {
+                'USD': `<svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="36" height="36" rx="8" fill="url(#${uniqueId}-gradient)"/>
+                    <text x="18" y="24" font-family="Arial" font-size="16" font-weight="bold" fill="white" text-anchor="middle">$</text>
+                    <defs>
+                        <linearGradient id="${uniqueId}-gradient" x1="0" y1="0" x2="36" y2="36" gradientUnits="userSpaceOnUse">
+                            <stop stop-color="#6366f1"/>
+                            <stop offset="1" stop-color="#8b5cf6"/>
+                        </linearGradient>
+                    </defs>
+                </svg>`,
+                'EUR': `<svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="36" height="36" rx="8" fill="url(#${uniqueId}-gradient)"/>
+                    <text x="18" y="24" font-family="Arial" font-size="16" font-weight="bold" fill="white" text-anchor="middle">€</text>
+                    <defs>
+                        <linearGradient id="${uniqueId}-gradient" x1="0" y1="0" x2="36" y2="36" gradientUnits="userSpaceOnUse">
+                            <stop stop-color="#3b82f6"/>
+                            <stop offset="1" stop-color="#2563eb"/>
+                        </linearGradient>
+                    </defs>
+                </svg>`,
+                'GBP': `<svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="36" height="36" rx="8" fill="url(#${uniqueId}-gradient)"/>
+                    <text x="18" y="24" font-family="Arial" font-size="16" font-weight="bold" fill="white" text-anchor="middle">£</text>
+                    <defs>
+                        <linearGradient id="${uniqueId}-gradient" x1="0" y1="0" x2="36" y2="36" gradientUnits="userSpaceOnUse">
+                            <stop stop-color="#ef4444"/>
+                            <stop offset="1" stop-color="#dc2626"/>
+                        </linearGradient>
+                    </defs>
+                </svg>`,
+                'JPY': `<svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="36" height="36" rx="8" fill="url(#${uniqueId}-gradient)"/>
+                    <text x="18" y="24" font-family="Arial" font-size="16" font-weight="bold" fill="white" text-anchor="middle">¥</text>
+                    <defs>
+                        <linearGradient id="${uniqueId}-gradient" x1="0" y1="0" x2="36" y2="36" gradientUnits="userSpaceOnUse">
+                            <stop stop-color="#f59e0b"/>
+                            <stop offset="1" stop-color="#d97706"/>
+                        </linearGradient>
+                    </defs>
+                </svg>`
+            };
+            
+            return currencyIcons[firstCurrency] || `<div style="width: 36px; height: 36px; border-radius: 8px; background: var(--warning-soft); color: var(--warning); display: flex; align-items: center; justify-content: center;"><i class="bi bi-currency-exchange"></i></div>`;
         }
     </script>
 </body>
