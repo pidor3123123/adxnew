@@ -28,58 +28,75 @@ Vercel автоматически определит Next.js проект. Пр�
 #### Обязательные переменные:
 
 1. **NEXT_PUBLIC_SUPABASE_URL**
-   - Значение: `https://ваш-проект.supabase.co`
+   - Значение: `https://teqnsfxvogniblyvsfun.supabase.co`
    - Окружения: Production, Preview, Development
+   - ✅ **Просто скопируйте это значение и вставьте**
 
 2. **SUPABASE_SERVICE_ROLE_KEY**
-   - Значение: ваш Service Role Key из Supabase
+   - Значение: `sb_secret_1n5HZHAYXSXLg5wnanntrA_d_t82MzG`
    - Окружения: Production, Preview, Development
+   - ✅ **Просто скопируйте это значение и вставьте**
 
 3. **NEXTAUTH_URL**
-   - Значение: `https://adx.finance/admin` (после настройки кастомного домена)
-   - Или временно: `https://ваш-проект.vercel.app/admin` (после первого деплоя)
+   - Значение: `https://adx.finance/admin`
    - Окружения: Production, Preview, Development
-   - **Примечание**: После настройки кастомного домена обновите на `https://adx.finance/admin`
+   - ✅ **Просто скопируйте это значение и вставьте**
+   - **Примечание**: Если домен еще не настроен, временно используйте `https://ваш-проект.vercel.app/admin` (замените `ваш-проект` на реальное имя проекта из Vercel), а после настройки домена обновите на `https://adx.finance/admin`
 
 4. **NEXTAUTH_SECRET**
-   - Значение: сгенерируйте случайную строку (можно использовать: `openssl rand -base64 32`)
+   - Значение: сгенерируйте случайную строку (см. команды ниже)
    - Окружения: Production, Preview, Development
+   - **Windows (PowerShell):**
+     ```powershell
+     [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes([System.Guid]::NewGuid().ToString() + [System.Guid]::NewGuid().ToString()))
+     ```
+   - **Linux/Mac:**
+     ```bash
+     openssl rand -base64 32
+     ```
+   - **Или онлайн:** https://generate-secret.vercel.app/32
+   - Скопируйте сгенерированное значение и вставьте
 
 5. **GITHUB_CLIENT_ID**
-   - Значение: Client ID из GitHub OAuth App
+   - Значение: `Ov23liX30oJJAQWpKXY3`
    - Окружения: Production, Preview, Development
+   - ✅ **Просто скопируйте это значение и вставьте**
 
 6. **GITHUB_CLIENT_SECRET**
-   - Значение: Client Secret из GitHub OAuth App
+   - Значение: `ed71ae551cc8a0d5b8bcc7f613c97191f5cbe3cd`
    - Окружения: Production, Preview, Development
+   - ✅ **Просто скопируйте это значение и вставьте**
 
 7. **ADMIN_EMAILS**
-   - Значение: `ваш-email@gmail.com,другой-email@gmail.com` (через запятую)
+   - Значение: `gabelatraffick@gmail.com`
    - Окружения: Production, Preview, Development
+   - ✅ **Просто скопируйте это значение и вставьте**
+   - **Примечание**: Если нужно добавить несколько email, разделите их запятой: `email1@gmail.com,email2@gmail.com`
 
 8. **WEBHOOK_URL**
-   - Значение: `https://ваш-домен.com/api/webhook.php` (URL вашего PHP API на Hostinger)
+   - Значение: `https://adx.finance/api/webhook.php`
    - Окружения: Production, Preview, Development
+   - ✅ **Просто скопируйте это значение и вставьте**
 
 9. **WEBHOOK_SECRET**
-   - Значение: тот же секрет, что используется в `.env` на Hostinger
+   - Значение: `novatrade-webhook-secret-2024`
    - Окружения: Production, Preview, Development
+   - ✅ **Просто скопируйте это значение и вставьте**
 
-### Шаг 4: Настройка GitHub OAuth App
+### Шаг 4: Проверка GitHub OAuth App
 
-Перед деплоем нужно создать GitHub OAuth App:
+✅ **GitHub OAuth App уже настроен!** Используйте следующие значения:
 
+- **Client ID**: `Ov23liX30oJJAQWpKXY3`
+- **Client Secret**: `ed71ae551cc8a0d5b8bcc7f613c97191f5cbe3cd`
+
+**Если нужно обновить настройки OAuth App:**
 1. Перейдите на [GitHub Settings → Developer settings → OAuth Apps](https://github.com/settings/developers)
-2. Нажмите **"New OAuth App"**
-3. Заполните форму:
-   - **Application name**: `ADX Finance Admin`
-   - **Homepage URL**: `https://adx.finance/admin` (или временно `https://ваш-проект.vercel.app/admin`)
-   - **Authorization callback URL**: `https://adx.finance/admin/api/auth/callback/github` (или временно `https://ваш-проект.vercel.app/admin/api/auth/callback/github`)
-4. Нажмите **"Register application"**
-5. Скопируйте **Client ID**
-6. Нажмите **"Generate a new client secret"** и скопируйте **Client Secret**
-
-**Важно**: После первого деплоя обновите Homepage URL и Authorization callback URL на реальный URL Vercel.
+2. Найдите ваше приложение "ADX Finance Admin"
+3. Убедитесь, что настройки правильные:
+   - **Homepage URL**: `https://adx.finance/admin`
+   - **Authorization callback URL**: `https://adx.finance/admin/api/auth/callback/github`
+4. Если домен еще не настроен, временно используйте URL из Vercel (после первого деплоя)
 
 ### Шаг 5: Деплой
 
@@ -107,7 +124,7 @@ Vercel автоматически определит Next.js проект. Пр�
 
 ## Генерация NEXTAUTH_SECRET
 
-Если нужно сгенерировать секретный ключ:
+Если еще не сгенерировали NEXTAUTH_SECRET, используйте одну из команд:
 
 **Windows (PowerShell):**
 ```powershell
@@ -120,6 +137,8 @@ openssl rand -base64 32
 ```
 
 **Или онлайн:** https://generate-secret.vercel.app/32
+
+Скопируйте сгенерированное значение и вставьте в переменную `NEXTAUTH_SECRET` в Vercel.
 
 ## Решение проблем
 
