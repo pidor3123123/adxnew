@@ -183,47 +183,73 @@ function getUserByToken(string $token): ?array {
  * Создание сессии
  */
 function createSession(int $userId, bool $remember = false): string {
-    $db = getDB();
-    $token = generateToken();
-    
-    // Время жизни сессии: 30 дней если "запомнить", иначе 24 часа
-    $expiresAt = date('Y-m-d H:i:s', strtotime($remember ? '+30 days' : '+24 hours'));
-    
-    $stmt = $db->prepare('
-        INSERT INTO user_sessions (user_id, token, ip_address, user_agent, expires_at)
-        VALUES (?, ?, ?, ?, ?)
-    ');
-    
-    $stmt->execute([
-        $userId,
-        $token,
-        $_SERVER['REMOTE_ADDR'] ?? null,
-        $_SERVER['HTTP_USER_AGENT'] ?? null,
-        $expiresAt
-    ]);
-    
-    return $token;
+    try {
+        $db = getDB();
+        $token = generateToken();
+        
+        // Время жизни сессии: 30 дней если "запомнить", иначе 24 часа
+        $expiresAt = date('Y-m-d H:i:s', strtotime($remember ? '+30 days' : '+24 hours'));
+        
+        $stmt = $db->prepare('
+            INSERT INTO user_sessions (user_id, token, ip_address, user_agent, expires_at)
+            VALUES (?, ?, ?, ?, ?)
+        ');
+        
+        $stmt->execute([
+            $userId,
+            $token,
+            $_SERVER['REMOTE_ADDR'] ?? null,
+            $_SERVER['HTTP_USER_AGENT'] ?? null,
+            $expiresAt
+        ]);
+        
+        return $token;
+    } catch (PDOException $e) {
+        error_log('Error creating session: ' . $e->getMessage());
+        throw new Exception('Ошибка создания сессии: ' . $e->getMessage(), 500, $e);
+    } catch (Exception $e) {
+        error_log('Error creating session: ' . $e->getMessage());
+        throw $e;
+    }
 }
 
 /**
  * Создание начального баланса для нового пользователя
  */
 function createInitialBalances(int $userId): void {
-    $db = getDB();
-    
-    $currencies = [
-        ['USD', 0.00],
-        ['BTC', 0],
-        ['ETH', 0],
-        ['BNB', 0],
-        ['XRP', 0],
-        ['SOL', 0]
-    ];
-    
-    $stmt = $db->prepare('INSERT INTO balances (user_id, currency, available) VALUES (?, ?, ?)');
-    
-    foreach ($currencies as $currency) {
-        $stmt->execute([$userId, $currency[0], $currency[1]]);
+    try {
+        $db = getDB();
+        
+        $currencies = [
+            ['USD', 0.00],
+            ['BTC', 0],
+            ['ETH', 0],
+            ['BNB', 0],
+            ['XRP', 0],
+            ['SOL', 0]
+        ];
+        
+        $stmt = $db->prepare('INSERT INTO balances (user_id, currency, available) VALUES (?, ?, ?)');
+        
+        foreach ($currencies as $currency) {
+            try {
+                $stmt->execute([$userId, $currency[0], $currency[1]]);
+            } catch (PDOException $e) {
+                // Логируем ошибку для конкретной валюты, но продолжаем
+                error_log("Error creating balance for currency {$currency[0]}: " . $e->getMessage());
+                // Если это не дубликат, пробрасываем дальше
+                if (strpos($e->getMessage(), 'Duplicate') === false) {
+                    throw $e;
+                }
+            }
+        }
+    } catch (PDOException $e) {
+        error_log('Error creating initial balances: ' . $e->getMessage());
+        // Не пробрасываем исключение, чтобы не прервать регистрацию
+        // Просто логируем ошибку
+    } catch (Exception $e) {
+        error_log('Error creating initial balances: ' . $e->getMessage());
+        // Не пробрасываем исключение
     }
 }
 
@@ -269,35 +295,44 @@ if (basename($_SERVER['SCRIPT_FILENAME']) === 'auth.php') {
             $db = getDB();
             
             // Проверка существования email
-            $stmt = $db->prepare('SELECT id FROM users WHERE email = ?');
-            $stmt->execute([$email]);
-            
-            if ($stmt->fetch()) {
-                throw new Exception('Пользователь с таким email уже существует', 409);
+            try {
+                $stmt = $db->prepare('SELECT id FROM users WHERE email = ?');
+                $stmt->execute([$email]);
+                
+                if ($stmt->fetch()) {
+                    throw new Exception('Пользователь с таким email уже существует', 409);
+                }
+            } catch (PDOException $e) {
+                error_log('Database error checking email: ' . $e->getMessage());
+                throw new Exception('Ошибка проверки email. Проверьте настройку базы данных.', 500);
             }
             
             // Создание пользователя
-            $stmt = $db->prepare('
-                INSERT INTO users (email, password, first_name, last_name)
-                VALUES (?, ?, ?, ?)
-            ');
-            
-            $stmt->execute([
-                $email,
-                hashPassword($password),
-                $firstName,
-                $lastName
-            ]);
-            
-            $userId = (int) $db->lastInsertId();
-            
-            // Создание начальных балансов (оборачиваем в try-catch на случай ошибки)
             try {
-                createInitialBalances($userId);
-            } catch (Exception $e) {
-                // Логируем ошибку, но не прерываем регистрацию
-                error_log('Error creating initial balances: ' . $e->getMessage());
+                $stmt = $db->prepare('
+                    INSERT INTO users (email, password, first_name, last_name)
+                    VALUES (?, ?, ?, ?)
+                ');
+                
+                $stmt->execute([
+                    $email,
+                    hashPassword($password),
+                    $firstName,
+                    $lastName
+                ]);
+                
+                $userId = (int) $db->lastInsertId();
+                
+                if ($userId === 0) {
+                    throw new Exception('Не удалось создать пользователя', 500);
+                }
+            } catch (PDOException $e) {
+                error_log('Database error creating user: ' . $e->getMessage());
+                throw new Exception('Ошибка создания пользователя. Проверьте настройку базы данных.', 500);
             }
+            
+            // Создание начальных балансов (функция уже обрабатывает ошибки внутри)
+            createInitialBalances($userId);
             
             // Синхронизация с Supabase (в фоне, не блокируем ответ)
             // Используем отдельный процесс, чтобы не блокировать ответ
@@ -328,13 +363,8 @@ if (basename($_SERVER['SCRIPT_FILENAME']) === 'auth.php') {
                 error_log('Supabase sync fatal error on registration: ' . $e->getMessage());
             }
             
-            // Создание сессии (оборачиваем в try-catch на случай ошибки)
-            try {
-                $token = createSession($userId, true);
-            } catch (Exception $e) {
-                // Если не удалось создать сессию, выбрасываем ошибку
-                throw new Exception('Ошибка создания сессии: ' . $e->getMessage(), 500);
-            }
+            // Создание сессии (функция уже обрабатывает ошибки внутри)
+            $token = createSession($userId, true);
             
             // Очищаем буфер перед выводом JSON
             ob_end_clean();
