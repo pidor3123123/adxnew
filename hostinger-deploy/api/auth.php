@@ -19,14 +19,17 @@ set_error_handler(function($severity, $message, $file, $line) {
     }
     
     if (!headers_sent()) {
-        header('Content-Type: application/json');
+        header('Content-Type: application/json; charset=utf-8');
         http_response_code(500);
     }
     
+    $errorMessage = 'PHP Error: ' . $message . ' in ' . basename($file) . ':' . $line;
+    error_log($errorMessage);
+    
     echo json_encode([
         'success' => false,
-        'error' => 'PHP Error: ' . $message . ' in ' . basename($file) . ':' . $line
-    ]);
+        'error' => $errorMessage
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
 });
 
@@ -34,19 +37,23 @@ set_error_handler(function($severity, $message, $file, $line) {
 register_shutdown_function(function() {
     $error = error_get_last();
     if ($error !== null && in_array($error['type'], [E_ERROR, E_CORE_ERROR, E_COMPILE_ERROR, E_PARSE])) {
-        if (ob_get_level() > 0) {
+        // Очищаем все буферы вывода
+        while (ob_get_level() > 0) {
             ob_end_clean();
         }
         
         if (!headers_sent()) {
-            header('Content-Type: application/json');
+            header('Content-Type: application/json; charset=utf-8');
             http_response_code(500);
         }
         
+        $errorMessage = 'Fatal Error: ' . $error['message'] . ' in ' . basename($error['file']) . ':' . $error['line'];
+        error_log($errorMessage);
+        
         echo json_encode([
             'success' => false,
-            'error' => 'Fatal Error: ' . $error['message'] . ' in ' . basename($error['file']) . ':' . $error['line']
-        ]);
+            'error' => $errorMessage
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         exit;
     }
 });
@@ -93,6 +100,42 @@ try {
         'error' => 'Ошибка загрузки модулей: ' . $e->getMessage()
     ]);
     exit;
+}
+
+/**
+ * Проверка существования необходимых таблиц в базе данных
+ */
+function checkRequiredTables(): void {
+    try {
+        $db = getDB();
+        $requiredTables = ['users', 'user_sessions', 'balances'];
+        
+        foreach ($requiredTables as $table) {
+            $stmt = $db->prepare("SHOW TABLES LIKE ?");
+            $stmt->execute([$table]);
+            
+            if (!$stmt->fetch()) {
+                throw new Exception("Таблица '{$table}' не существует в базе данных. Запустите setup.php для настройки базы данных.", 500);
+            }
+        }
+    } catch (PDOException $e) {
+        error_log('Error checking tables: ' . $e->getMessage());
+        throw new Exception('Ошибка проверки базы данных: ' . $e->getMessage(), 500);
+    }
+}
+
+/**
+ * Проверка подключения к базе данных
+ */
+function checkDatabaseConnection(): void {
+    try {
+        $db = getDB();
+        // Простой запрос для проверки подключения
+        $db->query('SELECT 1');
+    } catch (PDOException $e) {
+        error_log('Database connection error: ' . $e->getMessage());
+        throw new Exception('Ошибка подключения к базе данных. Проверьте настройки в config/database.php', 500);
+    }
 }
 
 /**
@@ -266,6 +309,22 @@ if (basename($_SERVER['SCRIPT_FILENAME']) === 'auth.php') {
         case 'register':
             if ($method !== 'POST') {
                 throw new Exception('Method not allowed', 405);
+            }
+            
+            // Проверяем подключение к базе данных
+            try {
+                checkDatabaseConnection();
+            } catch (Exception $e) {
+                error_log('Database connection check failed: ' . $e->getMessage());
+                throw $e;
+            }
+            
+            // Проверяем существование необходимых таблиц
+            try {
+                checkRequiredTables();
+            } catch (Exception $e) {
+                error_log('Table check failed: ' . $e->getMessage());
+                throw $e;
             }
             
             $data = json_decode(file_get_contents('php://input'), true);
