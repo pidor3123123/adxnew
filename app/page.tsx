@@ -18,7 +18,7 @@ export default async function Home() {
       <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
         <div className="w-full flex justify-between items-start mb-8">
           <h1 className="text-3xl font-bold text-black dark:text-zinc-50">
-            Admin Dashboard
+            ADX Finance Admin
           </h1>
           <AuthButtons session={session} isAdmin={isAdmin} />
         </div>

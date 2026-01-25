@@ -1,9 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  basePath: '/admin',
-  // Для работы на подпути /admin
-  // Все маршруты будут автоматически иметь префикс /admin
+  // Убрали basePath, так как используем поддомен admin.adx.finance
+  // Админ панель будет доступна на поддомене, основной сайт на adx.finance
 };
 
 export default nextConfig;
