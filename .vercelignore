@@ -1,0 +1,29 @@
+# PHP файлы для Hostinger (только в корне проекта)
+/api/
+/config/
+*.php
+
+# HTML страницы для Hostinger (кроме статических файлов в public/)
+*.html
+
+# JavaScript файлы для фронтенда Hostinger (в корне)
+/js/
+
+# CSS файлы для фронтенда Hostinger (в корне)
+/css/
+
+# Папка с файлами для деплоя на Hostinger
+/hostinger-deploy/
+
+# ZIP архивы
+*.zip
+
+# База данных SQL файлы
+*.sql
+
+# Временные файлы
+*.bat
+*.sh
+
+# История и другие HTML файлы для Hostinger
+history.html
