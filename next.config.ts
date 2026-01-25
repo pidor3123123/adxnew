@@ -1,7 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  basePath: '/admin',
+  // Для работы на подпути /admin
+  // Все маршруты будут автоматически иметь префикс /admin
 };
 
 export default nextConfig;
