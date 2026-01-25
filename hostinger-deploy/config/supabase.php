@@ -10,19 +10,43 @@ define('SUPABASE_SERVICE_ROLE_KEY', getenv('SUPABASE_SERVICE_ROLE_KEY') ?: '');
 
 /**
  * Получение Supabase REST API клиента
+ * Возвращает null, если Supabase не настроен (не критично для основной функциональности)
  */
 function getSupabaseClient() {
     static $client = null;
+    static $checked = false;
+    
+    // Если уже проверяли и настройки отсутствуют, возвращаем null
+    if ($checked && $client === false) {
+        return null;
+    }
     
     if ($client === null) {
+        $checked = true;
+        
         if (empty(SUPABASE_URL) || empty(SUPABASE_SERVICE_ROLE_KEY)) {
-            throw new Exception('Supabase configuration is missing. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY');
+            // Устанавливаем флаг, что Supabase не настроен
+            $client = false;
+            return null;
         }
         
-        $client = new SupabaseClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+        try {
+            $client = new SupabaseClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+        } catch (Exception $e) {
+            error_log('Supabase client initialization error: ' . $e->getMessage());
+            $client = false;
+            return null;
+        }
     }
     
     return $client;
+}
+
+/**
+ * Проверка, настроен ли Supabase
+ */
+function isSupabaseConfigured(): bool {
+    return !empty(SUPABASE_URL) && !empty(SUPABASE_SERVICE_ROLE_KEY);
 }
 
 /**

@@ -85,12 +85,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 // Безопасная загрузка дополнительных файлов
 try {
-    // Функции синхронизации (если доступны)
-    if (file_exists(__DIR__ . '/sync.php')) {
-        require_once __DIR__ . '/sync.php';
-    }
     require_once __DIR__ . '/totp.php';
-    require_once __DIR__ . '/../config/supabase.php';
 } catch (Exception $e) {
     ob_end_clean();
     header('Content-Type: application/json');
@@ -100,6 +95,26 @@ try {
         'error' => 'Ошибка загрузки модулей: ' . $e->getMessage()
     ]);
     exit;
+}
+
+// Опциональная загрузка Supabase (не блокирует работу, если не настроен)
+try {
+    if (file_exists(__DIR__ . '/../config/supabase.php')) {
+        require_once __DIR__ . '/../config/supabase.php';
+    }
+} catch (Exception $e) {
+    // Игнорируем ошибки загрузки Supabase - это не критично для основной функциональности
+    error_log('Supabase config load warning: ' . $e->getMessage());
+}
+
+// Функции синхронизации (если доступны)
+try {
+    if (file_exists(__DIR__ . '/sync.php')) {
+        require_once __DIR__ . '/sync.php';
+    }
+} catch (Exception $e) {
+    // Игнорируем ошибки загрузки sync.php - это не критично для основной функциональности
+    error_log('Sync module load warning: ' . $e->getMessage());
 }
 
 /**

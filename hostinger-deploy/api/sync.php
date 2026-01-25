@@ -144,6 +144,12 @@ function syncUserToSupabase(int $mysqlUserId): void {
         $db = getDB();
         $supabase = getSupabaseClient();
         
+        // Если Supabase не настроен, просто пропускаем синхронизацию
+        if ($supabase === null) {
+            error_log("Supabase not configured, skipping sync for user ID $mysqlUserId");
+            return;
+        }
+        
         // Получаем пользователя из MySQL
         $stmt = $db->prepare('SELECT * FROM users WHERE id = ?');
         $stmt->execute([$mysqlUserId]);
@@ -200,6 +206,12 @@ function syncBalanceToSupabase(int $mysqlUserId, string $currency): void {
     try {
         $db = getDB();
         $supabase = getSupabaseClient();
+        
+        // Если Supabase не настроен, просто пропускаем синхронизацию
+        if ($supabase === null) {
+            error_log("Supabase not configured, skipping balance sync for user ID $mysqlUserId, currency $currency");
+            return;
+        }
         
         // Получаем баланс из MySQL
         $stmt = $db->prepare('SELECT * FROM balances WHERE user_id = ? AND currency = ?');
