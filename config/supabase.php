@@ -5,8 +5,8 @@
  */
 
 // Конфигурация Supabase
-define('SUPABASE_URL', getenv('SUPABASE_URL') ?: '');
-define('SUPABASE_SERVICE_ROLE_KEY', getenv('SUPABASE_SERVICE_ROLE_KEY') ?: '');
+define('SUPABASE_URL', getenv('SUPABASE_URL') ?: 'https://teqnsfxvogniblyvsfun.supabase.co');
+define('SUPABASE_SERVICE_ROLE_KEY', getenv('SUPABASE_SERVICE_ROLE_KEY') ?: 'sb_secret_1n5HZHAYXSXLg5wnanntrA_d_t82MzG');
 
 /**
  * Получение Supabase REST API клиента

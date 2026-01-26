@@ -3,12 +3,6 @@
  * ADX Finance - API авторизации
  */
 
-// ВРЕМЕННО: Включаем отображение ошибок для диагностики
-// УДАЛИТЬ ПОСЛЕ ИСПРАВЛЕНИЯ ПРОБЛЕМЫ!
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
-
 // Включаем буферизацию вывода для предотвращения попадания предупреждений в JSON
 ob_start();
 
@@ -25,17 +19,14 @@ set_error_handler(function($severity, $message, $file, $line) {
     }
     
     if (!headers_sent()) {
-        header('Content-Type: application/json; charset=utf-8');
+        header('Content-Type: application/json');
         http_response_code(500);
     }
     
-    $errorMessage = 'PHP Error: ' . $message . ' in ' . basename($file) . ':' . $line;
-    error_log($errorMessage);
-    
     echo json_encode([
         'success' => false,
-        'error' => $errorMessage
-    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        'error' => 'PHP Error: ' . $message . ' in ' . basename($file) . ':' . $line
+    ]);
     exit;
 });
 
@@ -43,23 +34,19 @@ set_error_handler(function($severity, $message, $file, $line) {
 register_shutdown_function(function() {
     $error = error_get_last();
     if ($error !== null && in_array($error['type'], [E_ERROR, E_CORE_ERROR, E_COMPILE_ERROR, E_PARSE])) {
-        // Очищаем все буферы вывода
-        while (ob_get_level() > 0) {
+        if (ob_get_level() > 0) {
             ob_end_clean();
         }
         
         if (!headers_sent()) {
-            header('Content-Type: application/json; charset=utf-8');
+            header('Content-Type: application/json');
             http_response_code(500);
         }
         
-        $errorMessage = 'Fatal Error: ' . $error['message'] . ' in ' . basename($error['file']) . ':' . $error['line'];
-        error_log($errorMessage);
-        
         echo json_encode([
             'success' => false,
-            'error' => $errorMessage
-        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            'error' => 'Fatal Error: ' . $error['message'] . ' in ' . basename($error['file']) . ':' . $error['line']
+        ]);
         exit;
     }
 });
@@ -91,7 +78,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 // Безопасная загрузка дополнительных файлов
 try {
+    // Функции синхронизации (если доступны)
+    if (file_exists(__DIR__ . '/sync.php')) {
+        require_once __DIR__ . '/sync.php';
+    }
     require_once __DIR__ . '/totp.php';
+    require_once __DIR__ . '/../config/supabase.php';
 } catch (Exception $e) {
     ob_end_clean();
     header('Content-Type: application/json');
@@ -101,62 +93,6 @@ try {
         'error' => 'Ошибка загрузки модулей: ' . $e->getMessage()
     ]);
     exit;
-}
-
-// Опциональная загрузка Supabase (не блокирует работу, если не настроен)
-try {
-    if (file_exists(__DIR__ . '/../config/supabase.php')) {
-        require_once __DIR__ . '/../config/supabase.php';
-    }
-} catch (Exception $e) {
-    // Игнорируем ошибки загрузки Supabase - это не критично для основной функциональности
-    error_log('Supabase config load warning: ' . $e->getMessage());
-}
-
-// Функции синхронизации (если доступны)
-try {
-    if (file_exists(__DIR__ . '/sync.php')) {
-        require_once __DIR__ . '/sync.php';
-    }
-} catch (Exception $e) {
-    // Игнорируем ошибки загрузки sync.php - это не критично для основной функциональности
-    error_log('Sync module load warning: ' . $e->getMessage());
-}
-
-/**
- * Проверка существования необходимых таблиц в базе данных
- */
-function checkRequiredTables(): void {
-    try {
-        $db = getDB();
-        $requiredTables = ['users', 'user_sessions', 'balances'];
-        
-        foreach ($requiredTables as $table) {
-            $stmt = $db->prepare("SHOW TABLES LIKE ?");
-            $stmt->execute([$table]);
-            
-            if (!$stmt->fetch()) {
-                throw new Exception("Таблица '{$table}' не существует в базе данных. Запустите setup.php для настройки базы данных.", 500);
-            }
-        }
-    } catch (PDOException $e) {
-        error_log('Error checking tables: ' . $e->getMessage());
-        throw new Exception('Ошибка проверки базы данных: ' . $e->getMessage(), 500);
-    }
-}
-
-/**
- * Проверка подключения к базе данных
- */
-function checkDatabaseConnection(): void {
-    try {
-        $db = getDB();
-        // Простой запрос для проверки подключения
-        $db->query('SELECT 1');
-    } catch (PDOException $e) {
-        error_log('Database connection error: ' . $e->getMessage());
-        throw new Exception('Ошибка подключения к базе данных. Проверьте настройки в config/database.php', 500);
-    }
 }
 
 /**
@@ -326,26 +262,10 @@ if (basename($_SERVER['SCRIPT_FILENAME']) === 'auth.php') {
     $action = $_GET['action'] ?? '';
 
     try {
-    switch ($action) {
-        case 'register':
+        switch ($action) {
+            case 'register':
             if ($method !== 'POST') {
                 throw new Exception('Method not allowed', 405);
-            }
-            
-            // Проверяем подключение к базе данных
-            try {
-                checkDatabaseConnection();
-            } catch (Exception $e) {
-                error_log('Database connection check failed: ' . $e->getMessage());
-                throw $e;
-            }
-            
-            // Проверяем существование необходимых таблиц
-            try {
-                checkRequiredTables();
-            } catch (Exception $e) {
-                error_log('Table check failed: ' . $e->getMessage());
-                throw $e;
             }
             
             $data = json_decode(file_get_contents('php://input'), true);
@@ -375,72 +295,97 @@ if (basename($_SERVER['SCRIPT_FILENAME']) === 'auth.php') {
             $db = getDB();
             
             // Проверка существования email
-            try {
-                $stmt = $db->prepare('SELECT id FROM users WHERE email = ?');
-                $stmt->execute([$email]);
-                
-                if ($stmt->fetch()) {
-                    throw new Exception('Пользователь с таким email уже существует', 409);
-                }
-            } catch (PDOException $e) {
-                error_log('Database error checking email: ' . $e->getMessage());
-                throw new Exception('Ошибка проверки email. Проверьте настройку базы данных.', 500);
+            $stmt = $db->prepare('SELECT id FROM users WHERE email = ?');
+            $stmt->execute([$email]);
+            
+            if ($stmt->fetch()) {
+                throw new Exception('Пользователь с таким email уже существует', 409);
             }
             
             // Создание пользователя
-            try {
-                $stmt = $db->prepare('
-                    INSERT INTO users (email, password, first_name, last_name)
-                    VALUES (?, ?, ?, ?)
-                ');
-                
-                $stmt->execute([
-                    $email,
-                    hashPassword($password),
-                    $firstName,
-                    $lastName
-                ]);
-                
-                $userId = (int) $db->lastInsertId();
-                
-                if ($userId === 0) {
-                    throw new Exception('Не удалось создать пользователя', 500);
-                }
-            } catch (PDOException $e) {
-                error_log('Database error creating user: ' . $e->getMessage());
-                throw new Exception('Ошибка создания пользователя. Проверьте настройку базы данных.', 500);
-            }
+            $stmt = $db->prepare('
+                INSERT INTO users (email, password, first_name, last_name)
+                VALUES (?, ?, ?, ?)
+            ');
+            
+            $stmt->execute([
+                $email,
+                hashPassword($password),
+                $firstName,
+                $lastName
+            ]);
+            
+            $userId = (int) $db->lastInsertId();
             
             // Создание начальных балансов (функция уже обрабатывает ошибки внутри)
             createInitialBalances($userId);
             
-            // Синхронизация с Supabase (в фоне, не блокируем ответ)
-            // Используем отдельный процесс, чтобы не блокировать ответ
+            // Синхронизация с Supabase
+            // Сначала пробуем прямую синхронизацию, если доступна
             try {
-                $syncData = [
-                    'user_id' => $userId
-                ];
+                // Проверяем, что Supabase настроен
+                $supabaseConfigured = false;
+                try {
+                    if (function_exists('getSupabaseClient')) {
+                        $testClient = getSupabaseClient();
+                        $supabaseConfigured = ($testClient !== null);
+                    }
+                } catch (Exception $e) {
+                    error_log("Supabase client check failed: " . $e->getMessage());
+                    $supabaseConfigured = false;
+                }
                 
-                // Используем curl для асинхронного запроса (не ждем ответа)
-                $ch = curl_init('http' . (isset($_SERVER['HTTPS']) ? 's' : '') . '://' . $_SERVER['HTTP_HOST'] . '/api/sync.php?action=user');
-                curl_setopt_array($ch, [
-                    CURLOPT_POST => true,
-                    CURLOPT_POSTFIELDS => json_encode($syncData),
-                    CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-                    CURLOPT_RETURNTRANSFER => true, // Возвращаем результат вместо вывода
-                    CURLOPT_TIMEOUT => 1, // Таймаут 1 секунда, не ждем
-                    CURLOPT_NOSIGNAL => 1,
-                    CURLOPT_CONNECTTIMEOUT => 1, // Таймаут подключения 1 секунда
-                ]);
-                // Игнорируем результат, чтобы не блокировать ответ
-                @curl_exec($ch);
-                @curl_close($ch);
+                if (!$supabaseConfigured) {
+                    error_log("Supabase not configured - skipping sync for user ID $userId");
+                } elseif (function_exists('syncUserToSupabase')) {
+                    // Прямая синхронизация - быстрее и надежнее
+                    try {
+                        syncUserToSupabase($userId);
+                        error_log("User ID $userId (email: $email) synced to Supabase successfully (direct sync)");
+                    } catch (Exception $syncException) {
+                        error_log("Direct sync failed for user ID $userId: " . $syncException->getMessage());
+                        throw $syncException; // Пробрасываем для обработки в общем catch
+                    }
+                } else {
+                    // Если функция недоступна, используем HTTP запрос
+                    $syncData = [
+                        'user_id' => $userId
+                    ];
+                    
+                    // Используем curl с увеличенным таймаутом и логированием
+                    $syncUrl = 'http' . (isset($_SERVER['HTTPS']) ? 's' : '') . '://' . $_SERVER['HTTP_HOST'] . '/api/sync.php?action=user';
+                    $ch = curl_init($syncUrl);
+                    curl_setopt_array($ch, [
+                        CURLOPT_POST => true,
+                        CURLOPT_POSTFIELDS => json_encode($syncData),
+                        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                        CURLOPT_RETURNTRANSFER => true,
+                        CURLOPT_TIMEOUT => 5, // Увеличенный таймаут до 5 секунд
+                        CURLOPT_CONNECTTIMEOUT => 3, // Таймаут подключения 3 секунды
+                        CURLOPT_SSL_VERIFYPEER => true,
+                    ]);
+                    
+                    $response = curl_exec($ch);
+                    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                    $curlError = curl_error($ch);
+                    curl_close($ch);
+                    
+                    if ($curlError) {
+                        error_log("Supabase sync cURL error for user ID $userId (email: $email): $curlError");
+                    } elseif ($httpCode >= 400) {
+                        error_log("Supabase sync HTTP error for user ID $userId (email: $email): HTTP $httpCode - " . substr($response, 0, 200));
+                    } else {
+                        error_log("User ID $userId (email: $email) synced to Supabase successfully (HTTP sync)");
+                    }
+                }
             } catch (Exception $e) {
-                // Игнорируем ошибки синхронизации при регистрации
-                error_log('Supabase sync error on registration: ' . $e->getMessage());
+                // Логируем ошибки синхронизации, но не прерываем регистрацию
+                error_log("Supabase sync error on registration for user ID $userId (email: $email): " . $e->getMessage());
+                error_log("Stack trace: " . $e->getTraceAsString());
             } catch (Throwable $e) {
                 // Перехватываем все ошибки, включая фатальные
-                error_log('Supabase sync fatal error on registration: ' . $e->getMessage());
+                error_log("Supabase sync fatal error on registration for user ID $userId (email: $email): " . $e->getMessage());
+                error_log("Stack trace: " . $e->getTraceAsString());
             }
             
             // Создание сессии (функция уже обрабатывает ошибки внутри)
@@ -816,8 +761,8 @@ if (basename($_SERVER['SCRIPT_FILENAME']) === 'auth.php') {
             
         default:
             throw new Exception('Unknown action', 400);
-    }
-} catch (PDOException $e) {
+        }
+    } catch (PDOException $e) {
     ob_end_clean();
     http_response_code(500);
     echo json_encode([
@@ -840,4 +785,5 @@ if (basename($_SERVER['SCRIPT_FILENAME']) === 'auth.php') {
         'error' => $e->getMessage()
     ]);
     exit;
+    }
 }

@@ -262,8 +262,8 @@ if (basename($_SERVER['SCRIPT_FILENAME']) === 'auth.php') {
     $action = $_GET['action'] ?? '';
 
     try {
-    switch ($action) {
-        case 'register':
+        switch ($action) {
+            case 'register':
             if ($method !== 'POST') {
                 throw new Exception('Method not allowed', 405);
             }
@@ -320,33 +320,72 @@ if (basename($_SERVER['SCRIPT_FILENAME']) === 'auth.php') {
             // Создание начальных балансов (функция уже обрабатывает ошибки внутри)
             createInitialBalances($userId);
             
-            // Синхронизация с Supabase (в фоне, не блокируем ответ)
-            // Используем отдельный процесс, чтобы не блокировать ответ
+            // Синхронизация с Supabase
+            // Сначала пробуем прямую синхронизацию, если доступна
             try {
-                $syncData = [
-                    'user_id' => $userId
-                ];
+                // Проверяем, что Supabase настроен
+                $supabaseConfigured = false;
+                try {
+                    if (function_exists('getSupabaseClient')) {
+                        $testClient = getSupabaseClient();
+                        $supabaseConfigured = ($testClient !== null);
+                    }
+                } catch (Exception $e) {
+                    error_log("Supabase client check failed: " . $e->getMessage());
+                    $supabaseConfigured = false;
+                }
                 
-                // Используем curl для асинхронного запроса (не ждем ответа)
-                $ch = curl_init('http' . (isset($_SERVER['HTTPS']) ? 's' : '') . '://' . $_SERVER['HTTP_HOST'] . '/api/sync.php?action=user');
-                curl_setopt_array($ch, [
-                    CURLOPT_POST => true,
-                    CURLOPT_POSTFIELDS => json_encode($syncData),
-                    CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-                    CURLOPT_RETURNTRANSFER => true, // Возвращаем результат вместо вывода
-                    CURLOPT_TIMEOUT => 1, // Таймаут 1 секунда, не ждем
-                    CURLOPT_NOSIGNAL => 1,
-                    CURLOPT_CONNECTTIMEOUT => 1, // Таймаут подключения 1 секунда
-                ]);
-                // Игнорируем результат, чтобы не блокировать ответ
-                @curl_exec($ch);
-                @curl_close($ch);
+                if (!$supabaseConfigured) {
+                    error_log("Supabase not configured - skipping sync for user ID $userId");
+                } elseif (function_exists('syncUserToSupabase')) {
+                    // Прямая синхронизация - быстрее и надежнее
+                    try {
+                        syncUserToSupabase($userId);
+                        error_log("User ID $userId (email: $email) synced to Supabase successfully (direct sync)");
+                    } catch (Exception $syncException) {
+                        error_log("Direct sync failed for user ID $userId: " . $syncException->getMessage());
+                        throw $syncException; // Пробрасываем для обработки в общем catch
+                    }
+                } else {
+                    // Если функция недоступна, используем HTTP запрос
+                    $syncData = [
+                        'user_id' => $userId
+                    ];
+                    
+                    // Используем curl с увеличенным таймаутом и логированием
+                    $syncUrl = 'http' . (isset($_SERVER['HTTPS']) ? 's' : '') . '://' . $_SERVER['HTTP_HOST'] . '/api/sync.php?action=user';
+                    $ch = curl_init($syncUrl);
+                    curl_setopt_array($ch, [
+                        CURLOPT_POST => true,
+                        CURLOPT_POSTFIELDS => json_encode($syncData),
+                        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                        CURLOPT_RETURNTRANSFER => true,
+                        CURLOPT_TIMEOUT => 5, // Увеличенный таймаут до 5 секунд
+                        CURLOPT_CONNECTTIMEOUT => 3, // Таймаут подключения 3 секунды
+                        CURLOPT_SSL_VERIFYPEER => true,
+                    ]);
+                    
+                    $response = curl_exec($ch);
+                    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                    $curlError = curl_error($ch);
+                    curl_close($ch);
+                    
+                    if ($curlError) {
+                        error_log("Supabase sync cURL error for user ID $userId (email: $email): $curlError");
+                    } elseif ($httpCode >= 400) {
+                        error_log("Supabase sync HTTP error for user ID $userId (email: $email): HTTP $httpCode - " . substr($response, 0, 200));
+                    } else {
+                        error_log("User ID $userId (email: $email) synced to Supabase successfully (HTTP sync)");
+                    }
+                }
             } catch (Exception $e) {
-                // Игнорируем ошибки синхронизации при регистрации
-                error_log('Supabase sync error on registration: ' . $e->getMessage());
+                // Логируем ошибки синхронизации, но не прерываем регистрацию
+                error_log("Supabase sync error on registration for user ID $userId (email: $email): " . $e->getMessage());
+                error_log("Stack trace: " . $e->getTraceAsString());
             } catch (Throwable $e) {
                 // Перехватываем все ошибки, включая фатальные
-                error_log('Supabase sync fatal error on registration: ' . $e->getMessage());
+                error_log("Supabase sync fatal error on registration for user ID $userId (email: $email): " . $e->getMessage());
+                error_log("Stack trace: " . $e->getTraceAsString());
             }
             
             // Создание сессии (функция уже обрабатывает ошибки внутри)
@@ -722,8 +761,8 @@ if (basename($_SERVER['SCRIPT_FILENAME']) === 'auth.php') {
             
         default:
             throw new Exception('Unknown action', 400);
-    }
-} catch (PDOException $e) {
+        }
+    } catch (PDOException $e) {
     ob_end_clean();
     http_response_code(500);
     echo json_encode([
@@ -746,4 +785,5 @@ if (basename($_SERVER['SCRIPT_FILENAME']) === 'auth.php') {
         'error' => $e->getMessage()
     ]);
     exit;
+    }
 }

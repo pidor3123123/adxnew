@@ -11,13 +11,18 @@ require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../config/supabase.php';
 require_once __DIR__ . '/auth.php';
 
-header('Content-Type: application/json; charset=utf-8');
+/**
+ * Основная логика API синхронизации
+ * Выполняется только при прямом запросе к sync.php, а не при require_once в других файлах
+ */
+if (basename($_SERVER['SCRIPT_FILENAME']) === 'sync.php') {
+    header('Content-Type: application/json; charset=utf-8');
 
-$method = $_SERVER['REQUEST_METHOD'];
-$action = $_GET['action'] ?? '';
+    $method = $_SERVER['REQUEST_METHOD'];
+    $action = $_GET['action'] ?? '';
 
-try {
-    switch ($action) {
+    try {
+        switch ($action) {
         case 'user':
             if ($method !== 'POST') {
                 throw new Exception('Method not allowed', 405);
@@ -118,22 +123,23 @@ try {
             
         default:
             throw new Exception('Unknown action', 400);
+        }
+        
+    } catch (Exception $e) {
+        $code = $e->getCode();
+        if (!is_numeric($code) || $code < 100 || $code > 599) {
+            $code = 500;
+        }
+        $code = (int)$code;
+        http_response_code($code);
+        
+        ob_end_clean();
+        echo json_encode([
+            'success' => false,
+            'error' => $e->getMessage()
+        ]);
+        exit;
     }
-    
-} catch (Exception $e) {
-    $code = $e->getCode();
-    if (!is_numeric($code) || $code < 100 || $code > 599) {
-        $code = 500;
-    }
-    $code = (int)$code;
-    http_response_code($code);
-    
-    ob_end_clean();
-    echo json_encode([
-        'success' => false,
-        'error' => $e->getMessage()
-    ]);
-    exit;
 }
 
 /**
