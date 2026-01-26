@@ -317,6 +317,160 @@ function syncOrderToSupabase(int $orderId): void {
 }
 
 /**
+ * Синхронизация баланса из Supabase в MySQL
+ * Используется когда баланс обновляется через админ панель
+ */
+function syncBalanceFromSupabase(string $supabaseUserId, string $currency, float $availableBalance, float $lockedBalance): void {
+    try {
+        $db = getDB();
+        $supabase = getSupabaseClient();
+        
+        // Получаем email пользователя из Supabase
+        $user = $supabase->get('users', 'id', $supabaseUserId, 'email');
+        if (!$user || !isset($user['email'])) {
+            throw new Exception("User not found in Supabase: $supabaseUserId");
+        }
+        
+        $email = $user['email'];
+        
+        // Находим MySQL user_id по email
+        $stmt = $db->prepare('SELECT id FROM users WHERE email = ?');
+        $stmt->execute([$email]);
+        $mysqlUser = $stmt->fetch();
+        
+        if (!$mysqlUser) {
+            // Пользователь не найден в MySQL - возможно, он был создан только в админ панели
+            // Попробуем синхронизировать пользователя сначала
+            try {
+                syncUserFromSupabase($supabaseUserId);
+                // Повторно ищем пользователя
+                $stmt = $db->prepare('SELECT id FROM users WHERE email = ?');
+                $stmt->execute([$email]);
+                $mysqlUser = $stmt->fetch();
+                
+                if (!$mysqlUser) {
+                    throw new Exception("Failed to sync user from Supabase: $email");
+                }
+            } catch (Exception $e) {
+                error_log("Failed to sync user before balance sync: " . $e->getMessage());
+                throw new Exception("User not found in MySQL and sync failed: $email");
+            }
+        }
+        
+        $mysqlUserId = $mysqlUser['id'];
+        
+        // Обновляем или создаем баланс в MySQL
+        $stmt = $db->prepare('
+            INSERT INTO balances (user_id, currency, available, reserved)
+            VALUES (?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+                available = VALUES(available),
+                reserved = VALUES(reserved),
+                updated_at = CURRENT_TIMESTAMP
+        ');
+        $stmt->execute([
+            $mysqlUserId,
+            $currency,
+            $availableBalance,
+            $lockedBalance
+        ]);
+        
+        error_log("Synced balance from Supabase to MySQL: user_id=$mysqlUserId, currency=$currency, available=$availableBalance, locked=$lockedBalance");
+        
+    } catch (Exception $e) {
+        error_log("Supabase balance sync error: " . $e->getMessage());
+        throw $e;
+    }
+}
+
+/**
+ * Синхронизация пользователя из Supabase в MySQL
+ * Используется когда пользователь создается или обновляется через админ панель
+ */
+function syncUserFromSupabase(string $supabaseUserId): void {
+    try {
+        $db = getDB();
+        $supabase = getSupabaseClient();
+        
+        // Получаем данные пользователя из Supabase
+        $supabaseUser = $supabase->get('users', 'id', $supabaseUserId);
+        if (!$supabaseUser) {
+            throw new Exception("User not found in Supabase: $supabaseUserId");
+        }
+        
+        $email = $supabaseUser['email'] ?? null;
+        if (!$email) {
+            throw new Exception("User email not found in Supabase: $supabaseUserId");
+        }
+        
+        // Проверяем, существует ли пользователь в MySQL
+        $stmt = $db->prepare('SELECT id FROM users WHERE email = ?');
+        $stmt->execute([$email]);
+        $mysqlUser = $stmt->fetch();
+        
+        if ($mysqlUser) {
+            // Пользователь существует - обновляем данные
+            $mysqlUserId = $mysqlUser['id'];
+            
+            $stmt = $db->prepare('
+                UPDATE users SET
+                    first_name = ?,
+                    last_name = ?,
+                    country = ?,
+                    is_verified = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ');
+            $stmt->execute([
+                $supabaseUser['first_name'] ?? '',
+                $supabaseUser['last_name'] ?? '',
+                $supabaseUser['country'] ?? 'US',
+                $supabaseUser['is_verified'] ? 1 : 0,
+                $mysqlUserId
+            ]);
+            
+            error_log("Updated user from Supabase to MySQL: user_id=$mysqlUserId, email=$email");
+        } else {
+            // Пользователь не существует - создаем нового
+            // Генерируем случайный пароль (пользователь не сможет войти через основной сайт,
+            // но это нормально, так как он был создан в админ панели)
+            $tempPassword = password_hash(bin2hex(random_bytes(16)), PASSWORD_DEFAULT);
+            
+            $stmt = $db->prepare('
+                INSERT INTO users (email, password, first_name, last_name, country, is_verified, is_active, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, 1, NOW())
+            ');
+            $stmt->execute([
+                $email,
+                $tempPassword,
+                $supabaseUser['first_name'] ?? '',
+                $supabaseUser['last_name'] ?? '',
+                $supabaseUser['country'] ?? 'US',
+                $supabaseUser['is_verified'] ? 1 : 0
+            ]);
+            
+            $mysqlUserId = $db->lastInsertId();
+            
+            // Создаем начальные балансы для нового пользователя
+            try {
+                require_once __DIR__ . '/auth.php';
+                if (function_exists('createInitialBalances')) {
+                    createInitialBalances($mysqlUserId);
+                }
+            } catch (Exception $e) {
+                error_log("Failed to create initial balances for synced user: " . $e->getMessage());
+            }
+            
+            error_log("Created user from Supabase in MySQL: user_id=$mysqlUserId, email=$email");
+        }
+        
+    } catch (Exception $e) {
+        error_log("Supabase user sync error: " . $e->getMessage());
+        throw $e;
+    }
+}
+
+/**
  * Обработка webhook от админ панели
  */
 function handleAdminWebhook(string $type, array $payload): void {

@@ -59,6 +59,9 @@ try {
     
     $db = getDB();
     
+    // Загружаем функции синхронизации
+    require_once __DIR__ . '/sync.php';
+    
     switch ($type) {
         case 'user_blocked':
         case 'user_unblocked':
@@ -66,11 +69,56 @@ try {
             break;
             
         case 'balance_updated':
-            handleBalanceUpdate($db, $payload);
+            // Используем новую функцию синхронизации из Supabase
+            $supabaseUserId = $payload['user_id'] ?? null;
+            $email = $payload['email'] ?? null;
+            $currency = $payload['currency'] ?? null;
+            $available = $payload['available_balance'] ?? null;
+            $locked = $payload['locked_balance'] ?? null;
+            
+            if (!$currency) {
+                throw new Exception('currency is required', 400);
+            }
+            
+            if ($supabaseUserId && function_exists('syncBalanceFromSupabase')) {
+                // Используем новую функцию синхронизации
+                syncBalanceFromSupabase(
+                    $supabaseUserId,
+                    $currency,
+                    (float)($available ?? 0),
+                    (float)($locked ?? 0)
+                );
+            } else {
+                // Fallback на старый метод
+                handleBalanceUpdate($db, $payload);
+            }
+            break;
+            
+        case 'user_created':
+            // Синхронизация пользователя из админ панели в MySQL
+            $supabaseUserId = $payload['user_id'] ?? null;
+            
+            if (!$supabaseUserId) {
+                throw new Exception('user_id is required', 400);
+            }
+            
+            if (function_exists('syncUserFromSupabase')) {
+                syncUserFromSupabase($supabaseUserId);
+            } else {
+                throw new Exception('syncUserFromSupabase function not available', 500);
+            }
             break;
             
         case 'user_updated':
-            handleUserUpdate($db, $payload);
+            // Обновление пользователя - синхронизируем обратно в MySQL
+            $supabaseUserId = $payload['user_id'] ?? null;
+            
+            if ($supabaseUserId && function_exists('syncUserFromSupabase')) {
+                syncUserFromSupabase($supabaseUserId);
+            } else {
+                // Fallback на старый метод
+                handleUserUpdate($db, $payload);
+            }
             break;
             
         default:

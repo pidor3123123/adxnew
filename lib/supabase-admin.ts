@@ -412,6 +412,7 @@ export async function updateBalance(
 
   // Send webhook to main site
   await sendWebhook('balance_updated', {
+    user_id: oldBalance.user_id, // Supabase UUID
     email: user?.email,
     currency: oldBalance.currency,
     available_balance: updates.available_balance ?? oldBalance.available_balance,
