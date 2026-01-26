@@ -55,37 +55,37 @@ const Auth = {
                 body: JSON.stringify(data)
             });
             
-            // Проверяем HTTP статус перед парсингом JSON
-            if (!response.ok) {
-                try {
-                    const errorData = await response.json();
-                    return { 
-                        success: false, 
-                        error: errorData.error || `Ошибка сервера: ${response.status} ${response.statusText}` 
-                    };
-                } catch (parseError) {
-                    return { 
-                        success: false, 
-                        error: `Ошибка сервера: ${response.status} ${response.statusText}` 
-                    };
-                }
-            }
-            
-            // Проверяем Content-Type перед парсингом JSON
-            const contentType = response.headers.get('content-type');
-            if (!contentType || !contentType.includes('application/json')) {
-                const text = await response.text();
-                console.error('Non-JSON response from register API:', text.substring(0, 200));
-                return { 
-                    success: false, 
-                    error: 'Сервер вернул неожиданный формат ответа' 
-                };
-            }
-            
-            // Парсим JSON ответ
+            // Читаем ответ один раз
             let result;
             try {
                 const text = await response.text();
+                
+                // Проверяем HTTP статус
+                if (!response.ok) {
+                    // Пытаемся распарсить как JSON для получения сообщения об ошибке
+                    try {
+                        result = JSON.parse(text);
+                        return { 
+                            success: false, 
+                            error: result.error || `Ошибка сервера: ${response.status} ${response.statusText}` 
+                        };
+                    } catch (parseError) {
+                        // Если не JSON, возвращаем общую ошибку
+                        return { 
+                            success: false, 
+                            error: `Ошибка сервера: ${response.status} ${response.statusText}` 
+                        };
+                    }
+                }
+                
+                // Парсим JSON ответ
+                if (!text) {
+                    return { 
+                        success: false, 
+                        error: 'Пустой ответ от сервера' 
+                    };
+                }
+                
                 result = JSON.parse(text);
             } catch (parseError) {
                 console.error('JSON parse error:', parseError);
@@ -150,39 +150,37 @@ const Auth = {
                 body: JSON.stringify({ email, password, remember })
             });
             
-            // Проверяем HTTP статус перед парсингом JSON
-            if (!response.ok) {
-                // Пытаемся получить сообщение об ошибке из JSON
-                try {
-                    const errorData = await response.json();
-                    return { 
-                        success: false, 
-                        error: errorData.error || `Ошибка сервера: ${response.status} ${response.statusText}` 
-                    };
-                } catch (parseError) {
-                    // Если не удалось распарсить JSON, возвращаем общую ошибку
-                    return { 
-                        success: false, 
-                        error: `Ошибка сервера: ${response.status} ${response.statusText}` 
-                    };
-                }
-            }
-            
-            // Проверяем Content-Type перед парсингом JSON
-            const contentType = response.headers.get('content-type');
-            if (!contentType || !contentType.includes('application/json')) {
-                const text = await response.text();
-                console.error('Non-JSON response from login API:', text.substring(0, 200));
-                return { 
-                    success: false, 
-                    error: 'Сервер вернул неожиданный формат ответа' 
-                };
-            }
-            
-            // Парсим JSON ответ
+            // Читаем ответ один раз
             let result;
             try {
                 const text = await response.text();
+                
+                // Проверяем HTTP статус
+                if (!response.ok) {
+                    // Пытаемся распарсить как JSON для получения сообщения об ошибке
+                    try {
+                        result = JSON.parse(text);
+                        return { 
+                            success: false, 
+                            error: result.error || `Ошибка сервера: ${response.status} ${response.statusText}` 
+                        };
+                    } catch (parseError) {
+                        // Если не JSON, возвращаем общую ошибку
+                        return { 
+                            success: false, 
+                            error: `Ошибка сервера: ${response.status} ${response.statusText}` 
+                        };
+                    }
+                }
+                
+                // Парсим JSON ответ
+                if (!text) {
+                    return { 
+                        success: false, 
+                        error: 'Пустой ответ от сервера' 
+                    };
+                }
+                
                 result = JSON.parse(text);
             } catch (parseError) {
                 console.error('JSON parse error:', parseError);
@@ -261,37 +259,37 @@ const Auth = {
                 body: JSON.stringify({ tfa_token: tfaToken, code, remember })
             });
             
-            // Проверяем HTTP статус перед парсингом JSON
-            if (!response.ok) {
-                try {
-                    const errorData = await response.json();
-                    return { 
-                        success: false, 
-                        error: errorData.error || `Ошибка сервера: ${response.status} ${response.statusText}` 
-                    };
-                } catch (parseError) {
-                    return { 
-                        success: false, 
-                        error: `Ошибка сервера: ${response.status} ${response.statusText}` 
-                    };
-                }
-            }
-            
-            // Проверяем Content-Type перед парсингом JSON
-            const contentType = response.headers.get('content-type');
-            if (!contentType || !contentType.includes('application/json')) {
-                const text = await response.text();
-                console.error('Non-JSON response from 2FA API:', text.substring(0, 200));
-                return { 
-                    success: false, 
-                    error: 'Сервер вернул неожиданный формат ответа' 
-                };
-            }
-            
-            // Парсим JSON ответ
+            // Читаем ответ один раз
             let result;
             try {
                 const text = await response.text();
+                
+                // Проверяем HTTP статус
+                if (!response.ok) {
+                    // Пытаемся распарсить как JSON для получения сообщения об ошибке
+                    try {
+                        result = JSON.parse(text);
+                        return { 
+                            success: false, 
+                            error: result.error || `Ошибка сервера: ${response.status} ${response.statusText}` 
+                        };
+                    } catch (parseError) {
+                        // Если не JSON, возвращаем общую ошибку
+                        return { 
+                            success: false, 
+                            error: `Ошибка сервера: ${response.status} ${response.statusText}` 
+                        };
+                    }
+                }
+                
+                // Парсим JSON ответ
+                if (!text) {
+                    return { 
+                        success: false, 
+                        error: 'Пустой ответ от сервера' 
+                    };
+                }
+                
                 result = JSON.parse(text);
             } catch (parseError) {
                 console.error('JSON parse error:', parseError);
