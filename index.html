@@ -1166,8 +1166,9 @@
                 <div class="tradingview-ticker-container" style="width: 100%; height: 100%;">
                     <div class="tradingview-widget-container" style="height: 100%;">
                         <div class="tradingview-widget-container__widget"></div>
-                        <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js" async>
-                        {
+                        <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js" async></script>
+                        <script type="text/javascript">
+                        new TradingView.widget({
                             "symbols": [
                                 ${popularAssets.map(coin => {
                                     const symbol = coin.symbol.toUpperCase();
@@ -1180,7 +1181,7 @@
                             "isTransparent": true,
                             "displayMode": "adaptive",
                             "locale": "ru"
-                        }
+                        });
                         </script>
                     </div>
                 </div>
@@ -1220,22 +1221,29 @@
                 }
             }
             
+            // Проверяем, что pathData не пустой
+            if (!pathData || pathData.trim() === '') {
+                pathData = `M ${padding} ${height / 2} L ${width - padding} ${height / 2}`;
+            }
+            
+            const gradientId = `sparkline-gradient-${isPositive ? 'up' : 'down'}`;
+            
             return `
                 <svg class="sparkline-svg" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <linearGradient id="${gradientId}" x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" style="stop-color:${color};stop-opacity:0.3" />
+                            <stop offset="100%" style="stop-color:${color};stop-opacity:0" />
+                        </linearGradient>
+                    </defs>
                     <path d="${pathData}" 
                           stroke="${color}" 
                           stroke-width="2" 
                           fill="none" 
                           stroke-linecap="round" 
                           stroke-linejoin="round"/>
-                    <defs>
-                        <linearGradient id="sparkline-gradient-${isPositive ? 'up' : 'down'}" x1="0%" y1="0%" x2="0%" y2="100%">
-                            <stop offset="0%" style="stop-color:${color};stop-opacity:0.3" />
-                            <stop offset="100%" style="stop-color:${color};stop-opacity:0" />
-                        </linearGradient>
-                    </defs>
                     <path d="${pathData} L ${padding + chartWidth} ${height - padding} L ${padding} ${height - padding} Z" 
-                          fill="url(#sparkline-gradient-${isPositive ? 'up' : 'down'})"/>
+                          fill="url(#${gradientId})"/>
                 </svg>
             `;
         }
