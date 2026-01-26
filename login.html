@@ -385,6 +385,25 @@
                         tfaData.remember = result.remember;
                         showTFAForm();
                     } else {
+                        // Проверяем, что токен действительно был установлен
+                        const token = Auth.getToken();
+                        if (!token) {
+                            formError.classList.remove('hidden');
+                            errorMessage.textContent = 'Ошибка: токен не был сохранен. Попробуйте еще раз.';
+                            console.error('Login successful but token not saved:', result);
+                            return;
+                        }
+                        
+                        // Проверяем, что пользователь также был сохранен
+                        const user = Auth.getUser();
+                        if (!user) {
+                            formError.classList.remove('hidden');
+                            errorMessage.textContent = 'Ошибка: данные пользователя не были сохранены. Попробуйте еще раз.';
+                            console.error('Login successful but user data not saved:', result);
+                            return;
+                        }
+                        
+                        // Все проверки пройдены, выполняем редирект
                         window.location.href = 'index.html';
                     }
                 } else {
@@ -394,6 +413,7 @@
             } catch (error) {
                 formError.classList.remove('hidden');
                 errorMessage.textContent = 'Ошибка сервера. Попробуйте позже.';
+                console.error('Login error:', error);
             } finally {
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = '<span>Войти</span><i class="bi bi-arrow-right"></i>';
@@ -423,6 +443,25 @@
                 const result = await Auth.login2FA(tfaData.token, code, tfaData.remember);
                 
                 if (result.success) {
+                    // Проверяем, что токен действительно был установлен
+                    const token = Auth.getToken();
+                    if (!token) {
+                        tfaError.classList.remove('hidden');
+                        tfaErrorMessage.textContent = 'Ошибка: токен не был сохранен. Попробуйте еще раз.';
+                        console.error('2FA login successful but token not saved:', result);
+                        return;
+                    }
+                    
+                    // Проверяем, что пользователь также был сохранен
+                    const user = Auth.getUser();
+                    if (!user) {
+                        tfaError.classList.remove('hidden');
+                        tfaErrorMessage.textContent = 'Ошибка: данные пользователя не были сохранены. Попробуйте еще раз.';
+                        console.error('2FA login successful but user data not saved:', result);
+                        return;
+                    }
+                    
+                    // Все проверки пройдены, выполняем редирект
                     window.location.href = 'index.html';
                 } else {
                     tfaError.classList.remove('hidden');
