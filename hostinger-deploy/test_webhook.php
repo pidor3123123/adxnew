@@ -239,12 +239,24 @@ try {
     exit;
 }
 
+// Загрузка конфигурации webhook
+try {
+    if (file_exists(__DIR__ . '/config/webhook.php')) {
+        require_once __DIR__ . '/config/webhook.php';
+        addResult('Загрузка config/webhook.php', 'success', 'Файл конфигурации webhook загружен');
+    } else {
+        addResult('Загрузка config/webhook.php', 'warning', 'Файл config/webhook.php не найден, используется getenv()');
+    }
+} catch (Throwable $e) {
+    addResult('Загрузка config/webhook.php', 'warning', 'Ошибка загрузки: ' . $e->getMessage() . ', используется getenv()');
+}
+
 // Проверка конфигурации
-$webhookSecret = getenv('WEBHOOK_SECRET');
+$webhookSecret = defined('WEBHOOK_SECRET') ? WEBHOOK_SECRET : getenv('WEBHOOK_SECRET');
 if (empty($webhookSecret)) {
-    addResult('WEBHOOK_SECRET', 'error', 'WEBHOOK_SECRET не установлен в переменных окружения');
+    addResult('WEBHOOK_SECRET', 'error', 'WEBHOOK_SECRET не установлен. Проверьте config/webhook.php или переменные окружения');
 } else {
-    addResult('WEBHOOK_SECRET', 'success', 'WEBHOOK_SECRET установлен');
+    addResult('WEBHOOK_SECRET', 'success', 'WEBHOOK_SECRET установлен (длина: ' . strlen($webhookSecret) . ' символов)');
 }
 
 $webhookUrl = 'http' . (isset($_SERVER['HTTPS']) ? 's' : '') . '://' . $_SERVER['HTTP_HOST'] . '/api/webhook.php';

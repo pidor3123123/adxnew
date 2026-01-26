@@ -6,6 +6,7 @@
  */
 
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../config/webhook.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -23,7 +24,7 @@ if ($method !== 'POST') {
 
 // Валидация webhook секрета
 $webhookSecret = $_SERVER['HTTP_X_WEBHOOK_SECRET'] ?? '';
-$expectedSecret = getenv('WEBHOOK_SECRET');
+$expectedSecret = defined('WEBHOOK_SECRET') ? WEBHOOK_SECRET : getenv('WEBHOOK_SECRET');
 
 if (empty($expectedSecret)) {
     http_response_code(500);
