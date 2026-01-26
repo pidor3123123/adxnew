@@ -55,16 +55,85 @@ const Auth = {
                 body: JSON.stringify(data)
             });
             
-            const result = await response.json();
+            // Читаем ответ один раз
+            let result;
+            try {
+                const text = await response.text();
+                
+                // Проверяем HTTP статус
+                if (!response.ok) {
+                    // Пытаемся распарсить как JSON для получения сообщения об ошибке
+                    try {
+                        result = JSON.parse(text);
+                        return { 
+                            success: false, 
+                            error: result.error || `Ошибка сервера: ${response.status} ${response.statusText}` 
+                        };
+                    } catch (parseError) {
+                        // Если не JSON, возвращаем общую ошибку
+                        return { 
+                            success: false, 
+                            error: `Ошибка сервера: ${response.status} ${response.statusText}` 
+                        };
+                    }
+                }
+                
+                // Парсим JSON ответ
+                if (!text) {
+                    return { 
+                        success: false, 
+                        error: 'Пустой ответ от сервера' 
+                    };
+                }
+                
+                result = JSON.parse(text);
+            } catch (parseError) {
+                console.error('JSON parse error:', parseError);
+                return { 
+                    success: false, 
+                    error: 'Ошибка обработки ответа сервера' 
+                };
+            }
             
             if (result.success) {
+                if (!result.token) {
+                    console.error('Registration successful but token missing:', result);
+                    return { 
+                        success: false, 
+                        error: 'Ошибка: токен не получен от сервера' 
+                    };
+                }
+                
+                if (!result.user) {
+                    console.error('Registration successful but user data missing:', result);
+                    return { 
+                        success: false, 
+                        error: 'Ошибка: данные пользователя не получены от сервера' 
+                    };
+                }
+                
+                // Сохраняем токен и данные пользователя
                 this.setToken(result.token);
                 this.setUser(result.user);
+                
+                // Проверяем, что токен действительно был сохранен
+                const savedToken = this.getToken();
+                if (!savedToken || savedToken !== result.token) {
+                    console.error('Token not saved correctly. Expected:', result.token, 'Got:', savedToken);
+                    return { 
+                        success: false, 
+                        error: 'Ошибка сохранения токена' 
+                    };
+                }
             }
             
             return result;
         } catch (error) {
-            return { success: false, error: error.message };
+            console.error('Registration request error:', error);
+            return { 
+                success: false, 
+                error: error.message || 'Ошибка подключения к серверу' 
+            };
         }
     },
     
@@ -81,22 +150,99 @@ const Auth = {
                 body: JSON.stringify({ email, password, remember })
             });
             
-            const result = await response.json();
+            // Читаем ответ один раз
+            let result;
+            try {
+                const text = await response.text();
+                
+                // Проверяем HTTP статус
+                if (!response.ok) {
+                    // Пытаемся распарсить как JSON для получения сообщения об ошибке
+                    try {
+                        result = JSON.parse(text);
+                        return { 
+                            success: false, 
+                            error: result.error || `Ошибка сервера: ${response.status} ${response.statusText}` 
+                        };
+                    } catch (parseError) {
+                        // Если не JSON, возвращаем общую ошибку
+                        return { 
+                            success: false, 
+                            error: `Ошибка сервера: ${response.status} ${response.statusText}` 
+                        };
+                    }
+                }
+                
+                // Парсим JSON ответ
+                if (!text) {
+                    return { 
+                        success: false, 
+                        error: 'Пустой ответ от сервера' 
+                    };
+                }
+                
+                result = JSON.parse(text);
+            } catch (parseError) {
+                console.error('JSON parse error:', parseError);
+                return { 
+                    success: false, 
+                    error: 'Ошибка обработки ответа сервера' 
+                };
+            }
             
             // Если требуется 2FA, возвращаем результат без установки токена
             if (result.success && result.requires_2fa) {
+                // Проверяем наличие обязательных полей для 2FA
+                if (!result.tfa_token) {
+                    console.error('2FA required but tfa_token missing:', result);
+                    return { 
+                        success: false, 
+                        error: 'Ошибка: токен 2FA не получен' 
+                    };
+                }
                 return result;
             }
             
-            // Обычный вход без 2FA
-            if (result.success && result.token) {
+            // Обычный вход без 2FA - проверяем наличие обязательных полей
+            if (result.success) {
+                if (!result.token) {
+                    console.error('Login successful but token missing:', result);
+                    return { 
+                        success: false, 
+                        error: 'Ошибка: токен не получен от сервера' 
+                    };
+                }
+                
+                if (!result.user) {
+                    console.error('Login successful but user data missing:', result);
+                    return { 
+                        success: false, 
+                        error: 'Ошибка: данные пользователя не получены от сервера' 
+                    };
+                }
+                
+                // Сохраняем токен и данные пользователя
                 this.setToken(result.token);
                 this.setUser(result.user);
+                
+                // Проверяем, что токен действительно был сохранен
+                const savedToken = this.getToken();
+                if (!savedToken || savedToken !== result.token) {
+                    console.error('Token not saved correctly. Expected:', result.token, 'Got:', savedToken);
+                    return { 
+                        success: false, 
+                        error: 'Ошибка сохранения токена' 
+                    };
+                }
             }
             
             return result;
         } catch (error) {
-            return { success: false, error: error.message };
+            console.error('Login request error:', error);
+            return { 
+                success: false, 
+                error: error.message || 'Ошибка подключения к серверу' 
+            };
         }
     },
     
@@ -113,16 +259,85 @@ const Auth = {
                 body: JSON.stringify({ tfa_token: tfaToken, code, remember })
             });
             
-            const result = await response.json();
+            // Читаем ответ один раз
+            let result;
+            try {
+                const text = await response.text();
+                
+                // Проверяем HTTP статус
+                if (!response.ok) {
+                    // Пытаемся распарсить как JSON для получения сообщения об ошибке
+                    try {
+                        result = JSON.parse(text);
+                        return { 
+                            success: false, 
+                            error: result.error || `Ошибка сервера: ${response.status} ${response.statusText}` 
+                        };
+                    } catch (parseError) {
+                        // Если не JSON, возвращаем общую ошибку
+                        return { 
+                            success: false, 
+                            error: `Ошибка сервера: ${response.status} ${response.statusText}` 
+                        };
+                    }
+                }
+                
+                // Парсим JSON ответ
+                if (!text) {
+                    return { 
+                        success: false, 
+                        error: 'Пустой ответ от сервера' 
+                    };
+                }
+                
+                result = JSON.parse(text);
+            } catch (parseError) {
+                console.error('JSON parse error:', parseError);
+                return { 
+                    success: false, 
+                    error: 'Ошибка обработки ответа сервера' 
+                };
+            }
             
-            if (result.success && result.token) {
+            if (result.success) {
+                if (!result.token) {
+                    console.error('2FA login successful but token missing:', result);
+                    return { 
+                        success: false, 
+                        error: 'Ошибка: токен не получен от сервера' 
+                    };
+                }
+                
+                if (!result.user) {
+                    console.error('2FA login successful but user data missing:', result);
+                    return { 
+                        success: false, 
+                        error: 'Ошибка: данные пользователя не получены от сервера' 
+                    };
+                }
+                
+                // Сохраняем токен и данные пользователя
                 this.setToken(result.token);
                 this.setUser(result.user);
+                
+                // Проверяем, что токен действительно был сохранен
+                const savedToken = this.getToken();
+                if (!savedToken || savedToken !== result.token) {
+                    console.error('Token not saved correctly. Expected:', result.token, 'Got:', savedToken);
+                    return { 
+                        success: false, 
+                        error: 'Ошибка сохранения токена' 
+                    };
+                }
             }
             
             return result;
         } catch (error) {
-            return { success: false, error: error.message };
+            console.error('2FA login request error:', error);
+            return { 
+                success: false, 
+                error: error.message || 'Ошибка подключения к серверу' 
+            };
         }
     },
     
@@ -167,21 +382,37 @@ const Auth = {
                 }
             });
             
-            const result = await response.json();
+            // Проверяем HTTP статус
+            if (!response.ok) {
+                // Если токен недействителен, очищаем данные
+                if (response.status === 401) {
+                    localStorage.removeItem(this.TOKEN_KEY);
+                    localStorage.removeItem(this.USER_KEY);
+                }
+                return null;
+            }
             
-            if (result.success) {
+            // Парсим JSON ответ
+            let result;
+            try {
+                const text = await response.text();
+                if (!text) {
+                    return null;
+                }
+                result = JSON.parse(text);
+            } catch (parseError) {
+                console.error('JSON parse error in fetchUser:', parseError);
+                return null;
+            }
+            
+            if (result.success && result.user) {
                 this.setUser(result.user);
                 return result;
             }
             
-            // Если токен недействителен, очищаем данные
-            if (response.status === 401) {
-                localStorage.removeItem(this.TOKEN_KEY);
-                localStorage.removeItem(this.USER_KEY);
-            }
-            
             return null;
         } catch (error) {
+            console.error('fetchUser error:', error);
             return null;
         }
     },
@@ -203,9 +434,27 @@ const Auth = {
                 }
             });
             
-            const result = await response.json();
-            return result.authenticated;
+            // Проверяем HTTP статус
+            if (!response.ok) {
+                return false;
+            }
+            
+            // Парсим JSON ответ
+            let result;
+            try {
+                const text = await response.text();
+                if (!text) {
+                    return false;
+                }
+                result = JSON.parse(text);
+            } catch (parseError) {
+                console.error('JSON parse error in checkAuth:', parseError);
+                return false;
+            }
+            
+            return result.authenticated === true;
         } catch (error) {
+            console.error('checkAuth error:', error);
             return false;
         }
     },

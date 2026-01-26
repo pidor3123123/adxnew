@@ -110,6 +110,66 @@
         .tfa-back-link:hover {
             color: var(--accent-primary);
         }
+        
+        @media (max-width: 768px) {
+            .auth-page {
+                padding: 16px;
+            }
+            
+            .auth-container {
+                max-width: 100%;
+            }
+            
+            .auth-card {
+                padding: 32px 24px;
+            }
+            
+            .auth-title {
+                font-size: 1.5rem;
+            }
+            
+            .auth-subtitle {
+                font-size: 0.875rem;
+            }
+            
+            .auth-logo span {
+                font-size: 1.25rem !important;
+            }
+            
+            .tfa-icon {
+                width: 64px;
+                height: 64px;
+                font-size: 1.5rem;
+            }
+            
+            .tfa-title {
+                font-size: 1.125rem;
+            }
+            
+            .tfa-code-input {
+                font-size: 1.5rem;
+                letter-spacing: 0.3em;
+                padding: 14px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .auth-page {
+                padding: 12px;
+            }
+            
+            .auth-card {
+                padding: 24px 16px;
+            }
+            
+            .auth-title {
+                font-size: 1.25rem;
+            }
+            
+            .social-buttons {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 <body>
@@ -265,40 +325,72 @@
         };
         
         function togglePassword() {
-            const input = document.getElementById('password');
-            const icon = document.querySelector('.password-toggle i');
-            
-            if (input.type === 'password') {
-                input.type = 'text';
-                icon.classList.replace('bi-eye', 'bi-eye-slash');
-            } else {
-                input.type = 'password';
-                icon.classList.replace('bi-eye-slash', 'bi-eye');
+            try {
+                const input = document.getElementById('password');
+                const icon = document.querySelector('.password-toggle i');
+                
+                if (input && icon) {
+                    if (input.type === 'password') {
+                        input.type = 'text';
+                        icon.classList.replace('bi-eye', 'bi-eye-slash');
+                    } else {
+                        input.type = 'password';
+                        icon.classList.replace('bi-eye-slash', 'bi-eye');
+                    }
+                }
+            } catch (error) {
+                console.error('Error in togglePassword:', error);
             }
         }
         
         // Показать форму 2FA
         function showTFAForm() {
-            document.getElementById('loginForm').classList.add('hidden');
-            document.getElementById('tfaForm').classList.add('active');
-            document.querySelector('.auth-divider').style.display = 'none';
-            document.querySelector('.social-buttons').style.display = 'none';
-            document.getElementById('tfaCode').focus();
+            try {
+                const loginForm = document.getElementById('loginForm');
+                const tfaForm = document.getElementById('tfaForm');
+                const divider = document.querySelector('.auth-divider');
+                const socialButtons = document.querySelector('.social-buttons');
+                const tfaCode = document.getElementById('tfaCode');
+                
+                if (loginForm) loginForm.classList.add('hidden');
+                if (tfaForm) tfaForm.classList.add('active');
+                if (divider) divider.style.display = 'none';
+                if (socialButtons) socialButtons.style.display = 'none';
+                if (tfaCode) tfaCode.focus();
+            } catch (error) {
+                console.error('Error in showTFAForm:', error);
+            }
         }
         
         // Вернуться к форме входа
         function backToLogin() {
-            document.getElementById('loginForm').classList.remove('hidden');
-            document.getElementById('tfaForm').classList.remove('active');
-            document.querySelector('.auth-divider').style.display = '';
-            document.querySelector('.social-buttons').style.display = '';
-            document.getElementById('tfaCode').value = '';
-            document.getElementById('tfaError').classList.add('hidden');
-            tfaData = { token: null, remember: false };
+            try {
+                const loginForm = document.getElementById('loginForm');
+                const tfaForm = document.getElementById('tfaForm');
+                const divider = document.querySelector('.auth-divider');
+                const socialButtons = document.querySelector('.social-buttons');
+                const tfaCode = document.getElementById('tfaCode');
+                const tfaError = document.getElementById('tfaError');
+                
+                if (loginForm) loginForm.classList.remove('hidden');
+                if (tfaForm) tfaForm.classList.remove('active');
+                if (divider) divider.style.display = '';
+                if (socialButtons) socialButtons.style.display = '';
+                if (tfaCode) tfaCode.value = '';
+                if (tfaError) tfaError.classList.add('hidden');
+                tfaData = { token: null, remember: false };
+            } catch (error) {
+                console.error('Error in backToLogin:', error);
+            }
         }
         
-        // Обработчик формы входа
-        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+        // Инициализация обработчиков формы
+        document.addEventListener('DOMContentLoaded', () => {
+            try {
+                // Обработчик формы входа
+                const loginForm = document.getElementById('loginForm');
+                if (loginForm) {
+                    loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             
             const formError = document.getElementById('formError');
@@ -325,6 +417,25 @@
                         tfaData.remember = result.remember;
                         showTFAForm();
                     } else {
+                        // Проверяем, что токен действительно был установлен
+                        const token = Auth.getToken();
+                        if (!token) {
+                            formError.classList.remove('hidden');
+                            errorMessage.textContent = 'Ошибка: токен не был сохранен. Попробуйте еще раз.';
+                            console.error('Login successful but token not saved:', result);
+                            return;
+                        }
+                        
+                        // Проверяем, что пользователь также был сохранен
+                        const user = Auth.getUser();
+                        if (!user) {
+                            formError.classList.remove('hidden');
+                            errorMessage.textContent = 'Ошибка: данные пользователя не были сохранены. Попробуйте еще раз.';
+                            console.error('Login successful but user data not saved:', result);
+                            return;
+                        }
+                        
+                        // Все проверки пройдены, выполняем редирект
                         window.location.href = 'index.html';
                     }
                 } else {
@@ -334,14 +445,22 @@
             } catch (error) {
                 formError.classList.remove('hidden');
                 errorMessage.textContent = 'Ошибка сервера. Попробуйте позже.';
+                console.error('Login error:', error);
             } finally {
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = '<span>Войти</span><i class="bi bi-arrow-right"></i>';
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<span>Войти</span><i class="bi bi-arrow-right"></i>';
+                }
             }
-        });
-        
-        // Обработчик формы 2FA
-        document.getElementById('tfaForm').addEventListener('submit', async (e) => {
+                    });
+                } else {
+                    console.error('Login form not found');
+                }
+                
+                // Обработчик формы 2FA
+                const tfaForm = document.getElementById('tfaForm');
+                if (tfaForm) {
+                    tfaForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             
             const tfaError = document.getElementById('tfaError');
@@ -363,6 +482,25 @@
                 const result = await Auth.login2FA(tfaData.token, code, tfaData.remember);
                 
                 if (result.success) {
+                    // Проверяем, что токен действительно был установлен
+                    const token = Auth.getToken();
+                    if (!token) {
+                        tfaError.classList.remove('hidden');
+                        tfaErrorMessage.textContent = 'Ошибка: токен не был сохранен. Попробуйте еще раз.';
+                        console.error('2FA login successful but token not saved:', result);
+                        return;
+                    }
+                    
+                    // Проверяем, что пользователь также был сохранен
+                    const user = Auth.getUser();
+                    if (!user) {
+                        tfaError.classList.remove('hidden');
+                        tfaErrorMessage.textContent = 'Ошибка: данные пользователя не были сохранены. Попробуйте еще раз.';
+                        console.error('2FA login successful but user data not saved:', result);
+                        return;
+                    }
+                    
+                    // Все проверки пройдены, выполняем редирект
                     window.location.href = 'index.html';
                 } else {
                     tfaError.classList.remove('hidden');
@@ -374,18 +512,34 @@
                 tfaError.classList.remove('hidden');
                 tfaErrorMessage.textContent = 'Ошибка сервера. Попробуйте позже.';
             } finally {
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = '<span>Подтвердить</span><i class="bi bi-check-lg"></i>';
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<span>Подтвердить</span><i class="bi bi-check-lg"></i>';
+                }
             }
-        });
-        
-        // Автоматическая отправка при вводе 6 цифр
-        document.getElementById('tfaCode').addEventListener('input', (e) => {
-            const value = e.target.value.replace(/\D/g, '');
-            e.target.value = value;
-            
-            if (value.length === 6) {
-                document.getElementById('tfaForm').dispatchEvent(new Event('submit'));
+                    });
+                    
+                    // Автоматическая отправка при вводе 6 цифр
+                    const tfaCode = document.getElementById('tfaCode');
+                    if (tfaCode) {
+                        tfaCode.addEventListener('input', (e) => {
+                            try {
+                                const value = e.target.value.replace(/\D/g, '');
+                                e.target.value = value;
+                                
+                                if (value.length === 6 && tfaForm) {
+                                    tfaForm.dispatchEvent(new Event('submit'));
+                                }
+                            } catch (error) {
+                                console.error('Error in tfaCode input handler:', error);
+                            }
+                        });
+                    }
+                } else {
+                    console.error('2FA form not found');
+                }
+            } catch (error) {
+                console.error('Error initializing login handlers:', error);
             }
         });
     </script>
