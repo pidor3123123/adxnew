@@ -143,12 +143,26 @@
         
         .market-item {
             display: grid;
-            grid-template-columns: 2fr 1fr 1fr 1fr 100px;
+            grid-template-columns: 2fr 1fr 80px 1fr 1fr 100px;
             align-items: center;
             padding: 16px 20px;
             border-bottom: 1px solid var(--border-color);
             transition: background-color var(--transition-fast);
             cursor: pointer;
+            gap: 12px;
+        }
+        
+        .market-sparkline {
+            width: 80px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .sparkline-svg {
+            width: 100%;
+            height: 100%;
         }
         
         .market-item:hover {
@@ -212,7 +226,8 @@
             }
             
             .market-item .market-cap,
-            .market-item .market-volume {
+            .market-item .market-volume,
+            .market-item .market-sparkline {
                 display: none;
             }
             
@@ -984,6 +999,7 @@
             marketList.innerHTML = data.map(coin => {
                 const coinSymbol = coin.symbol.toUpperCase();
                 const imageUrl = getCryptoImageUrl(coin.id, coin.symbol);
+                const sparkline = createSparkline(coin.price_change_percentage_24h || 0);
                 return `
                 <div class="market-item" onclick="window.location.href='trade.html?symbol=${coinSymbol}'">
                     <div class="market-row">
@@ -999,6 +1015,7 @@
                         </div>
                     </div>
                     <div class="market-price font-mono">${NovaTrade.formatCurrency(coin.current_price, 'USD', coin.current_price < 1 ? 6 : 2)}</div>
+                    <div class="market-sparkline">${sparkline}</div>
                     <div class="market-cap font-mono">${NovaTrade.formatNumber(coin.market_cap)}</div>
                     <div class="market-volume font-mono">${NovaTrade.formatNumber(coin.total_volume)}</div>
                     <div style="text-align: right;">
@@ -1026,6 +1043,7 @@
             marketList.innerHTML = data.map(stock => {
                 const logoUrl = getStockLogoUrl(stock.symbol);
                 const fallbackIcon = getStockIconSVG(stock.symbol);
+                const sparkline = createSparkline(stock.changePercent || 0);
                 return `
                 <div class="market-item" onclick="window.location.href='trade.html?symbol=${stock.symbol}'">
                     <div class="market-row">
@@ -1041,6 +1059,7 @@
                         </div>
                     </div>
                     <div class="market-price font-mono">${NovaTrade.formatCurrency(stock.price)}</div>
+                    <div class="market-sparkline">${sparkline}</div>
                     <div class="market-cap font-mono">—</div>
                     <div class="market-volume font-mono">—</div>
                     <div style="text-align: right;">
@@ -1067,6 +1086,7 @@
             
             marketList.innerHTML = data.map(pair => {
                 const forexIcon = getForexIcon(pair.symbol);
+                const sparkline = createSparkline(pair.changePercent || 0);
                 return `
                 <div class="market-item" onclick="window.location.href='trade.html?symbol=${pair.symbol}'">
                     <div class="market-row">
@@ -1079,6 +1099,7 @@
                         </div>
                     </div>
                     <div class="market-price font-mono">${pair.price.toFixed(pair.symbol.includes('JPY') ? 3 : 5)}</div>
+                    <div class="market-sparkline">${sparkline}</div>
                     <div class="market-cap font-mono">—</div>
                     <div class="market-volume font-mono">—</div>
                     <div style="text-align: right;">
@@ -1105,6 +1126,7 @@
             
             marketList.innerHTML = data.map(index => {
                 const indexIcon = getIndexIcon(index.symbol);
+                const sparkline = createSparkline(index.changePercent || 0);
                 return `
                 <div class="market-item" onclick="window.location.href='trade.html?symbol=${index.symbol}'">
                     <div class="market-row">
@@ -1117,6 +1139,7 @@
                         </div>
                     </div>
                     <div class="market-price font-mono">${NovaTrade.formatCurrency(index.price)}</div>
+                    <div class="market-sparkline">${sparkline}</div>
                     <div class="market-cap font-mono">—</div>
                     <div class="market-volume font-mono">—</div>
                     <div style="text-align: right;">
@@ -1135,18 +1158,86 @@
             const ticker = document.getElementById('tickerContent');
             const crypto = await MarketAPI.getCryptoPrices();
             
-            const items = crypto.slice(0, 8).map(coin => `
-                <div class="ticker-item">
-                    <span class="ticker-symbol">${coin.symbol.toUpperCase()}</span>
-                    <span class="ticker-price">${NovaTrade.formatCurrency(coin.current_price)}</span>
-                    <span class="ticker-change ${coin.price_change_percentage_24h >= 0 ? 'up' : 'down'}">
-                        ${NovaTrade.formatChange(coin.price_change_percentage_24h)}
-                    </span>
-                </div>
-            `).join('');
+            // Используем TradingView Ticker виджет для популярных активов
+            const popularAssets = crypto.slice(0, 8);
             
-            // Дублируем для бесконечной прокрутки
-            ticker.innerHTML = items + items;
+            // Создаем контейнер для TradingView Ticker
+            ticker.innerHTML = `
+                <div class="tradingview-ticker-container" style="width: 100%; height: 100%;">
+                    <div class="tradingview-widget-container" style="height: 100%;">
+                        <div class="tradingview-widget-container__widget"></div>
+                        <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js" async>
+                        {
+                            "symbols": [
+                                ${popularAssets.map(coin => {
+                                    const symbol = coin.symbol.toUpperCase();
+                                    const tvSymbol = getTradingViewSymbol('crypto', symbol);
+                                    return `{"proName": "${tvSymbol}", "title": "${symbol}"}`;
+                                }).join(',')}
+                            ],
+                            "showSymbolLogo": true,
+                            "colorTheme": "dark",
+                            "isTransparent": true,
+                            "displayMode": "adaptive",
+                            "locale": "ru"
+                        }
+                        </script>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Создание SVG спарклайна на основе изменения цены
+        function createSparkline(changePercent) {
+            const isPositive = changePercent >= 0;
+            const color = isPositive ? '#22c55e' : '#ef4444';
+            
+            // Генерируем простой график на основе изменения
+            // Создаем 20 точек для плавной линии
+            const points = 20;
+            const width = 80;
+            const height = 40;
+            const padding = 4;
+            const chartWidth = width - padding * 2;
+            const chartHeight = height - padding * 2;
+            
+            // Генерируем точки для линии (симуляция тренда)
+            let pathData = '';
+            const baseValue = chartHeight / 2;
+            const amplitude = Math.min(Math.abs(changePercent) * 2, chartHeight * 0.4);
+            
+            for (let i = 0; i < points; i++) {
+                const x = padding + (i / (points - 1)) * chartWidth;
+                // Создаем волну, которая идет вверх для положительного изменения и вниз для отрицательного
+                const wave = Math.sin((i / points) * Math.PI * 2) * amplitude * 0.3;
+                const trend = (isPositive ? -1 : 1) * (i / points) * amplitude * 0.7;
+                const y = padding + baseValue + wave + trend;
+                
+                if (i === 0) {
+                    pathData += `M ${x} ${y}`;
+                } else {
+                    pathData += ` L ${x} ${y}`;
+                }
+            }
+            
+            return `
+                <svg class="sparkline-svg" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
+                    <path d="${pathData}" 
+                          stroke="${color}" 
+                          stroke-width="2" 
+                          fill="none" 
+                          stroke-linecap="round" 
+                          stroke-linejoin="round"/>
+                    <defs>
+                        <linearGradient id="sparkline-gradient-${isPositive ? 'up' : 'down'}" x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" style="stop-color:${color};stop-opacity:0.3" />
+                            <stop offset="100%" style="stop-color:${color};stop-opacity:0" />
+                        </linearGradient>
+                    </defs>
+                    <path d="${pathData} L ${padding + chartWidth} ${height - padding} L ${padding} ${height - padding} Z" 
+                          fill="url(#sparkline-gradient-${isPositive ? 'up' : 'down'})"/>
+                </svg>
+            `;
         }
         
         // Получение URL изображения криптовалюты с альтернативными источниками
