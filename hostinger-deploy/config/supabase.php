@@ -175,4 +175,102 @@ class SupabaseClient {
         // Но для простоты можно попробовать найти по email
         return null;
     }
+    
+    /**
+     * Создание пользователя в auth.users через Admin API
+     * Возвращает UUID созданного пользователя
+     */
+    public function createAuthUser(string $email, string $password, array $metadata = []): string {
+        $url = $this->url . '/auth/v1/admin/users';
+        
+        $data = [
+            'email' => $email,
+            'password' => $password,
+            'email_confirm' => true, // Автоматически подтверждаем email
+            'user_metadata' => $metadata
+        ];
+        
+        $headers = [
+            'apikey: ' . $this->apiKey,
+            'Authorization: Bearer ' . $this->apiKey,
+            'Content-Type: application/json'
+        ];
+        
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
+        curl_close($ch);
+        
+        if ($error) {
+            throw new Exception("CURL Error creating auth user: $error");
+        }
+        
+        $decoded = json_decode($response, true);
+        
+        if ($httpCode >= 400) {
+            $errorMessage = $decoded['message'] ?? $decoded['error'] ?? $decoded['msg'] ?? "HTTP $httpCode";
+            // Если пользователь уже существует, это не критическая ошибка
+            if (strpos($errorMessage, 'already registered') !== false || strpos($errorMessage, 'already exists') !== false) {
+                // Пытаемся найти существующего пользователя
+                return $this->findAuthUserByEmail($email);
+            }
+            throw new Exception("Supabase Auth API Error: $errorMessage", $httpCode);
+        }
+        
+        if (!isset($decoded['user']['id'])) {
+            throw new Exception("Failed to create auth user: no ID returned");
+        }
+        
+        return $decoded['user']['id'];
+    }
+    
+    /**
+     * Поиск пользователя в auth.users по email
+     * Возвращает UUID пользователя или null если не найден
+     */
+    public function findAuthUserByEmail(string $email): ?string {
+        $url = $this->url . '/auth/v1/admin/users';
+        $url .= '?email=' . urlencode($email);
+        
+        $headers = [
+            'apikey: ' . $this->apiKey,
+            'Authorization: Bearer ' . $this->apiKey,
+            'Content-Type: application/json'
+        ];
+        
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
+        curl_close($ch);
+        
+        if ($error) {
+            throw new Exception("CURL Error finding auth user: $error");
+        }
+        
+        if ($httpCode >= 400) {
+            return null;
+        }
+        
+        $decoded = json_decode($response, true);
+        
+        if (isset($decoded['users']) && !empty($decoded['users'])) {
+            return $decoded['users'][0]['id'];
+        }
+        
+        return null;
+    }
 }

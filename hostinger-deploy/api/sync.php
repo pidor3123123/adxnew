@@ -11,18 +11,13 @@ require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../config/supabase.php';
 require_once __DIR__ . '/auth.php';
 
-/**
- * Основная логика API синхронизации
- * Выполняется только при прямом запросе к sync.php, а не при require_once в других файлах
- */
-if (basename($_SERVER['SCRIPT_FILENAME']) === 'sync.php') {
-    header('Content-Type: application/json; charset=utf-8');
+header('Content-Type: application/json; charset=utf-8');
 
-    $method = $_SERVER['REQUEST_METHOD'];
-    $action = $_GET['action'] ?? '';
+$method = $_SERVER['REQUEST_METHOD'];
+$action = $_GET['action'] ?? '';
 
-    try {
-        switch ($action) {
+try {
+    switch ($action) {
         case 'user':
             if ($method !== 'POST') {
                 throw new Exception('Method not allowed', 405);
@@ -123,23 +118,22 @@ if (basename($_SERVER['SCRIPT_FILENAME']) === 'sync.php') {
             
         default:
             throw new Exception('Unknown action', 400);
-        }
-        
-    } catch (Exception $e) {
-        $code = $e->getCode();
-        if (!is_numeric($code) || $code < 100 || $code > 599) {
-            $code = 500;
-        }
-        $code = (int)$code;
-        http_response_code($code);
-        
-        ob_end_clean();
-        echo json_encode([
-            'success' => false,
-            'error' => $e->getMessage()
-        ]);
-        exit;
     }
+    
+} catch (Exception $e) {
+    $code = $e->getCode();
+    if (!is_numeric($code) || $code < 100 || $code > 599) {
+        $code = 500;
+    }
+    $code = (int)$code;
+    http_response_code($code);
+    
+    ob_end_clean();
+    echo json_encode([
+        'success' => false,
+        'error' => $e->getMessage()
+    ]);
+    exit;
 }
 
 /**
@@ -150,12 +144,6 @@ function syncUserToSupabase(int $mysqlUserId): void {
         $db = getDB();
         $supabase = getSupabaseClient();
         
-        // Если Supabase не настроен, просто пропускаем синхронизацию
-        if ($supabase === null) {
-            error_log("Supabase not configured, skipping sync for user ID $mysqlUserId");
-            return;
-        }
-        
         // Получаем пользователя из MySQL
         $stmt = $db->prepare('SELECT * FROM users WHERE id = ?');
         $stmt->execute([$mysqlUserId]);
@@ -165,16 +153,47 @@ function syncUserToSupabase(int $mysqlUserId): void {
             throw new Exception("User with ID $mysqlUserId not found", 404);
         }
         
-        // Конвертируем MySQL ID в UUID
-        $supabaseId = SupabaseClient::mysqlIdToUuid($mysqlUserId);
+        $email = $user['email'];
         
-        // Проверяем, существует ли пользователь в Supabase
-        $existingUser = $supabase->get('users', 'id', $supabaseId);
+        // Шаг 1: Проверяем, существует ли пользователь в auth.users
+        $authUserId = $supabase->findAuthUserByEmail($email);
         
-        // Подготавливаем данные для Supabase
+        // Шаг 2: Если пользователя нет в auth.users - создаем его
+        if (!$authUserId) {
+            // Генерируем случайный пароль (пользователь не сможет войти через Supabase Auth,
+            // но это нормально, так как он использует основной сайт для входа)
+            $tempPassword = bin2hex(random_bytes(16));
+            
+            // Подготавливаем метаданные для auth.users
+            $userMetadata = [
+                'first_name' => $user['first_name'] ?? '',
+                'last_name' => $user['last_name'] ?? '',
+                'country' => $user['country'] ?? 'US',
+                'mysql_user_id' => $mysqlUserId // Сохраняем связь с MySQL
+            ];
+            
+            try {
+                $authUserId = $supabase->createAuthUser($email, $tempPassword, $userMetadata);
+                error_log("Created auth user for MySQL user ID $mysqlUserId (email: $email) with UUID: $authUserId");
+            } catch (Exception $e) {
+                // Если ошибка "уже существует", пытаемся найти еще раз
+                if (strpos($e->getMessage(), 'already') !== false) {
+                    $authUserId = $supabase->findAuthUserByEmail($email);
+                    if (!$authUserId) {
+                        throw new Exception("User exists but could not find UUID: " . $e->getMessage());
+                    }
+                } else {
+                    throw $e;
+                }
+            }
+        } else {
+            error_log("Found existing auth user for MySQL user ID $mysqlUserId (email: $email) with UUID: $authUserId");
+        }
+        
+        // Шаг 3: Создаем/обновляем запись в users с UUID из auth.users
         $userData = [
-            'id' => $supabaseId,
-            'email' => $user['email'],
+            'id' => $authUserId, // Используем UUID из auth.users
+            'email' => $email,
             'first_name' => $user['first_name'] ?? '',
             'last_name' => $user['last_name'] ?? '',
             'country' => $user['country'] ?? 'US',
@@ -184,21 +203,33 @@ function syncUserToSupabase(int $mysqlUserId): void {
             'created_at' => $user['created_at'] ?? date('Y-m-d\TH:i:s.u\Z')
         ];
         
-        // Upsert пользователя
-        $supabase->upsert('users', $userData, 'id');
+        // Upsert пользователя (триггер может уже создать запись, но обновим данные)
+        try {
+            $supabase->upsert('users', $userData, 'id');
+            error_log("Upserted user record for MySQL user ID $mysqlUserId (UUID: $authUserId)");
+        } catch (Exception $e) {
+            // Если ошибка внешнего ключа, возможно триггер еще не сработал
+            // Попробуем просто обновить существующую запись
+            $existingUser = $supabase->get('users', 'id', $authUserId);
+            if ($existingUser) {
+                $supabase->update('users', 'id', $authUserId, $userData);
+                error_log("Updated user record for MySQL user ID $mysqlUserId (UUID: $authUserId)");
+            } else {
+                throw $e;
+            }
+        }
         
-        // Синхронизируем user_security
+        // Шаг 4: Синхронизируем user_security
         $securityData = [
-            'user_id' => $supabaseId,
+            'user_id' => $authUserId,
             'two_fa_enabled' => (bool)($user['two_factor_enabled'] ?? false),
             'failed_login_attempts' => 0,
             'account_locked_until' => $user['is_active'] ? null : date('Y-m-d\TH:i:s.u\Z', strtotime('+1 year'))
         ];
         
         $supabase->upsert('user_security', $securityData, 'user_id');
+        error_log("Synced user_security for MySQL user ID $mysqlUserId (UUID: $authUserId)");
         
-        // Сохраняем маппинг MySQL ID -> Supabase UUID в отдельной таблице (опционально)
-        // Это можно использовать для обратного поиска
     } catch (Exception $e) {
         error_log("Supabase user sync error for user ID $mysqlUserId: " . $e->getMessage());
         throw $e;
@@ -212,12 +243,6 @@ function syncBalanceToSupabase(int $mysqlUserId, string $currency): void {
     try {
         $db = getDB();
         $supabase = getSupabaseClient();
-        
-        // Если Supabase не настроен, просто пропускаем синхронизацию
-        if ($supabase === null) {
-            error_log("Supabase not configured, skipping balance sync for user ID $mysqlUserId, currency $currency");
-            return;
-        }
         
         // Получаем баланс из MySQL
         $stmt = $db->prepare('SELECT * FROM balances WHERE user_id = ? AND currency = ?');
