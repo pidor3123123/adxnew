@@ -7,31 +7,45 @@
 ob_start();
 
 // Глобальная обработка ошибок для конвертации всех PHP ошибок в JSON
+// Устанавливается только при прямом запросе к auth.php
 set_error_handler(function($severity, $message, $file, $line) {
     // Игнорируем ошибки, которые не являются критическими
     if (!(error_reporting() & $severity)) {
         return false;
     }
     
-    // Очищаем буфер и устанавливаем заголовки
-    if (ob_get_level() > 0) {
-        ob_end_clean();
+    // Устанавливаем заголовки только если auth.php выполняется напрямую
+    if (basename($_SERVER['SCRIPT_FILENAME']) === 'auth.php') {
+        // Очищаем буфер и устанавливаем заголовки
+        if (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        
+        if (!headers_sent()) {
+            header('Content-Type: application/json');
+            http_response_code(500);
+        }
+        
+        echo json_encode([
+            'success' => false,
+            'error' => 'PHP Error: ' . $message . ' in ' . basename($file) . ':' . $line
+        ]);
+        exit;
     }
     
-    if (!headers_sent()) {
-        header('Content-Type: application/json');
-        http_response_code(500);
-    }
-    
-    echo json_encode([
-        'success' => false,
-        'error' => 'PHP Error: ' . $message . ' in ' . basename($file) . ':' . $line
-    ]);
-    exit;
+    // Если загружается через require_once, просто логируем ошибку
+    error_log("PHP Error in auth.php (loaded via require_once): $message in $file:$line");
+    return false;
 });
 
 // Обработка фатальных ошибок
+// Устанавливается только при прямом запросе к auth.php
 register_shutdown_function(function() {
+    // Проверяем, что auth.php выполняется напрямую
+    if (basename($_SERVER['SCRIPT_FILENAME']) !== 'auth.php') {
+        return;
+    }
+    
     $error = error_get_last();
     if ($error !== null && in_array($error['type'], [E_ERROR, E_CORE_ERROR, E_COMPILE_ERROR, E_PARSE])) {
         if (ob_get_level() > 0) {
@@ -55,25 +69,37 @@ register_shutdown_function(function() {
 try {
     require_once __DIR__ . '/../config/database.php';
 } catch (Exception $e) {
-    ob_end_clean();
-    header('Content-Type: application/json');
-    http_response_code(500);
-    echo json_encode([
-        'success' => false,
-        'error' => 'Ошибка загрузки конфигурации: ' . $e->getMessage()
-    ]);
-    exit;
+    // Устанавливаем заголовки только если auth.php выполняется напрямую
+    if (basename($_SERVER['SCRIPT_FILENAME']) === 'auth.php') {
+        ob_end_clean();
+        header('Content-Type: application/json');
+        http_response_code(500);
+        echo json_encode([
+            'success' => false,
+            'error' => 'Ошибка загрузки конфигурации: ' . $e->getMessage()
+        ]);
+        exit;
+    } else {
+        // Если загружается через require_once, пробрасываем исключение
+        throw $e;
+    }
 }
 
-header('Content-Type: application/json');
-setCorsHeaders();
-header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
+/**
+ * Основная логика API
+ * Выполняется только при прямом запросе к auth.php, а не при require_once в других файлах
+ */
+if (basename($_SERVER['SCRIPT_FILENAME']) === 'auth.php') {
+    header('Content-Type: application/json');
+    setCorsHeaders();
+    header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
+    header('Access-Control-Allow-Headers: Content-Type, Authorization');
 
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    ob_end_clean();
-    http_response_code(200);
-    exit;
+    if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+        ob_end_clean();
+        http_response_code(200);
+        exit;
+    }
 }
 
 // Безопасная загрузка дополнительных файлов
@@ -85,14 +111,20 @@ try {
     require_once __DIR__ . '/totp.php';
     require_once __DIR__ . '/../config/supabase.php';
 } catch (Exception $e) {
-    ob_end_clean();
-    header('Content-Type: application/json');
-    http_response_code(500);
-    echo json_encode([
-        'success' => false,
-        'error' => 'Ошибка загрузки модулей: ' . $e->getMessage()
-    ]);
-    exit;
+    // Устанавливаем заголовки только если auth.php выполняется напрямую
+    if (basename($_SERVER['SCRIPT_FILENAME']) === 'auth.php') {
+        ob_end_clean();
+        header('Content-Type: application/json');
+        http_response_code(500);
+        echo json_encode([
+            'success' => false,
+            'error' => 'Ошибка загрузки модулей: ' . $e->getMessage()
+        ]);
+        exit;
+    } else {
+        // Если загружается через require_once, пробрасываем исключение
+        throw $e;
+    }
 }
 
 /**
