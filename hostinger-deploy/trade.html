@@ -1548,24 +1548,58 @@
         
         // Переключение типа графика
         function switchChartType(type) {
-            const lightweightChart = document.getElementById('tradingChart');
-            const tradingViewChart = document.getElementById('tradingViewChart');
-            const buttons = document.querySelectorAll('.chart-type-btn');
-            
-            buttons.forEach(btn => btn.classList.remove('active'));
-            document.querySelector(`[data-chart-type="${type}"]`).classList.add('active');
-            
-            if (type === 'lightweight') {
-                lightweightChart.style.display = 'block';
-                tradingViewChart.style.display = 'none';
-            } else {
-                lightweightChart.style.display = 'none';
-                tradingViewChart.style.display = 'block';
+            try {
+                const lightweightChart = document.getElementById('tradingChart');
+                const tradingViewChart = document.getElementById('tradingViewChart');
+                const buttons = document.querySelectorAll('.chart-type-btn');
                 
-                // Инициализируем TradingView график при переключении
-                const urlParams = new URLSearchParams(window.location.search);
-                const symbol = urlParams.get('symbol') || 'BTC';
-                initTradingViewChart(symbol, currentTradingViewInterval, currentChartStyle);
+                if (!lightweightChart || !tradingViewChart) {
+                    console.error('Chart containers not found');
+                    return;
+                }
+                
+                if (buttons.length > 0) {
+                    buttons.forEach(btn => btn.classList.remove('active'));
+                }
+                
+                const activeButton = document.querySelector(`[data-chart-type="${type}"]`);
+                if (activeButton) {
+                    activeButton.classList.add('active');
+                } else {
+                    console.warn(`Button for chart type "${type}" not found`);
+                }
+                
+                if (type === 'lightweight') {
+                    lightweightChart.style.display = 'block';
+                    tradingViewChart.style.display = 'none';
+                    
+                    // Останавливаем обновление цены для TradingView
+                    if (typeof stopTradingViewPriceUpdates === 'function') {
+                        stopTradingViewPriceUpdates();
+                    }
+                } else {
+                    lightweightChart.style.display = 'none';
+                    tradingViewChart.style.display = 'block';
+                    
+                    // Инициализируем TradingView график при переключении
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const symbol = urlParams.get('symbol') || 'BTC';
+                    
+                    if (typeof initTradingViewChart === 'function') {
+                        initTradingViewChart(symbol, currentTradingViewInterval, currentChartStyle);
+                    } else {
+                        console.error('initTradingViewChart function not found');
+                    }
+                    
+                    // Запускаем обновление цены в реальном времени с небольшой задержкой
+                    setTimeout(() => {
+                        if (typeof startTradingViewPriceUpdates === 'function') {
+                            startTradingViewPriceUpdates();
+                        }
+                    }, 500);
+                }
+            } catch (error) {
+                console.error('Error in switchChartType:', error);
             }
         }
         
@@ -1677,35 +1711,55 @@
         
         // Инициализация TradingView графика
         function initTradingViewChart(symbol, interval = null, style = null) {
-            const urlParams = new URLSearchParams(window.location.search);
-            const currentSymbol = urlParams.get('symbol') || symbol || 'BTC';
-            
-            // Используем текущие значения или переданные параметры
-            const tvInterval = interval ? getTradingViewInterval(interval) : getTradingViewInterval(currentTradingViewInterval);
-            const chartStyle = style || currentChartStyle;
-            const tvSymbol = getTradingViewSymbolForAsset(currentSymbol);
-            
-            // Определяем range на основе интервала
-            let range = '1D';
-            if (interval === '1w' || interval === '1M' || interval === '1y' || interval === 'all') {
-                range = interval === 'all' ? 'ALL' : (interval === '1w' ? '1W' : (interval === '1M' ? '1M' : '12M'));
-            } else if (interval === '24h') {
-                range = '1D';
-            } else if (interval === '1h' || interval === '30m') {
-                range = '1D';
-            } else {
-                range = '1D';
-            }
-            
-            // Обновляем виджет TradingView
-            const widgetContainer = document.querySelector('#tradingViewChart .tradingview-widget-container__widget');
-            if (widgetContainer) {
+            try {
+                const urlParams = new URLSearchParams(window.location.search);
+                const currentSymbol = urlParams.get('symbol') || symbol || 'BTC';
+                
+                // Проверяем наличие необходимых функций
+                if (typeof getTradingViewInterval !== 'function') {
+                    console.error('getTradingViewInterval function not found');
+                    return;
+                }
+                
+                if (typeof getTradingViewSymbolForAsset !== 'function') {
+                    console.error('getTradingViewSymbolForAsset function not found');
+                    return;
+                }
+                
+                // Используем текущие значения или переданные параметры
+                const tvInterval = interval ? getTradingViewInterval(interval) : getTradingViewInterval(currentTradingViewInterval);
+                const chartStyle = style || currentChartStyle;
+                const tvSymbol = getTradingViewSymbolForAsset(currentSymbol);
+                
+                // Определяем range на основе интервала
+                let range = '1D';
+                if (interval === '1w' || interval === '1M' || interval === '1y' || interval === 'all') {
+                    range = interval === 'all' ? 'ALL' : (interval === '1w' ? '1W' : (interval === '1M' ? '1M' : '12M'));
+                } else if (interval === '24h') {
+                    range = '1D';
+                } else if (interval === '1h' || interval === '30m') {
+                    range = '1D';
+                } else {
+                    range = '1D';
+                }
+                
+                // Обновляем виджет TradingView
+                const widgetContainer = document.querySelector('#tradingViewChart .tradingview-widget-container__widget');
+                if (!widgetContainer) {
+                    console.error('TradingView widget container not found');
+                    return;
+                }
+                
+                // Очищаем контейнер перед добавлением нового скрипта
+                widgetContainer.innerHTML = '';
+                
+                // Создаем новый скрипт для виджета
+                const script = document.createElement('script');
+                script.type = 'text/javascript';
+                script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
+                script.async = true;
+                
                 try {
-                    widgetContainer.innerHTML = '';
-                    const script = document.createElement('script');
-                    script.type = 'text/javascript';
-                    script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
-                    script.async = true;
                     script.text = JSON.stringify({
                         "autosize": true,
                         "symbol": tvSymbol,
@@ -1735,10 +1789,13 @@
                         "calendar": false,
                         "studies": []
                     });
+                    
                     widgetContainer.appendChild(script);
                 } catch (error) {
-                    console.error('Error initializing TradingView chart:', error);
+                    console.error('Error creating TradingView script:', error);
                 }
+            } catch (error) {
+                console.error('Error in initTradingViewChart:', error);
             }
         }
         
