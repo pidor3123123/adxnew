@@ -254,10 +254,32 @@ function updateTradeButton() {
  * Format quantity value without trailing zeros and round to step
  */
 function formatQuantity(value, step = 0.0001) {
-    if (value <= 0) return '0';
+    // Если значение отрицательное или ноль, возвращаем '0'
+    if (value < 0) return '0';
     
-    // Округляем до шага
+    // Если значение равно 0, возвращаем '0'
+    if (value === 0) return '0';
+    
+    // Если значение меньше шага, но больше 0, возвращаем минимальное значение step
+    if (value > 0 && value < step) {
+        const stepStr = step.toString();
+        const decimals = stepStr.includes('.') ? stepStr.split('.')[1].length : 0;
+        return step.toFixed(decimals);
+    }
+    
+    // Округляем до шага с использованием более точного метода
+    // Используем Math.floor вместо Math.round для более консервативного округления
+    // Но для торговли лучше использовать Math.round
     const rounded = Math.round(value / step) * step;
+    
+    // Проверяем, что округление не привело к 0 для положительных значений
+    if (rounded <= 0 && value > 0) {
+        // Если округление дало 0, но исходное значение было положительным,
+        // возвращаем минимальное значение step
+        const stepStr = step.toString();
+        const decimals = stepStr.includes('.') ? stepStr.split('.')[1].length : 0;
+        return step.toFixed(decimals);
+    }
     
     // Определяем количество знаков после запятой на основе step
     const stepStr = step.toString();
