@@ -86,15 +86,30 @@ try {
             if ($supabaseUserId && function_exists('syncBalanceFromSupabase')) {
                 // Используем новую функцию синхронизации
                 try {
+                    error_log("Starting balance sync from Supabase to MySQL via webhook");
                     syncBalanceFromSupabase(
                         $supabaseUserId,
                         $currency,
                         (float)($available ?? 0),
                         (float)($locked ?? 0)
                     );
-                    error_log("Balance synced successfully from Supabase to MySQL");
+                    error_log("✓ Balance synced successfully from Supabase to MySQL");
+                    
+                    // Возвращаем успешный ответ
+                    ob_end_clean();
+                    echo json_encode([
+                        'success' => true,
+                        'message' => 'Balance updated successfully',
+                        'data' => [
+                            'currency' => $currency,
+                            'available_balance' => (float)($available ?? 0),
+                            'locked_balance' => (float)($locked ?? 0)
+                        ]
+                    ]);
+                    exit;
                 } catch (Exception $e) {
-                    error_log("Error syncing balance from Supabase: " . $e->getMessage());
+                    error_log("✗ Error syncing balance from Supabase: " . $e->getMessage());
+                    error_log("  Stack trace: " . $e->getTraceAsString());
                     throw $e;
                 }
             } else {

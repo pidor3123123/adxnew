@@ -543,18 +543,23 @@ if (basename($_SERVER['SCRIPT_FILENAME']) === 'auth.php') {
                 throw new Exception('Invalid or expired token', 401);
             }
             
-            // Получение балансов
+            // Получение балансов из MySQL (всегда свежие данные, без кэша)
             $db = getDB();
             $stmt = $db->prepare('SELECT currency, available, reserved FROM balances WHERE user_id = ?');
             $stmt->execute([$user['id']]);
-            $balances = $stmt->fetchAll();
+            $balances = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            // Логируем для отладки (только в development)
+            if (defined('DEBUG') && DEBUG) {
+                error_log("API /auth.php?action=me: Returning balances for user_id={$user['id']}, count=" . count($balances));
+            }
             
             ob_end_clean();
             echo json_encode([
                 'success' => true,
                 'user' => $user,
                 'balances' => $balances
-            ]);
+            ], JSON_NUMERIC_CHECK); // JSON_NUMERIC_CHECK для правильной сериализации чисел
             exit;
             
         case 'check':

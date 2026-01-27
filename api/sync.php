@@ -359,6 +359,17 @@ function syncBalanceFromSupabase(string $supabaseUserId, string $currency, float
         
         $mysqlUserId = $mysqlUser['id'];
         
+        // Получаем текущий баланс для логирования
+        $stmt = $db->prepare('SELECT available, reserved FROM balances WHERE user_id = ? AND currency = ?');
+        $stmt->execute([$mysqlUserId, $currency]);
+        $oldBalance = $stmt->fetch(PDO::FETCH_ASSOC);
+        $oldAvailable = $oldBalance ? (float)$oldBalance['available'] : 0;
+        $oldReserved = $oldBalance ? (float)$oldBalance['reserved'] : 0;
+        
+        error_log("Syncing balance from Supabase to MySQL: user_id=$mysqlUserId (email=$email), currency=$currency");
+        error_log("  Old balance: available=$oldAvailable, reserved=$oldReserved");
+        error_log("  New balance: available=$availableBalance, reserved=$lockedBalance");
+        
         // Обновляем или создаем баланс в MySQL
         $stmt = $db->prepare('
             INSERT INTO balances (user_id, currency, available, reserved)
@@ -376,11 +387,34 @@ function syncBalanceFromSupabase(string $supabaseUserId, string $currency, float
         ]);
         
         $affectedRows = $stmt->rowCount();
-        error_log("Synced balance from Supabase to MySQL: user_id=$mysqlUserId, currency=$currency, available=$availableBalance, locked=$lockedBalance, affected_rows=$affectedRows");
+        error_log("  SQL executed: affected_rows=$affectedRows");
         
-        if ($affectedRows === 0) {
-            error_log("Warning: Balance update affected 0 rows. Balance might not exist in MySQL.");
+        // Проверяем, что баланс реально обновился
+        $stmt = $db->prepare('SELECT available, reserved FROM balances WHERE user_id = ? AND currency = ?');
+        $stmt->execute([$mysqlUserId, $currency]);
+        $newBalance = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($newBalance) {
+            $newAvailable = (float)$newBalance['available'];
+            $newReserved = (float)$newBalance['reserved'];
+            
+            // Проверяем, что значения совпадают с ожидаемыми
+            $availableMatch = abs($newAvailable - $availableBalance) < 0.01; // Допускаем небольшую погрешность для float
+            $reservedMatch = abs($newReserved - $lockedBalance) < 0.01;
+            
+            if ($availableMatch && $reservedMatch) {
+                error_log("  ✓ Balance successfully updated in MySQL: available=$newAvailable, reserved=$newReserved");
+            } else {
+                error_log("  ✗ WARNING: Balance mismatch! Expected: available=$availableBalance, reserved=$lockedBalance");
+                error_log("    Actual: available=$newAvailable, reserved=$newReserved");
+                throw new Exception("Balance update verification failed: values don't match");
+            }
+        } else {
+            error_log("  ✗ ERROR: Balance not found in MySQL after update!");
+            throw new Exception("Balance not found after update");
         }
+        
+        error_log("Synced balance from Supabase to MySQL: user_id=$mysqlUserId, currency=$currency, available=$availableBalance, locked=$lockedBalance");
         
     } catch (Exception $e) {
         error_log("Supabase balance sync error: " . $e->getMessage());
