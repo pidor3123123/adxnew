@@ -250,14 +250,32 @@ function initUserMenu() {
     if (!userMenu) return;
     
     const trigger = userMenu.querySelector('.user-menu-trigger');
+    if (!trigger) return;
     
-    trigger?.addEventListener('click', (e) => {
+    // Удаляем старые обработчики если есть
+    const newTrigger = trigger.cloneNode(true);
+    trigger.parentNode.replaceChild(newTrigger, trigger);
+    
+    // Добавляем обработчик клика
+    newTrigger.addEventListener('click', (e) => {
         e.stopPropagation();
+        e.preventDefault();
         userMenu.classList.toggle('open');
     });
     
-    document.addEventListener('click', () => {
-        userMenu.classList.remove('open');
+    // Закрываем меню при клике вне его
+    document.addEventListener('click', (e) => {
+        if (!userMenu.contains(e.target)) {
+            userMenu.classList.remove('open');
+        }
+    });
+    
+    // Закрываем меню при клике на элемент внутри dropdown
+    const dropdownItems = userMenu.querySelectorAll('.dropdown-item');
+    dropdownItems.forEach(item => {
+        item.addEventListener('click', () => {
+            userMenu.classList.remove('open');
+        });
     });
 }
 
