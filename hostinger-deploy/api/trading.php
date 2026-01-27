@@ -327,7 +327,7 @@ try {
                         'take_profit' => $takeProfit,
                         'stop_loss' => $stopLoss
                     ]
-                ]);
+                ], JSON_NUMERIC_CHECK);
                 
             } catch (Exception $e) {
                 $db->rollBack();
@@ -354,7 +354,7 @@ try {
             echo json_encode([
                 'success' => true,
                 'orders' => $orders
-            ]);
+            ], JSON_NUMERIC_CHECK);
             break;
             
         case 'history':
@@ -379,7 +379,7 @@ try {
             echo json_encode([
                 'success' => true,
                 'orders' => $orders
-            ]);
+            ], JSON_NUMERIC_CHECK);
             break;
             
         case 'cancel':
@@ -435,7 +435,7 @@ try {
                 echo json_encode([
                     'success' => true,
                     'message' => 'Order cancelled'
-                ]);
+                ], JSON_NUMERIC_CHECK);
                 
             } catch (Exception $e) {
                 $db->rollBack();
@@ -614,7 +614,7 @@ try {
             echo json_encode([
                 'success' => true,
                 'closed_orders' => $closedOrders
-            ]);
+            ], JSON_NUMERIC_CHECK);
             break;
             
         case 'open_positions':
@@ -658,7 +658,13 @@ try {
                 
                 if ($remainingQty > 0) {
                     $currentPrice = getMarketPrice($order['symbol']);
-                    $entryPrice = (float)$order['average_price'];
+                    // Используем average_price, если он установлен, иначе используем price
+                    $entryPrice = (float)($order['average_price'] ?? $order['price'] ?? 0);
+                    if ($entryPrice <= 0) {
+                        $entryPrice = (float)$order['price'];
+                    }
+                    $order['average_price'] = $entryPrice; // Убеждаемся, что average_price установлен
+                    $order['entry_price'] = $entryPrice; // Добавляем явную цену входа для фронтенда
                     $order['current_price'] = $currentPrice;
                     $order['remaining_quantity'] = $remainingQty;
                     
@@ -676,7 +682,7 @@ try {
             echo json_encode([
                 'success' => true,
                 'positions' => $openPositions
-            ]);
+            ], JSON_NUMERIC_CHECK);
             break;
             
         case 'close_position':
@@ -836,7 +842,7 @@ try {
                     'success' => true,
                     'message' => 'Position closed',
                     'close_order_id' => $closeOrderId
-                ]);
+                ], JSON_NUMERIC_CHECK);
                 
             } catch (Exception $e) {
                 $db->rollBack();
@@ -942,7 +948,7 @@ try {
                 'positions' => $closedPositions,
                 'total_pnl' => $totalPnl,
                 'period' => $period
-            ]);
+            ], JSON_NUMERIC_CHECK);
             break;
             
         default:
@@ -961,5 +967,5 @@ try {
     echo json_encode([
         'success' => false,
         'error' => $e->getMessage()
-    ]);
+    ], JSON_NUMERIC_CHECK);
 }

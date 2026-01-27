@@ -440,14 +440,20 @@
         
         async function loadOrders() {
             try {
-                const result = await API.get('/trading.php?action=history', { limit: 100 });
+                // Используем TradingAPI.getOrderHistory для корректного вызова API
+                const result = await TradingAPI.getOrderHistory(100);
                 
-                if (result.success) {
+                console.log('Orders API response:', result);
+                
+                if (result && result.success) {
                     allOrders = Array.isArray(result.orders) ? result.orders : [];
                     filteredOrders = [...allOrders];
+                    console.log('Loaded orders:', allOrders.length);
                     renderOrders();
                 } else {
-                    throw new Error(result.error || 'Failed to load orders');
+                    const errorMsg = result?.error || 'Failed to load orders';
+                    console.error('API returned error:', errorMsg);
+                    throw new Error(errorMsg);
                 }
             } catch (error) {
                 console.error('Error loading orders:', error);
@@ -456,6 +462,9 @@
                         <i class="bi bi-exclamation-triangle"></i>
                         <h3>Ошибка загрузки</h3>
                         <p>Не удалось загрузить историю ордеров: ${error.message || 'Неизвестная ошибка'}</p>
+                        <p style="font-size: 0.75rem; margin-top: 8px; color: var(--text-tertiary);">
+                            Проверьте консоль браузера для деталей
+                        </p>
                     </div>
                 `;
             }
@@ -502,34 +511,46 @@
             const end = start + perPage;
             const pageOrders = filteredOrders.slice(start, end);
             
-            container.innerHTML = pageOrders.map(order => `
+            container.innerHTML = pageOrders.map(order => {
+                // Безопасная обработка данных ордера
+                const symbol = order.symbol || 'N/A';
+                const side = order.side || 'buy';
+                const type = order.type || 'market';
+                const status = order.status || 'unknown';
+                const filledQty = parseFloat(order.filled_quantity) || 0;
+                const avgPrice = parseFloat(order.average_price) || 0;
+                const total = parseFloat(order.total) || 0;
+                const createdAt = order.created_at || order.filled_at || new Date().toISOString();
+                
+                return `
                 <div class="order-row">
                     <div class="order-asset">
-                        <div class="order-icon ${order.side}">
-                            <i class="bi bi-${order.side === 'buy' ? 'arrow-down' : 'arrow-up'}"></i>
+                        <div class="order-icon ${side}">
+                            <i class="bi bi-${side === 'buy' ? 'arrow-down' : 'arrow-up'}"></i>
                         </div>
                         <div>
-                            <div class="order-symbol">${order.symbol}/USD</div>
-                            <div class="order-type">${getOrderType(order.type)}</div>
+                            <div class="order-symbol">${symbol}/USD</div>
+                            <div class="order-type">${getOrderType(type)}</div>
                         </div>
                     </div>
                     <div>
-                        <span class="order-side ${order.side}">${order.side === 'buy' ? 'Покупка' : 'Продажа'}</span>
+                        <span class="order-side ${side}">${side === 'buy' ? 'Покупка' : 'Продажа'}</span>
                     </div>
-                    <div class="font-mono hide-tablet">${formatQuantity(order.filled_quantity, order.symbol)}</div>
+                    <div class="font-mono hide-tablet">${formatQuantity(filledQty, symbol)}</div>
                     <div class="hide-tablet">
-                        <div class="font-mono">${NovaTrade.formatCurrency(order.average_price)}</div>
-                        <div style="font-size: 0.8125rem; color: var(--text-tertiary);">${NovaTrade.formatCurrency(order.total)}</div>
+                        <div class="font-mono">${NovaTrade.formatCurrency(avgPrice)}</div>
+                        <div style="font-size: 0.8125rem; color: var(--text-tertiary);">${NovaTrade.formatCurrency(total)}</div>
                     </div>
                     <div class="hide-tablet">
-                        <div>${NovaTrade.formatDate(order.created_at)}</div>
-                        <div style="font-size: 0.8125rem; color: var(--text-tertiary);">${formatTime(order.created_at)}</div>
+                        <div>${NovaTrade.formatDate(createdAt)}</div>
+                        <div style="font-size: 0.8125rem; color: var(--text-tertiary);">${formatTime(createdAt)}</div>
                     </div>
                     <div style="text-align: right;">
-                        <span class="order-status ${order.status}">${getStatusText(order.status)}</span>
+                        <span class="order-status ${status}">${getStatusText(status)}</span>
                     </div>
                 </div>
-            `).join('');
+            `;
+            }).join('');
             
             // Рендер пагинации
             renderPagination(totalPages);
