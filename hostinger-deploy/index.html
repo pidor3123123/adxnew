@@ -306,51 +306,49 @@
             background: var(--bg-secondary);
             border-bottom: 1px solid var(--border-color);
             overflow: hidden;
-            overflow-x: hidden;
+            overflow-x: auto;
             padding: 12px 0;
             height: 48px;
             max-height: 48px;
             width: 100%;
-            max-width: 100%;
+            min-width: 100%;
         }
         
         .ticker-content {
             display: flex;
-            gap: 48px;
-            animation: ticker 30s linear infinite;
+            gap: 0;
             height: 100%;
             max-height: 100%;
-            overflow: hidden;
-            overflow-x: hidden;
-            width: 100%;
-            max-width: 100%;
+            overflow: visible;
+            width: auto;
+            min-width: 100%;
         }
         
         .tradingview-ticker-container {
             height: 100% !important;
             max-height: 48px !important;
-            overflow: hidden !important;
-            overflow-x: hidden !important;
-            width: 100% !important;
-            max-width: 100% !important;
+            overflow: visible !important;
+            width: 100vw !important;
+            min-width: 100vw !important;
+            max-width: none !important;
         }
         
         .tradingview-widget-container {
             height: 100% !important;
             max-height: 48px !important;
-            overflow: hidden !important;
-            overflow-x: hidden !important;
+            overflow: visible !important;
             width: 100% !important;
-            max-width: 100% !important;
+            min-width: 100% !important;
+            max-width: none !important;
         }
         
         .tradingview-widget-container__widget {
             height: 100% !important;
             max-height: 48px !important;
-            overflow: hidden !important;
-            overflow-x: hidden !important;
+            overflow: visible !important;
             width: 100% !important;
-            max-width: 100% !important;
+            min-width: 100% !important;
+            max-width: none !important;
         }
         
         .ticker-item {
@@ -928,6 +926,11 @@
                 }
                 // Удаляем атрибут scroll если он есть
                 headerContainer.removeAttribute('scroll');
+            }
+            
+            // Инициализация user menu (если еще не инициализирован)
+            if (typeof initUserMenu === 'function') {
+                initUserMenu();
             }
             
             // Проверка авторизации
