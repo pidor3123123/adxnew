@@ -375,7 +375,12 @@ function syncBalanceFromSupabase(string $supabaseUserId, string $currency, float
             $lockedBalance
         ]);
         
-        error_log("Synced balance from Supabase to MySQL: user_id=$mysqlUserId, currency=$currency, available=$availableBalance, locked=$lockedBalance");
+        $affectedRows = $stmt->rowCount();
+        error_log("Synced balance from Supabase to MySQL: user_id=$mysqlUserId, currency=$currency, available=$availableBalance, locked=$lockedBalance, affected_rows=$affectedRows");
+        
+        if ($affectedRows === 0) {
+            error_log("Warning: Balance update affected 0 rows. Balance might not exist in MySQL.");
+        }
         
     } catch (Exception $e) {
         error_log("Supabase balance sync error: " . $e->getMessage());

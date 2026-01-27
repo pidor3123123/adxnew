@@ -77,19 +77,28 @@ try {
             $available = $payload['available_balance'] ?? null;
             $locked = $payload['locked_balance'] ?? null;
             
+            error_log("Webhook balance_updated received: user_id=$supabaseUserId, email=$email, currency=$currency, available=$available, locked=$locked");
+            
             if (!$currency) {
                 throw new Exception('currency is required', 400);
             }
             
             if ($supabaseUserId && function_exists('syncBalanceFromSupabase')) {
                 // Используем новую функцию синхронизации
-                syncBalanceFromSupabase(
-                    $supabaseUserId,
-                    $currency,
-                    (float)($available ?? 0),
-                    (float)($locked ?? 0)
-                );
+                try {
+                    syncBalanceFromSupabase(
+                        $supabaseUserId,
+                        $currency,
+                        (float)($available ?? 0),
+                        (float)($locked ?? 0)
+                    );
+                    error_log("Balance synced successfully from Supabase to MySQL");
+                } catch (Exception $e) {
+                    error_log("Error syncing balance from Supabase: " . $e->getMessage());
+                    throw $e;
+                }
             } else {
+                error_log("Using fallback handleBalanceUpdate method");
                 // Fallback на старый метод
                 handleBalanceUpdate($db, $payload);
             }

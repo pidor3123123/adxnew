@@ -78,6 +78,49 @@ export async function PATCH(
       action: `Updated balance: ${currency} = ${available_balance ?? 0} (locked: ${locked_balance ?? 0})`,
     })
 
+    // Get user email for webhook
+    const { data: user } = await supabase
+      .from('users')
+      .select('email')
+      .eq('id', userId)
+      .single()
+
+    // Send webhook to main site
+    const webhookUrl = process.env.WEBHOOK_URL
+    const webhookSecret = process.env.WEBHOOK_SECRET
+    
+    if (webhookUrl && webhookSecret) {
+      try {
+        const webhookResponse = await fetch(webhookUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Webhook-Secret': webhookSecret,
+          },
+          body: JSON.stringify({
+            type: 'balance_updated',
+            payload: {
+              user_id: userId, // Supabase UUID
+              email: user?.email,
+              currency: currency,
+              available_balance: available_balance ?? balance.available_balance ?? 0,
+              locked_balance: locked_balance ?? balance.locked_balance ?? 0,
+            },
+          }),
+        })
+
+        if (!webhookResponse.ok) {
+          const errorText = await webhookResponse.text()
+          console.error(`Webhook failed: ${webhookResponse.status} - ${errorText}`)
+        }
+      } catch (error: any) {
+        // Don't fail the request if webhook fails
+        console.error('Webhook error:', error.message)
+      }
+    } else {
+      console.error('Webhook configuration missing: WEBHOOK_URL and WEBHOOK_SECRET must be set')
+    }
+
     return NextResponse.json({ success: true, balance })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
