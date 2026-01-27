@@ -269,6 +269,16 @@ function syncBalanceToSupabase(int $mysqlUserId, string $currency): void {
         
         $supabaseId = SupabaseClient::mysqlIdToUuid($mysqlUserId);
         
+        // ВАЖНО: Проверяем существование пользователя в Supabase перед созданием баланса
+        $existingUser = $supabase->get('users', 'id', $supabaseId);
+        if (!$existingUser) {
+            // Пользователь не существует в Supabase - синхронизируем его сначала
+            error_log("User $supabaseId not found in Supabase, syncing user first...");
+            syncUserToSupabase($mysqlUserId);
+            // После синхронизации пользователя, повторно получаем UUID
+            $supabaseId = SupabaseClient::mysqlIdToUuid($mysqlUserId);
+        }
+        
         // Проверяем существование баланса в Supabase
         $existingBalance = $supabase->get('user_balances', 'user_id', $supabaseId, 'id,currency');
         
@@ -284,12 +294,13 @@ function syncBalanceToSupabase(int $mysqlUserId, string $currency): void {
             // Обновляем существующий баланс
             $supabase->update('user_balances', 'id', $existingBalance['id'], $balanceData);
         } else {
-            // Создаем новый баланс
+            // Создаем новый баланс (теперь пользователь точно существует)
             $supabase->insert('user_balances', $balanceData);
         }
     } catch (Exception $e) {
         error_log("Supabase balance sync error for user ID $mysqlUserId, currency $currency: " . $e->getMessage());
-        throw $e;
+        // Не пробрасываем исключение дальше, чтобы не блокировать основную логику
+        // throw $e;
     }
 }
 

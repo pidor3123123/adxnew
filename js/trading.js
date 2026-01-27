@@ -263,13 +263,30 @@ function calculateQuantityByPercent(percent, mode = 'normal') {
     const activeTab = document.querySelector(`${modeSelector} .trade-tab.active`);
     const side = activeTab?.dataset.side || tradeSide;
     
-    if (side === 'buy') {
-        const availableUSD = userBalances.USD;
-        const maxQuantity = availableUSD / currentAsset.price;
-        quantityInput.value = (maxQuantity * percent).toFixed(4);
+    // Если percent === 'max', используем весь доступный баланс
+    if (percent === 'max' || percent === 'max') {
+        if (side === 'buy') {
+            const availableUSD = userBalances.USD || 0;
+            // Для покупки: используем весь доступный USD с учетом комиссии
+            // Комиссия 0.1%, значит можем использовать 99.9% баланса
+            const usableUSD = availableUSD * 0.999; // Оставляем 0.1% на комиссию
+            const maxQuantity = usableUSD / currentAsset.price;
+            quantityInput.value = Math.max(0, maxQuantity).toFixed(8);
+        } else {
+            // Для продажи: используем весь доступный баланс актива
+            const availableAsset = userBalances[currentAsset.symbol] || 0;
+            quantityInput.value = Math.max(0, availableAsset).toFixed(8);
+        }
     } else {
-        const availableAsset = userBalances[currentAsset.symbol] || 0;
-        quantityInput.value = (availableAsset * percent).toFixed(4);
+        // Обычный расчет по проценту
+        if (side === 'buy') {
+            const availableUSD = userBalances.USD || 0;
+            const maxQuantity = availableUSD / currentAsset.price;
+            quantityInput.value = (maxQuantity * percent).toFixed(8);
+        } else {
+            const availableAsset = userBalances[currentAsset.symbol] || 0;
+            quantityInput.value = (availableAsset * percent).toFixed(8);
+        }
     }
     
     if (mode === 'quick') {

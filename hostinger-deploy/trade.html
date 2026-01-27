@@ -1077,6 +1077,7 @@
                                         <button type="button" class="trade-percent-btn" data-percent="50">50%</button>
                                         <button type="button" class="trade-percent-btn" data-percent="75">75%</button>
                                         <button type="button" class="trade-percent-btn" data-percent="100">100%</button>
+                                        <button type="button" class="trade-percent-btn trade-percent-btn-max" data-percent="max">Макс</button>
                                     </div>
                                     
                                     <div id="quickTradeFields" style="margin-top: 16px; padding: 16px; background: var(--bg-secondary); border-radius: var(--radius-md); border: 1px solid var(--border-color);">
@@ -1294,8 +1295,13 @@
             // Обработчики процентных кнопок
             document.querySelectorAll('.trade-percent-btn').forEach(btn => {
                 btn.addEventListener('click', () => {
-                    const percent = parseInt(btn.dataset.percent) / 100;
-                    calculateQuantityByPercent(percent);
+                    const percentValue = btn.dataset.percent;
+                    if (percentValue === 'max') {
+                        calculateQuantityByPercent('max');
+                    } else {
+                        const percent = parseInt(percentValue) / 100;
+                        calculateQuantityByPercent(percent);
+                    }
                 });
             });
             
@@ -1458,12 +1464,22 @@
             // Обработчики процентных кнопок для обеих форм
             document.querySelectorAll('.trade-percent-btn').forEach(btn => {
                 btn.addEventListener('click', () => {
-                    const percent = parseInt(btn.dataset.percent) / 100;
+                    const percentValue = btn.dataset.percent;
                     const parentForm = btn.closest('form');
                     if (parentForm.id === 'quickTradeForm') {
-                        calculateQuantityByPercent(percent, 'quick');
+                        if (percentValue === 'max') {
+                            calculateQuantityByPercent('max', 'quick');
+                        } else {
+                            const percent = parseInt(percentValue) / 100;
+                            calculateQuantityByPercent(percent, 'quick');
+                        }
                     } else {
-                        calculateQuantityByPercent(percent);
+                        if (percentValue === 'max') {
+                            calculateQuantityByPercent('max');
+                        } else {
+                            const percent = parseInt(percentValue) / 100;
+                            calculateQuantityByPercent(percent);
+                        }
                     }
                 });
             });

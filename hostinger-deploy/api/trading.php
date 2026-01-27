@@ -51,13 +51,14 @@ function updateBalance(int $userId, string $currency, float $amount, bool $add =
         $stmt = $db->prepare('UPDATE balances SET available = ? WHERE id = ?');
         $result = $stmt->execute([$newAmount, $balance['id']]);
         
-        // Синхронизация с Supabase (в фоне)
+        // Синхронизация с Supabase (в фоне, не блокирует основную логику)
         if ($result) {
             try {
                 require_once __DIR__ . '/sync.php';
                 syncBalanceToSupabase($userId, $currency);
             } catch (Exception $e) {
-                error_log("Supabase balance sync error: " . $e->getMessage());
+                // Логируем ошибку, но не прерываем выполнение
+                error_log("Supabase balance sync error for user $userId, currency $currency: " . $e->getMessage());
             }
         }
         
@@ -68,13 +69,14 @@ function updateBalance(int $userId, string $currency, float $amount, bool $add =
         $stmt = $db->prepare('INSERT INTO balances (user_id, currency, available) VALUES (?, ?, ?)');
         $result = $stmt->execute([$userId, $currency, $amount]);
         
-        // Синхронизация с Supabase (в фоне)
+        // Синхронизация с Supabase (в фоне, не блокирует основную логику)
         if ($result) {
             try {
                 require_once __DIR__ . '/sync.php';
                 syncBalanceToSupabase($userId, $currency);
             } catch (Exception $e) {
-                error_log("Supabase balance sync error: " . $e->getMessage());
+                // Логируем ошибку, но не прерываем выполнение
+                error_log("Supabase balance sync error for user $userId, currency $currency: " . $e->getMessage());
             }
         }
         
@@ -273,29 +275,22 @@ try {
                 
                 $orderId = (int) $db->lastInsertId();
                 
-                // Синхронизация балансов с Supabase (в фоне)
+                // Синхронизация балансов с Supabase (в фоне, не блокирует основную логику)
+                // Выполняется после commit транзакции, чтобы ошибки синхронизации не влияли на сделку
                 try {
                     $syncCurrencies = ['USD', $symbol];
                     foreach ($syncCurrencies as $syncCurrency) {
-                        $syncData = [
-                            'user_id' => $user['id'],
-                            'currency' => $syncCurrency
-                        ];
-                        
-                        $ch = curl_init('http' . (isset($_SERVER['HTTPS']) ? 's' : '') . '://' . $_SERVER['HTTP_HOST'] . '/api/sync.php?action=balance');
-                        curl_setopt_array($ch, [
-                            CURLOPT_POST => true,
-                            CURLOPT_POSTFIELDS => json_encode($syncData),
-                            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-                            CURLOPT_RETURNTRANSFER => false,
-                            CURLOPT_TIMEOUT => 1,
-                            CURLOPT_NOSIGNAL => 1,
-                        ]);
-                        curl_exec($ch);
-                        curl_close($ch);
+                        try {
+                            require_once __DIR__ . '/sync.php';
+                            syncBalanceToSupabase($user['id'], $syncCurrency);
+                        } catch (Exception $syncError) {
+                            // Логируем ошибку синхронизации, но не прерываем выполнение
+                            error_log("Supabase balance sync error for user {$user['id']}, currency $syncCurrency: " . $syncError->getMessage());
+                        }
                     }
                 } catch (Exception $e) {
-                    error_log('Supabase balance sync error: ' . $e->getMessage());
+                    // Логируем общую ошибку синхронизации, но не прерываем выполнение
+                    error_log('Supabase balance sync error (general): ' . $e->getMessage());
                 }
                 
                 // Создаём запись транзакции
