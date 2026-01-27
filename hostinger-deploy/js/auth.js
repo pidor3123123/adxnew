@@ -40,6 +40,15 @@ const Auth = {
      */
     setUser(user) {
         localStorage.setItem(this.USER_KEY, JSON.stringify(user));
+        
+        // Если баланс сохранен в user, обновляем его в шапке сразу
+        if (user && user.balance !== undefined) {
+            const headerBalance = document.getElementById('headerBalance');
+            if (headerBalance) {
+                const formatted = parseFloat(user.balance || 0).toLocaleString('en-US', { minimumFractionDigits: 2 });
+                headerBalance.textContent = formatted;
+            }
+        }
     },
     
     /**
@@ -406,6 +415,13 @@ const Auth = {
             }
             
             if (result.success && result.user) {
+                // Сохраняем баланс в user объект если он есть в результате
+                if (result.balances) {
+                    const usd = result.balances.find(b => b.currency === 'USD');
+                    if (usd) {
+                        result.user.balance = parseFloat(usd.available || 0);
+                    }
+                }
                 this.setUser(result.user);
                 return result;
             }
@@ -491,31 +507,53 @@ const Auth = {
      * Загрузка баланса пользователя
      */
     async loadBalance() {
-        if (!this.isAuthenticated()) return;
+        console.log('[loadBalance] Starting balance load...');
+        
+        if (!this.isAuthenticated()) {
+            console.log('[loadBalance] User not authenticated, skipping');
+            return;
+        }
         
         try {
+            console.log('[loadBalance] Fetching user data...');
             const result = await this.fetchUser();
+            console.log('[loadBalance] fetchUser result:', result);
+            
             if (result && result.balances) {
+                console.log('[loadBalance] Balances found:', result.balances);
                 const usd = result.balances.find(b => b.currency === 'USD');
+                console.log('[loadBalance] USD balance:', usd);
+                
                 if (usd) {
                     const balance = parseFloat(usd.available || 0);
                     const formatted = balance.toLocaleString('en-US', { minimumFractionDigits: 2 });
+                    console.log('[loadBalance] Formatted balance:', formatted);
                     
                     // Обновляем баланс в шапке на всех страницах
                     const headerBalance = document.getElementById('headerBalance');
+                    console.log('[loadBalance] headerBalance element:', headerBalance);
+                    
                     if (headerBalance) {
                         headerBalance.textContent = formatted;
+                        console.log('[loadBalance] Balance updated in header:', formatted);
+                    } else {
+                        console.warn('[loadBalance] Element #headerBalance not found!');
                     }
                     
                     // Обновляем данные пользователя в localStorage
                     const user = this.getUser();
                     if (user) {
                         this.setUser({ ...user, balance: balance });
+                        console.log('[loadBalance] Balance saved to localStorage');
                     }
+                } else {
+                    console.warn('[loadBalance] USD balance not found in balances array');
                 }
+            } else {
+                console.warn('[loadBalance] No balances in result:', result);
             }
         } catch (error) {
-            console.error('Error loading balance:', error);
+            console.error('[loadBalance] Error loading balance:', error);
         }
     },
     
@@ -553,7 +591,16 @@ const Auth = {
         
         // Автоматически загружаем баланс при обновлении UI
         if (isAuth) {
-            this.loadBalance();
+            // Используем setTimeout для гарантии, что DOM готов
+            setTimeout(() => {
+                this.loadBalance();
+            }, 100);
+        } else {
+            // Если не авторизован, показываем 0.00
+            const headerBalance = document.getElementById('headerBalance');
+            if (headerBalance) {
+                headerBalance.textContent = '0.00';
+            }
         }
     }
 };
@@ -565,14 +612,33 @@ window.Auth = Auth;
 (function() {
     // Функция для инициализации обновления баланса
     function initBalanceUpdates() {
-        if (!Auth.isAuthenticated()) return;
+        console.log('[initBalanceUpdates] Initializing balance updates...');
         
-        // Загружаем баланс сразу при загрузке страницы
-        Auth.loadBalance();
+        if (!Auth.isAuthenticated()) {
+            console.log('[initBalanceUpdates] User not authenticated');
+            // Показываем баланс из localStorage если есть
+            const user = Auth.getUser();
+            if (user && user.balance !== undefined) {
+                const headerBalance = document.getElementById('headerBalance');
+                if (headerBalance) {
+                    const formatted = parseFloat(user.balance || 0).toLocaleString('en-US', { minimumFractionDigits: 2 });
+                    headerBalance.textContent = formatted;
+                    console.log('[initBalanceUpdates] Displayed balance from localStorage:', formatted);
+                }
+            }
+            return;
+        }
+        
+        // Загружаем баланс сразу при загрузке страницы (с небольшой задержкой для гарантии готовности DOM)
+        setTimeout(() => {
+            console.log('[initBalanceUpdates] Loading balance on page load...');
+            Auth.loadBalance();
+        }, 200);
         
         // Обновляем каждые 30 секунд
         setInterval(() => {
             if (Auth.isAuthenticated()) {
+                console.log('[initBalanceUpdates] Periodic balance update...');
                 Auth.loadBalance();
             }
         }, 30000);
@@ -580,6 +646,7 @@ window.Auth = Auth;
         // Обновляем при возврате фокуса на вкладку
         document.addEventListener('visibilitychange', () => {
             if (!document.hidden && Auth.isAuthenticated()) {
+                console.log('[initBalanceUpdates] Visibility changed, updating balance...');
                 Auth.loadBalance();
             }
         });
@@ -587,6 +654,7 @@ window.Auth = Auth;
         // Обновляем при возврате фокуса на окно
         window.addEventListener('focus', () => {
             if (Auth.isAuthenticated()) {
+                console.log('[initBalanceUpdates] Window focused, updating balance...');
                 Auth.loadBalance();
             }
         });
@@ -594,8 +662,12 @@ window.Auth = Auth;
     
     // Инициализируем при загрузке DOM
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initBalanceUpdates);
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('[initBalanceUpdates] DOM loaded, initializing...');
+            initBalanceUpdates();
+        });
     } else {
+        console.log('[initBalanceUpdates] DOM already loaded, initializing immediately...');
         initBalanceUpdates();
     }
 })();
