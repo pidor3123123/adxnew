@@ -36,7 +36,7 @@ function getBalance(int $userId, string $currency): float {
 }
 
 // Обновление баланса
-function updateBalance(int $userId, string $currency, float $amount, bool $add = true): bool {
+function updateBalance(int $userId, string $currency, float $amount, bool $add = true, bool $skipSync = false): bool {
     $db = getDB();
     
     // Проверяем существование записи
@@ -52,7 +52,8 @@ function updateBalance(int $userId, string $currency, float $amount, bool $add =
         $result = $stmt->execute([$newAmount, $balance['id']]);
         
         // Синхронизация с Supabase (в фоне, не блокирует основную логику)
-        if ($result) {
+        // Пропускаем синхронизацию, если $skipSync = true (для случаев, когда синхронизация будет выполнена позже)
+        if ($result && !$skipSync) {
             try {
                 require_once __DIR__ . '/sync.php';
                 syncBalanceToSupabase($userId, $currency);
@@ -70,7 +71,8 @@ function updateBalance(int $userId, string $currency, float $amount, bool $add =
         $result = $stmt->execute([$userId, $currency, $amount]);
         
         // Синхронизация с Supabase (в фоне, не блокирует основную логику)
-        if ($result) {
+        // Пропускаем синхронизацию, если $skipSync = true (для случаев, когда синхронизация будет выполнена позже)
+        if ($result && !$skipSync) {
             try {
                 require_once __DIR__ . '/sync.php';
                 syncBalanceToSupabase($userId, $currency);
@@ -751,10 +753,10 @@ try {
                     $closeTotal = $remainingQty * $currentPrice;
                     $closeFee = $closeTotal * 0.001;
                     
-                    // Списываем актив
-                    updateBalance($user['id'], $order['symbol'], $remainingQty, false);
-                    // Начисляем USD
-                    updateBalance($user['id'], 'USD', $closeTotal - $closeFee, true);
+                    // Списываем актив (пропускаем синхронизацию, будет выполнена после commit)
+                    updateBalance($user['id'], $order['symbol'], $remainingQty, false, true);
+                    // Начисляем USD (пропускаем синхронизацию, будет выполнена после commit)
+                    updateBalance($user['id'], 'USD', $closeTotal - $closeFee, true, true);
                 } else {
                     // Покупаем актив (закрываем короткую позицию)
                     $closeTotal = $remainingQty * $currentPrice;
@@ -766,10 +768,10 @@ try {
                         throw new Exception('Insufficient USD balance', 400);
                     }
                     
-                    // Списываем USD
-                    updateBalance($user['id'], 'USD', $requiredAmount, false);
-                    // Начисляем актив
-                    updateBalance($user['id'], $order['symbol'], $remainingQty, true);
+                    // Списываем USD (пропускаем синхронизацию, будет выполнена после commit)
+                    updateBalance($user['id'], 'USD', $requiredAmount, false, true);
+                    // Начисляем актив (пропускаем синхронизацию, будет выполнена после commit)
+                    updateBalance($user['id'], $order['symbol'], $remainingQty, true, true);
                 }
                 
                 // Создаем закрывающий ордер
@@ -813,7 +815,8 @@ try {
                 
                 $db->commit();
                 
-                // Синхронизация балансов с Supabase (в фоне)
+                // Синхронизация балансов с Supabase (в фоне, после commit)
+                // Используем буферизацию вывода, чтобы curl ответ не попал в основной JSON ответ
                 try {
                     $syncCurrencies = ['USD', $order['symbol']];
                     foreach ($syncCurrencies as $syncCurrency) {
@@ -822,19 +825,40 @@ try {
                             'currency' => $syncCurrency
                         ];
                         
+                        // Начинаем буферизацию вывода для этого curl запроса
+                        ob_start();
+                        
                         $ch = curl_init('http' . (isset($_SERVER['HTTPS']) ? 's' : '') . '://' . $_SERVER['HTTP_HOST'] . '/api/sync.php?action=balance');
                         curl_setopt_array($ch, [
                             CURLOPT_POST => true,
                             CURLOPT_POSTFIELDS => json_encode($syncData),
                             CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-                            CURLOPT_RETURNTRANSFER => false,
+                            CURLOPT_RETURNTRANSFER => true, // Получаем ответ в переменную, а не выводим
                             CURLOPT_TIMEOUT => 1,
                             CURLOPT_NOSIGNAL => 1,
                         ]);
-                        curl_exec($ch);
+                        $response = curl_exec($ch);
+                        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
                         curl_close($ch);
+                        
+                        // Очищаем буфер вывода (curl ответ не должен попасть в основной JSON)
+                        ob_end_clean();
+                        
+                        // Проверяем ответ, но не выводим его
+                        if ($httpCode !== 200) {
+                            error_log("Supabase balance sync failed for currency $syncCurrency: HTTP $httpCode");
+                        } else {
+                            $syncResult = json_decode($response, true);
+                            if (!$syncResult || !($syncResult['success'] ?? false)) {
+                                error_log("Supabase balance sync failed for currency $syncCurrency: " . ($syncResult['error'] ?? 'Unknown error'));
+                            }
+                        }
                     }
                 } catch (Exception $e) {
+                    // Очищаем буфер в случае ошибки
+                    if (ob_get_level() > 0) {
+                        ob_end_clean();
+                    }
                     error_log('Supabase balance sync error: ' . $e->getMessage());
                 }
                 
