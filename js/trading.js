@@ -251,6 +251,26 @@ function updateTradeButton() {
 }
 
 /**
+ * Format quantity value without trailing zeros and round to step
+ */
+function formatQuantity(value, step = 0.0001) {
+    if (value <= 0) return '0';
+    
+    // Округляем до шага
+    const rounded = Math.round(value / step) * step;
+    
+    // Определяем количество знаков после запятой на основе step
+    const stepStr = step.toString();
+    const decimals = stepStr.includes('.') ? stepStr.split('.')[1].length : 0;
+    
+    // Форматируем с нужным количеством знаков
+    const formatted = rounded.toFixed(decimals);
+    
+    // Убираем trailing zeros используя parseFloat
+    return parseFloat(formatted).toString();
+}
+
+/**
  * Calculate quantity by percent
  */
 function calculateQuantityByPercent(percent, mode = 'normal') {
@@ -263,6 +283,9 @@ function calculateQuantityByPercent(percent, mode = 'normal') {
     const activeTab = document.querySelector(`${modeSelector} .trade-tab.active`);
     const side = activeTab?.dataset.side || tradeSide;
     
+    // Получаем step из input поля
+    const step = parseFloat(quantityInput.getAttribute('step')) || 0.0001;
+    
     // Если percent === 'max', используем весь доступный баланс
     if (percent === 'max' || percent === 'max') {
         if (side === 'buy') {
@@ -271,21 +294,21 @@ function calculateQuantityByPercent(percent, mode = 'normal') {
             // Комиссия 0.1%, значит можем использовать 99.9% баланса
             const usableUSD = availableUSD * 0.999; // Оставляем 0.1% на комиссию
             const maxQuantity = usableUSD / currentAsset.price;
-            quantityInput.value = Math.max(0, maxQuantity).toFixed(8);
+            quantityInput.value = formatQuantity(Math.max(0, maxQuantity), step);
         } else {
             // Для продажи: используем весь доступный баланс актива
             const availableAsset = userBalances[currentAsset.symbol] || 0;
-            quantityInput.value = Math.max(0, availableAsset).toFixed(8);
+            quantityInput.value = formatQuantity(Math.max(0, availableAsset), step);
         }
     } else {
         // Обычный расчет по проценту
         if (side === 'buy') {
             const availableUSD = userBalances.USD || 0;
             const maxQuantity = availableUSD / currentAsset.price;
-            quantityInput.value = (maxQuantity * percent).toFixed(8);
+            quantityInput.value = formatQuantity(maxQuantity * percent, step);
         } else {
             const availableAsset = userBalances[currentAsset.symbol] || 0;
-            quantityInput.value = (availableAsset * percent).toFixed(8);
+            quantityInput.value = formatQuantity(availableAsset * percent, step);
         }
     }
     
