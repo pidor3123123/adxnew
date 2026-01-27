@@ -254,13 +254,26 @@ h6 { font-size: 1rem; }
 .header .container {
     height: var(--header-height) !important;
     max-height: var(--header-height) !important;
+    min-height: var(--header-height) !important;
     padding: 0 24px !important;
-    margin: 0 !important;
+    margin: 0 auto !important;
     overflow: hidden !important;
     overflow-x: hidden !important;
     overflow-y: hidden !important;
     box-sizing: border-box !important;
     position: relative !important;
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+    scroll-behavior: auto !important;
+    overscroll-behavior: none !important;
+    -webkit-overflow-scrolling: auto !important;
+}
+
+.header .container::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    background: transparent !important;
 }
 
 .page-wrapper {
@@ -2738,6 +2751,23 @@ html, body {
     overflow-y: hidden !important;
     scrollbar-width: none !important;
     -ms-overflow-style: none !important;
+    scroll-behavior: auto !important;
+    overscroll-behavior: none !important;
+    -webkit-overflow-scrolling: auto !important;
+}
+
+/* ОСОБОЕ ВНИМАНИЕ К CONTAINER - ПОЛНОЕ УДАЛЕНИЕ СКРОЛЛА И СВОЙСТВА SCROLL */
+.header .container {
+    overflow: hidden !important;
+    overflow-x: hidden !important;
+    overflow-y: hidden !important;
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+    scroll-behavior: auto !important;
+    overscroll-behavior: none !important;
+    -webkit-overflow-scrolling: auto !important;
+    max-width: 100% !important;
+    width: 100% !important;
 }
 
 .header::-webkit-scrollbar,

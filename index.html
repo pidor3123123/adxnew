@@ -908,6 +908,28 @@
     <script>
         // Инициализация страницы
         document.addEventListener('DOMContentLoaded', async () => {
+            // УДАЛЕНИЕ СКРОЛЛБАРА И СВОЙСТВА SCROLL ИЗ HEADER CONTAINER
+            const headerContainer = document.querySelector('.header .container');
+            if (headerContainer) {
+                headerContainer.style.overflow = 'hidden';
+                headerContainer.style.overflowX = 'hidden';
+                headerContainer.style.overflowY = 'hidden';
+                headerContainer.style.scrollbarWidth = 'none';
+                headerContainer.style.msOverflowStyle = 'none';
+                headerContainer.style.webkitOverflowScrolling = 'auto';
+                headerContainer.style.overscrollBehavior = 'none';
+                // Удаляем свойство scroll если оно есть
+                if (headerContainer.scroll !== undefined) {
+                    try {
+                        delete headerContainer.scroll;
+                    } catch(e) {
+                        // Игнорируем ошибки
+                    }
+                }
+                // Удаляем атрибут scroll если он есть
+                headerContainer.removeAttribute('scroll');
+            }
+            
             // Проверка авторизации
             Auth.updateUI();
             
