@@ -488,6 +488,38 @@ const Auth = {
     },
     
     /**
+     * Загрузка баланса пользователя
+     */
+    async loadBalance() {
+        if (!this.isAuthenticated()) return;
+        
+        try {
+            const result = await this.fetchUser();
+            if (result && result.balances) {
+                const usd = result.balances.find(b => b.currency === 'USD');
+                if (usd) {
+                    const balance = parseFloat(usd.available || 0);
+                    const formatted = balance.toLocaleString('en-US', { minimumFractionDigits: 2 });
+                    
+                    // Обновляем баланс в шапке на всех страницах
+                    const headerBalance = document.getElementById('headerBalance');
+                    if (headerBalance) {
+                        headerBalance.textContent = formatted;
+                    }
+                    
+                    // Обновляем данные пользователя в localStorage
+                    const user = this.getUser();
+                    if (user) {
+                        this.setUser({ ...user, balance: balance });
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Error loading balance:', error);
+        }
+    },
+    
+    /**
      * Обновление UI для авторизованного пользователя
      */
     updateUI() {
@@ -518,8 +550,52 @@ const Auth = {
                 el.textContent = initials.toUpperCase() || user.email[0].toUpperCase();
             });
         }
+        
+        // Автоматически загружаем баланс при обновлении UI
+        if (isAuth) {
+            this.loadBalance();
+        }
     }
 };
 
 // Экспорт
 window.Auth = Auth;
+
+// Автоматическое обновление баланса для авторизованных пользователей
+(function() {
+    // Функция для инициализации обновления баланса
+    function initBalanceUpdates() {
+        if (!Auth.isAuthenticated()) return;
+        
+        // Загружаем баланс сразу при загрузке страницы
+        Auth.loadBalance();
+        
+        // Обновляем каждые 30 секунд
+        setInterval(() => {
+            if (Auth.isAuthenticated()) {
+                Auth.loadBalance();
+            }
+        }, 30000);
+        
+        // Обновляем при возврате фокуса на вкладку
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden && Auth.isAuthenticated()) {
+                Auth.loadBalance();
+            }
+        });
+        
+        // Обновляем при возврате фокуса на окно
+        window.addEventListener('focus', () => {
+            if (Auth.isAuthenticated()) {
+                Auth.loadBalance();
+            }
+        });
+    }
+    
+    // Инициализируем при загрузке DOM
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initBalanceUpdates);
+    } else {
+        initBalanceUpdates();
+    }
+})();
