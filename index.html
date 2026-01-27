@@ -305,13 +305,12 @@
         .ticker-bar {
             background: var(--bg-secondary);
             border-bottom: 1px solid var(--border-color);
-            overflow: hidden;
             overflow-x: auto;
+            overflow-y: hidden;
             padding: 12px 0;
             height: 48px;
             max-height: 48px;
             width: 100%;
-            min-width: 100%;
         }
         
         .ticker-content {
@@ -328,27 +327,24 @@
             height: 100% !important;
             max-height: 48px !important;
             overflow: visible !important;
-            width: 100vw !important;
-            min-width: 100vw !important;
-            max-width: none !important;
+            width: auto !important;
+            min-width: 100% !important;
         }
         
         .tradingview-widget-container {
             height: 100% !important;
             max-height: 48px !important;
             overflow: visible !important;
-            width: 100% !important;
+            width: auto !important;
             min-width: 100% !important;
-            max-width: none !important;
         }
         
         .tradingview-widget-container__widget {
             height: 100% !important;
             max-height: 48px !important;
             overflow: visible !important;
-            width: 100% !important;
+            width: auto !important;
             min-width: 100% !important;
-            max-width: none !important;
         }
         
         .ticker-item {
@@ -1264,9 +1260,9 @@
             
             // Создаем контейнер для виджета с ограниченной высотой
             ticker.innerHTML = `
-                <div class="tradingview-ticker-container" style="width: 100%; max-width: 100%; height: 48px; max-height: 48px; overflow: hidden; overflow-x: hidden;">
-                    <div class="tradingview-widget-container" style="width: 100%; max-width: 100%; height: 48px; max-height: 48px; overflow: hidden; overflow-x: hidden;">
-                        <div class="tradingview-widget-container__widget" style="width: 100%; max-width: 100%; height: 48px; max-height: 48px; overflow: hidden; overflow-x: hidden;"></div>
+                <div class="tradingview-ticker-container" style="height: 48px; max-height: 48px;">
+                    <div class="tradingview-widget-container" style="height: 48px; max-height: 48px;">
+                        <div class="tradingview-widget-container__widget" style="height: 48px; max-height: 48px;"></div>
                     </div>
                 </div>
             `;

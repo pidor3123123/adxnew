@@ -2737,12 +2737,20 @@ html, body {
 .page-wrapper,
 .header,
 .header-inner,
-.container,
-.ticker-bar,
-.ticker-content {
+.container {
     overflow-x: hidden !important;
     max-width: 100% !important;
     width: 100% !important;
+}
+
+.ticker-bar {
+    overflow-x: auto !important;
+    width: 100% !important;
+}
+
+.ticker-content {
+    width: auto !important;
+    min-width: 100% !important;
 }
 
 /* Убедиться, что все абсолютно позиционированные элементы не выходят за границы */
