@@ -730,6 +730,11 @@
                         
                         if (result.success) {
                             NovaTrade.showToast('Позиция закрыта', 'Позиция успешно закрыта', 'success');
+                            
+                            // Автоматически переключаемся на вкладку "Закрытые", чтобы пользователь сразу увидел закрытую сделку
+                            switchTab('closed');
+                            
+                            // Обновляем списки позиций
                             await loadOpenPositions();
                             const periodFilter = document.getElementById('periodFilter');
                             await loadClosedPositions(periodFilter ? periodFilter.value : 'all');
