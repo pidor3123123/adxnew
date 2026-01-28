@@ -161,101 +161,125 @@ function syncUserToSupabase(int $mysqlUserId): void {
         
         $email = $user['email'];
         
-        // Шаг 1: Проверяем, существует ли пользователь в auth.users
+        // Шаг 1: Находим или создаем auth пользователя по email
+        // ВАЖНО: Таблица users имеет внешний ключ на auth.users, поэтому нужно использовать UUID из auth.users
         $authUserId = $supabase->findAuthUserByEmail($email);
+        $needToCreateAuthUser = false;
+        $needToUpdateMetadata = false;
         
-        // Шаг 2: Если пользователя нет в auth.users - создаем его
         if (!$authUserId) {
-            // Генерируем случайный пароль (пользователь не сможет войти через Supabase Auth,
-            // но это нормально, так как он использует основной сайт для входа)
-            $tempPassword = bin2hex(random_bytes(16));
-            
-            // Подготавливаем метаданные для auth.users
-            $userMetadata = [
-                'first_name' => $user['first_name'] ?? '',
-                'last_name' => $user['last_name'] ?? '',
-                'country' => $user['country'] ?? 'US',
-                'mysql_user_id' => $mysqlUserId // Сохраняем связь с MySQL
-            ];
-            
+            // Auth пользователя нет - создаем нового
+            $needToCreateAuthUser = true;
+            error_log("Auth user not found for email $email, will create new one for MySQL user ID $mysqlUserId");
+        } else {
+            // Auth пользователь существует - проверяем метаданные mysql_user_id
+            // Получаем информацию о auth пользователе через API для проверки метаданных
+            // Пока просто логируем и предполагаем, что нужно обновить метаданные
+            error_log("Found existing auth user for email $email with UUID: $authUserId");
+            $needToUpdateMetadata = true; // Обновим метаданные при создании/обновлении записи в users
+        }
+        
+        // Шаг 2: Создаем auth пользователя, если его нет
+        if ($needToCreateAuthUser) {
             try {
+                $tempPassword = bin2hex(random_bytes(16));
+                $userMetadata = [
+                    'first_name' => $user['first_name'] ?? '',
+                    'last_name' => $user['last_name'] ?? '',
+                    'country' => $user['country'] ?? 'US',
+                    'mysql_user_id' => $mysqlUserId // Сохраняем связь с MySQL
+                ];
+                
                 $authUserId = $supabase->createAuthUser($email, $tempPassword, $userMetadata);
                 error_log("Created auth user for MySQL user ID $mysqlUserId (email: $email) with UUID: $authUserId");
             } catch (Exception $e) {
-                // Если ошибка "уже существует", пытаемся найти еще раз
-                if (strpos($e->getMessage(), 'already') !== false) {
+                // Если пользователь уже существует - пытаемся найти его
+                if (strpos($e->getMessage(), 'already') !== false || strpos($e->getMessage(), 'exists') !== false) {
                     $authUserId = $supabase->findAuthUserByEmail($email);
                     if (!$authUserId) {
                         throw new Exception("User exists but could not find UUID: " . $e->getMessage());
                     }
+                    error_log("Found existing auth user after create error: $authUserId");
+                    $needToUpdateMetadata = true;
                 } else {
                     throw $e;
                 }
             }
-        } else {
-            error_log("Found existing auth user for MySQL user ID $mysqlUserId (email: $email) with UUID: $authUserId");
         }
         
         // Шаг 3: Создаем/обновляем запись в users с UUID из auth.users
-        // Сначала проверяем, существует ли пользователь
+        // ВАЖНО: Используем UUID из auth.users (не детерминированный), чтобы соблюсти foreign key constraint
         $existingUser = $supabase->get('users', 'id', $authUserId);
         
-        $userData = [
-            'id' => $authUserId, // Используем UUID из auth.users
-            'email' => $email,
-            'first_name' => $user['first_name'] ?? '',
-            'last_name' => $user['last_name'] ?? '',
-            'country' => $user['country'] ?? 'US',
-            'is_verified' => (bool)$user['is_verified'],
-            'kyc_status' => 'pending',
-            'kyc_verified' => false,
-            'created_at' => $user['created_at'] ?? date('Y-m-d\TH:i:s.u\Z')
-        ];
-        
-        // Если пользователь существует - обновляем, если нет - создаем
-        try {
-            if ($existingUser) {
-                // Пользователь существует - обновляем только изменяемые поля (не трогаем created_at)
-                $updateData = [
-                    'email' => $email,
-                    'first_name' => $user['first_name'] ?? '',
-                    'last_name' => $user['last_name'] ?? '',
-                    'country' => $user['country'] ?? 'US',
-                    'is_verified' => (bool)$user['is_verified'],
-                    'kyc_status' => 'pending',
-                    'kyc_verified' => false
-                ];
-                $supabase->update('users', 'id', $authUserId, $updateData);
-                error_log("Updated existing user record for MySQL user ID $mysqlUserId (UUID: $authUserId)");
-            } else {
-                // Пользователь не существует - создаем новую запись
-                $supabase->insert('users', $userData);
-                error_log("Created new user record for MySQL user ID $mysqlUserId (UUID: $authUserId)");
+        // Если пользователь существует, проверяем, что email совпадает
+        if ($existingUser) {
+            $existingEmail = $existingUser['email'] ?? '';
+            if ($existingEmail !== $email) {
+                // КРИТИЧЕСКАЯ ОШИБКА: UUID используется другим пользователем!
+                error_log("CRITICAL: UUID $authUserId is used by different user! Existing: $existingEmail, New: $email");
+                throw new Exception("UUID conflict: UUID $authUserId is already used by user with email $existingEmail. Cannot sync user with email $email");
             }
-        } catch (Exception $e) {
-            // Если ошибка, пытаемся обработать
-            error_log("Error syncing user to Supabase: " . $e->getMessage());
-            
-            // Если это ошибка уникальности (пользователь уже существует), просто обновляем
-            if (strpos($e->getMessage(), 'duplicate') !== false || strpos($e->getMessage(), 'unique') !== false) {
-                try {
-                    $updateData = [
-                        'email' => $email,
-                        'first_name' => $user['first_name'] ?? '',
-                        'last_name' => $user['last_name'] ?? '',
-                        'country' => $user['country'] ?? 'US',
-                        'is_verified' => (bool)$user['is_verified'],
-                        'kyc_status' => 'pending',
-                        'kyc_verified' => false
-                    ];
-                    $supabase->update('users', 'id', $authUserId, $updateData);
-                    error_log("Updated user record after conflict for MySQL user ID $mysqlUserId (UUID: $authUserId)");
-                } catch (Exception $updateError) {
-                    error_log("Failed to update user after conflict: " . $updateError->getMessage());
-                    throw $e; // Пробрасываем исходную ошибку
-                }
-            } else {
+            // Email совпадает - обновляем только изменяемые поля (не трогаем created_at и id)
+            $updateData = [
+                'email' => $email, // Обновляем email на случай, если он изменился
+                'first_name' => $user['first_name'] ?? '',
+                'last_name' => $user['last_name'] ?? '',
+                'country' => $user['country'] ?? 'US',
+                'is_verified' => (bool)$user['is_verified'],
+                'kyc_status' => 'pending',
+                'kyc_verified' => false
+            ];
+            try {
+                $supabase->update('users', 'id', $authUserId, $updateData);
+                error_log("Updated existing user record for MySQL user ID $mysqlUserId (UUID: $authUserId, email: $email)");
+            } catch (Exception $e) {
+                error_log("Error updating user in Supabase: " . $e->getMessage());
                 throw $e;
+            }
+        } else {
+            // Пользователь не существует - создаем новую запись с детерминированным UUID
+            $userData = [
+                'id' => $authUserId, // Используем детерминированный UUID на основе MySQL ID
+                'email' => $email,
+                'first_name' => $user['first_name'] ?? '',
+                'last_name' => $user['last_name'] ?? '',
+                'country' => $user['country'] ?? 'US',
+                'is_verified' => (bool)$user['is_verified'],
+                'kyc_status' => 'pending',
+                'kyc_verified' => false,
+                'created_at' => $user['created_at'] ?? date('Y-m-d\TH:i:s.u\Z')
+            ];
+            
+            try {
+                $supabase->insert('users', $userData);
+                error_log("Created new user record for MySQL user ID $mysqlUserId (UUID: $authUserId, email: $email)");
+            } catch (Exception $e) {
+                error_log("Error creating user in Supabase: " . $e->getMessage());
+                
+                // Если это ошибка уникальности, проверяем, что произошло
+                if (strpos($e->getMessage(), 'duplicate') !== false || strpos($e->getMessage(), 'unique') !== false) {
+                    // Пользователь уже существует - проверяем email
+                    $existingUser = $supabase->get('users', 'id', $authUserId);
+                    if ($existingUser && ($existingUser['email'] ?? '') === $email) {
+                        // Это тот же пользователь - просто логируем и обновляем
+                        error_log("User already exists with same email, updating instead for MySQL user ID $mysqlUserId");
+                        $updateData = [
+                            'first_name' => $user['first_name'] ?? '',
+                            'last_name' => $user['last_name'] ?? '',
+                            'country' => $user['country'] ?? 'US',
+                            'is_verified' => (bool)$user['is_verified'],
+                            'kyc_status' => 'pending',
+                            'kyc_verified' => false
+                        ];
+                        $supabase->update('users', 'id', $authUserId, $updateData);
+                    } else {
+                        // Это другой пользователь - критическая ошибка
+                        error_log("CRITICAL: Attempted to create user with existing UUID but different email!");
+                        throw new Exception("Cannot create user: UUID $authUserId is already used by another user");
+                    }
+                } else {
+                    throw $e;
+                }
             }
         }
         
@@ -301,16 +325,42 @@ function syncBalanceToSupabase(int $mysqlUserId, string $currency): void {
             ];
         }
         
-        $supabaseId = SupabaseClient::mysqlIdToUuid($mysqlUserId);
+        // ВАЖНО: Получаем UUID из auth.users по email, а не используем детерминированный
+        // Это нужно для соблюдения foreign key constraint
+        $db = getDB();
+        $stmt = $db->prepare('SELECT email FROM users WHERE id = ?');
+        $stmt->execute([$mysqlUserId]);
+        $mysqlUser = $stmt->fetch();
+        
+        if (!$mysqlUser) {
+            throw new Exception("MySQL user with ID $mysqlUserId not found");
+        }
+        
+        $email = $mysqlUser['email'];
+        $supabaseId = $supabase->findAuthUserByEmail($email);
+        
+        if (!$supabaseId) {
+            // Пользователь не существует в Supabase - синхронизируем его сначала
+            error_log("Auth user not found for email $email, syncing user first...");
+            syncUserToSupabase($mysqlUserId);
+            // После синхронизации пользователя, повторно получаем UUID
+            $supabaseId = $supabase->findAuthUserByEmail($email);
+            if (!$supabaseId) {
+                throw new Exception("Failed to get auth user UUID after sync for MySQL user ID $mysqlUserId");
+            }
+        }
         
         // ВАЖНО: Проверяем существование пользователя в Supabase перед созданием баланса
         $existingUser = $supabase->get('users', 'id', $supabaseId);
         if (!$existingUser) {
-            // Пользователь не существует в Supabase - синхронизируем его сначала
-            error_log("User $supabaseId not found in Supabase, syncing user first...");
+            // Пользователь не существует в таблице users - синхронизируем его
+            error_log("User $supabaseId not found in users table, syncing user first...");
             syncUserToSupabase($mysqlUserId);
             // После синхронизации пользователя, повторно получаем UUID
-            $supabaseId = SupabaseClient::mysqlIdToUuid($mysqlUserId);
+            $supabaseId = $supabase->findAuthUserByEmail($email);
+            if (!$supabaseId) {
+                throw new Exception("Failed to get auth user UUID after sync for MySQL user ID $mysqlUserId");
+            }
         }
         
         // Проверяем существование баланса в Supabase
