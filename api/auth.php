@@ -420,6 +420,17 @@ if (basename($_SERVER['SCRIPT_FILENAME']) === 'auth.php') {
                 error_log("Stack trace: " . $e->getTraceAsString());
             }
             
+            // Синхронизируем начальные балансы после создания пользователя
+            try {
+                require_once __DIR__ . '/sync.php';
+                if (function_exists('syncAllBalancesToSupabase')) {
+                    syncAllBalancesToSupabase($userId);
+                    error_log("Initial balances synced to Supabase for user ID $userId");
+                }
+            } catch (Exception $e) {
+                error_log("Supabase initial balances sync error for user ID $userId: " . $e->getMessage());
+            }
+            
             // Создание сессии (функция уже обрабатывает ошибки внутри)
             $token = createSession($userId, true);
             

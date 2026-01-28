@@ -185,24 +185,13 @@ try {
                 
                 $db->commit();
                 
-                // Синхронизация баланса с Supabase (в фоне)
+                // Синхронизация баланса с Supabase (в фоне, не блокирует основную логику)
                 try {
-                    $syncData = [
-                        'user_id' => $user['id'],
-                        'currency' => $currency
-                    ];
-                    
-                    $ch = curl_init('http' . (isset($_SERVER['HTTPS']) ? 's' : '') . '://' . $_SERVER['HTTP_HOST'] . '/api/sync.php?action=balance');
-                    curl_setopt_array($ch, [
-                        CURLOPT_POST => true,
-                        CURLOPT_POSTFIELDS => json_encode($syncData),
-                        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-                        CURLOPT_RETURNTRANSFER => false,
-                        CURLOPT_TIMEOUT => 1,
-                        CURLOPT_NOSIGNAL => 1,
-                    ]);
-                    curl_exec($ch);
-                    curl_close($ch);
+                    require_once __DIR__ . '/sync.php';
+                    if (function_exists('syncBalanceToSupabase')) {
+                        syncBalanceToSupabase($user['id'], $currency);
+                        error_log("Balance synced to Supabase: user_id={$user['id']}, currency=$currency (deposit)");
+                    }
                 } catch (Exception $e) {
                     error_log('Supabase balance sync error: ' . $e->getMessage());
                 }
@@ -273,24 +262,13 @@ try {
                 
                 $db->commit();
                 
-                // Синхронизация баланса с Supabase (в фоне)
+                // Синхронизация баланса с Supabase (в фоне, не блокирует основную логику)
                 try {
-                    $syncData = [
-                        'user_id' => $user['id'],
-                        'currency' => $currency
-                    ];
-                    
-                    $ch = curl_init('http' . (isset($_SERVER['HTTPS']) ? 's' : '') . '://' . $_SERVER['HTTP_HOST'] . '/api/sync.php?action=balance');
-                    curl_setopt_array($ch, [
-                        CURLOPT_POST => true,
-                        CURLOPT_POSTFIELDS => json_encode($syncData),
-                        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-                        CURLOPT_RETURNTRANSFER => false,
-                        CURLOPT_TIMEOUT => 1,
-                        CURLOPT_NOSIGNAL => 1,
-                    ]);
-                    curl_exec($ch);
-                    curl_close($ch);
+                    require_once __DIR__ . '/sync.php';
+                    if (function_exists('syncBalanceToSupabase')) {
+                        syncBalanceToSupabase($user['id'], $currency);
+                        error_log("Balance synced to Supabase: user_id={$user['id']}, currency=$currency (withdrawal)");
+                    }
                 } catch (Exception $e) {
                     error_log('Supabase balance sync error: ' . $e->getMessage());
                 }
