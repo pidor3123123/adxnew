@@ -389,10 +389,6 @@ h6 { font-size: 1rem; }
     max-height: none !important;
 }
 
-.user-dropdown {
-    z-index: 2000;
-}
-
 /* Скрываем скроллбар в WebKit браузерах (Chrome, Safari) */
 .header::-webkit-scrollbar,
 .header *::-webkit-scrollbar,
@@ -613,7 +609,7 @@ h6 { font-size: 1rem; }
     visibility: hidden;
     transform: translateY(-8px);
     transition: all var(--transition-fast);
-    z-index: 1000;
+    z-index: 10000 !important;
     overflow: visible !important;
     overflow-x: visible !important;
     overflow-y: visible !important;
@@ -2758,13 +2754,34 @@ html, body {
 }
 
 .ticker-bar {
-    overflow-x: auto !important;
+    overflow-x: hidden !important;
+    overflow-y: hidden !important;
     width: 100% !important;
+    position: relative;
 }
 
 .ticker-content {
+    display: inline-flex;
     width: auto !important;
     min-width: 100% !important;
+    animation: ticker-scroll 60s linear infinite;
+    white-space: nowrap;
+}
+
+@keyframes ticker-scroll {
+    0% {
+        transform: translateX(0);
+    }
+    100% {
+        transform: translateX(-50%);
+    }
+}
+
+/* Дублируем контент для seamless loop */
+.ticker-content::after {
+    content: '';
+    display: inline-block;
+    width: 100%;
 }
 
 /* Убедиться, что все абсолютно позиционированные элементы не выходят за границы */

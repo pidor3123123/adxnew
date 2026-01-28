@@ -305,31 +305,35 @@
         .ticker-bar {
             background: var(--bg-secondary);
             border-bottom: 1px solid var(--border-color);
-<<<<<<< HEAD
-            overflow-x: auto;
-            overflow-y: hidden;
-=======
             overflow: hidden;
-            overflow-x: auto;
->>>>>>> 7a0b94442799c3b56d0e82221ac14dbd79c923dc
+            overflow-x: hidden;
+            overflow-y: hidden;
             padding: 12px 0;
             height: 48px;
             max-height: 48px;
             width: 100%;
-<<<<<<< HEAD
-=======
-            min-width: 100%;
->>>>>>> 7a0b94442799c3b56d0e82221ac14dbd79c923dc
+            position: relative;
         }
         
         .ticker-content {
-            display: flex;
+            display: inline-flex;
             gap: 0;
             height: 100%;
             max-height: 100%;
             overflow: visible;
             width: auto;
-            min-width: 100%;
+            min-width: 200%;
+            animation: ticker-scroll 60s linear infinite;
+            white-space: nowrap;
+        }
+        
+        @keyframes ticker-scroll {
+            0% {
+                transform: translateX(0);
+            }
+            100% {
+                transform: translateX(-50%);
+            }
         }
         
         .tradingview-ticker-container {
@@ -1289,18 +1293,20 @@
                 };
             });
             
-            // Создаем контейнер для виджета с ограниченной высотой
-            ticker.innerHTML = `
-                <div class="tradingview-ticker-container" style="height: 48px; max-height: 48px;">
+            // Создаем контейнер для виджета с ограниченной высотой и дублируем для seamless loop
+            const tickerWidget = `
+                <div class="tradingview-ticker-container" style="height: 48px; max-height: 48px; display: inline-block;">
                     <div class="tradingview-widget-container" style="height: 48px; max-height: 48px;">
                         <div class="tradingview-widget-container__widget" style="height: 48px; max-height: 48px;"></div>
                     </div>
                 </div>
             `;
+            // Дублируем виджет для seamless loop анимации
+            ticker.innerHTML = tickerWidget + tickerWidget;
             
-            // Инициализируем виджет после создания контейнера
-            const widgetContainer = ticker.querySelector('.tradingview-widget-container__widget');
-            if (widgetContainer) {
+            // Инициализируем виджет для обоих контейнеров (для seamless loop)
+            const widgetContainers = ticker.querySelectorAll('.tradingview-widget-container__widget');
+            widgetContainers.forEach(widgetContainer => {
                 const script = document.createElement('script');
                 script.type = 'text/javascript';
                 script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js';
@@ -1314,7 +1320,7 @@
                     "locale": "ru"
                 });
                 widgetContainer.appendChild(script);
-            }
+            });
         }
         
         // Создание SVG спарклайна на основе изменения цены
