@@ -35,7 +35,7 @@ export default function UsersPage() {
     setLoading(true)
     try {
       const params = new URLSearchParams()
-      params.set('limit', '100')
+      params.set('limit', '1000') // Увеличен лимит для отображения всех пользователей
       if (search) params.set('search', search)
       
       const res = await fetch(`/api/admin/users?${params}`)

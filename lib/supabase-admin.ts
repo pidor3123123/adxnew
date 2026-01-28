@@ -127,15 +127,20 @@ export async function logAudit(
 // Users
 export async function getUsers(limit = 50, offset = 0, search?: string) {
   const supabase = getSupabase()
+  
+  // Увеличиваем лимит до 1000 для отображения всех пользователей
+  // Supabase по умолчанию ограничивает до 1000 записей, но мы можем запросить больше
+  const actualLimit = Math.min(limit, 10000) // Максимум 10000 для безопасности
+  
   let query = supabase
     .from('users')
     .select(`
       *,
       user_security (*),
       user_balances (*)
-    `)
+    `, { count: 'exact' })
     .order('created_at', { ascending: false })
-    .range(offset, offset + limit - 1)
+    .range(offset, offset + actualLimit - 1)
 
   if (search) {
     query = query.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%`)
