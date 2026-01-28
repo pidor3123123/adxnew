@@ -197,6 +197,9 @@ function syncUserToSupabase(int $mysqlUserId): void {
         }
         
         // Шаг 3: Создаем/обновляем запись в users с UUID из auth.users
+        // Сначала проверяем, существует ли пользователь
+        $existingUser = $supabase->get('users', 'id', $authUserId);
+        
         $userData = [
             'id' => $authUserId, // Используем UUID из auth.users
             'email' => $email,
@@ -209,17 +212,48 @@ function syncUserToSupabase(int $mysqlUserId): void {
             'created_at' => $user['created_at'] ?? date('Y-m-d\TH:i:s.u\Z')
         ];
         
-        // Upsert пользователя (триггер может уже создать запись, но обновим данные)
+        // Если пользователь существует - обновляем, если нет - создаем
         try {
-            $supabase->upsert('users', $userData, 'id');
-            error_log("Upserted user record for MySQL user ID $mysqlUserId (UUID: $authUserId)");
-        } catch (Exception $e) {
-            // Если ошибка внешнего ключа, возможно триггер еще не сработал
-            // Попробуем просто обновить существующую запись
-            $existingUser = $supabase->get('users', 'id', $authUserId);
             if ($existingUser) {
-                $supabase->update('users', 'id', $authUserId, $userData);
-                error_log("Updated user record for MySQL user ID $mysqlUserId (UUID: $authUserId)");
+                // Пользователь существует - обновляем только изменяемые поля (не трогаем created_at)
+                $updateData = [
+                    'email' => $email,
+                    'first_name' => $user['first_name'] ?? '',
+                    'last_name' => $user['last_name'] ?? '',
+                    'country' => $user['country'] ?? 'US',
+                    'is_verified' => (bool)$user['is_verified'],
+                    'kyc_status' => 'pending',
+                    'kyc_verified' => false
+                ];
+                $supabase->update('users', 'id', $authUserId, $updateData);
+                error_log("Updated existing user record for MySQL user ID $mysqlUserId (UUID: $authUserId)");
+            } else {
+                // Пользователь не существует - создаем новую запись
+                $supabase->insert('users', $userData);
+                error_log("Created new user record for MySQL user ID $mysqlUserId (UUID: $authUserId)");
+            }
+        } catch (Exception $e) {
+            // Если ошибка, пытаемся обработать
+            error_log("Error syncing user to Supabase: " . $e->getMessage());
+            
+            // Если это ошибка уникальности (пользователь уже существует), просто обновляем
+            if (strpos($e->getMessage(), 'duplicate') !== false || strpos($e->getMessage(), 'unique') !== false) {
+                try {
+                    $updateData = [
+                        'email' => $email,
+                        'first_name' => $user['first_name'] ?? '',
+                        'last_name' => $user['last_name'] ?? '',
+                        'country' => $user['country'] ?? 'US',
+                        'is_verified' => (bool)$user['is_verified'],
+                        'kyc_status' => 'pending',
+                        'kyc_verified' => false
+                    ];
+                    $supabase->update('users', 'id', $authUserId, $updateData);
+                    error_log("Updated user record after conflict for MySQL user ID $mysqlUserId (UUID: $authUserId)");
+                } catch (Exception $updateError) {
+                    error_log("Failed to update user after conflict: " . $updateError->getMessage());
+                    throw $e; // Пробрасываем исходную ошибку
+                }
             } else {
                 throw $e;
             }
