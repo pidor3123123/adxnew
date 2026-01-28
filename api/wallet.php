@@ -19,10 +19,51 @@ require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../config/supabase.php';
 require_once __DIR__ . '/auth.php';
 
-// Получение рыночных цен для конвертации в USD
+// Получение рыночных цен для конвертации в USD (использует реальный API)
 function getUsdPrices(): array {
-    return [
-        'USD' => 1.0,
+    $prices = ['USD' => 1.0];
+    
+    // Для криптовалют используем CoinGecko API
+    $cryptoMap = [
+        'BTC' => 'bitcoin',
+        'ETH' => 'ethereum',
+        'BNB' => 'binancecoin',
+        'XRP' => 'ripple',
+        'SOL' => 'solana',
+        'ADA' => 'cardano',
+        'DOGE' => 'dogecoin',
+        'DOT' => 'polkadot',
+        'MATIC' => 'polygon-ecosystem-token',
+        'LTC' => 'litecoin'
+    ];
+    
+    try {
+        $coinIds = array_values($cryptoMap);
+        $url = 'https://api.coingecko.com/api/v3/simple/price?ids=' . implode(',', $coinIds) . '&vs_currencies=usd';
+        $context = stream_context_create([
+            'http' => [
+                'timeout' => 5,
+                'header' => 'Accept: application/json'
+            ]
+        ]);
+        
+        $response = @file_get_contents($url, false, $context);
+        if ($response !== false) {
+            $data = json_decode($response, true);
+            if ($data) {
+                foreach ($cryptoMap as $symbol => $coinId) {
+                    if (isset($data[$coinId]['usd'])) {
+                        $prices[$symbol] = (float)$data[$coinId]['usd'];
+                    }
+                }
+            }
+        }
+    } catch (Exception $e) {
+        error_log("Error fetching crypto prices from CoinGecko: " . $e->getMessage());
+    }
+    
+    // Fallback: моковые цены (если API недоступен)
+    $fallbackPrices = [
         'BTC' => 43250.00,
         'ETH' => 2285.50,
         'BNB' => 312.40,
@@ -34,6 +75,15 @@ function getUsdPrices(): array {
         'MATIC' => 0.92,
         'LTC' => 72.30,
     ];
+    
+    // Заполняем отсутствующие цены из fallback
+    foreach ($fallbackPrices as $symbol => $price) {
+        if (!isset($prices[$symbol])) {
+            $prices[$symbol] = $price;
+        }
+    }
+    
+    return $prices;
 }
 
 $method = $_SERVER['REQUEST_METHOD'];

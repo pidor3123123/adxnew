@@ -3,10 +3,27 @@
  * ADX Finance - Конфигурация базы данных
  */
 
-define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
-define('DB_NAME', getenv('DB_NAME') ?: 'novatrade');
-define('DB_USER', getenv('DB_USER') ?: 'root');
-define('DB_PASS', getenv('DB_PASS') ?: '');
+// Определяем, запущено ли на Hostinger (проверяем по домену или переменной окружения)
+$isHostinger = (
+    isset($_SERVER['HTTP_HOST']) && 
+    (strpos($_SERVER['HTTP_HOST'], 'adx.finance') !== false || 
+     strpos($_SERVER['HTTP_HOST'], 'hostinger') !== false)
+) || getenv('IS_HOSTINGER') === 'true';
+
+// Используем переменные окружения, если установлены, иначе используем значения по умолчанию
+// Для Hostinger используем правильные credentials
+if ($isHostinger) {
+    define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
+    define('DB_NAME', getenv('DB_NAME') ?: 'u680161286_adxfinance');
+    define('DB_USER', getenv('DB_USER') ?: 'u680161286_adx');
+    define('DB_PASS', getenv('DB_PASS') ?: 'pS1gaUyhCm');
+} else {
+    // Локальная разработка
+    define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
+    define('DB_NAME', getenv('DB_NAME') ?: 'novatrade');
+    define('DB_USER', getenv('DB_USER') ?: 'root');
+    define('DB_PASS', getenv('DB_PASS') ?: '');
+}
 define('DB_CHARSET', getenv('DB_CHARSET') ?: 'utf8mb4');
 
 /**

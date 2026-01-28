@@ -125,6 +125,13 @@ const Auth = {
                 this.setToken(result.token);
                 this.setUser(result.user);
                 
+                // Загружаем баланс после успешной регистрации
+                if (result.success) {
+                    setTimeout(() => {
+                        this.loadBalance();
+                    }, 100);
+                }
+                
                 // Проверяем, что токен действительно был сохранен
                 const savedToken = this.getToken();
                 if (!savedToken || savedToken !== result.token) {
@@ -233,6 +240,13 @@ const Auth = {
                 // Сохраняем токен и данные пользователя
                 this.setToken(result.token);
                 this.setUser(result.user);
+                
+                // Загружаем баланс после успешного входа
+                if (result.success) {
+                    setTimeout(() => {
+                        this.loadBalance();
+                    }, 100);
+                }
                 
                 // Проверяем, что токен действительно был сохранен
                 const savedToken = this.getToken();

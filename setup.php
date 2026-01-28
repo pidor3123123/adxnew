@@ -7,16 +7,20 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-$host = 'localhost';
-$user = 'root';
-$pass = 'M#LXcxB}1';  // Стандартный пароль Open Server
-$dbName = 'novatrade';
+// Загружаем конфигурацию базы данных
+require_once __DIR__ . '/config/database.php';
 
 echo "<h1>ADX Finance - Установка</h1>";
 echo "<style>body{font-family:sans-serif;padding:20px;background:#1a1a1f;color:#fff;}h1{color:#6366f1;}pre{background:#2a2a32;padding:15px;border-radius:8px;overflow-x:auto;}.success{color:#22c55e;}.error{color:#ef4444;}.info{color:#6366f1;}</style>";
 
 try {
-    // Подключаемся без выбора базы
+    // Используем настройки из config/database.php
+    $host = DB_HOST;
+    $user = DB_USER;
+    $pass = DB_PASS;
+    $dbName = DB_NAME;
+    
+    // Подключаемся без выбора базы (для создания БД если её нет)
     $pdo = new PDO("mysql:host=$host;charset=utf8mb4", $user, $pass, [
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION
     ]);

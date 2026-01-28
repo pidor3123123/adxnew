@@ -45,7 +45,7 @@ function getCryptoPrices(): array {
 }
 
 /**
- * Моковые данные криптовалют
+ * Моковые данные криптовалют (используются только если API недоступен)
  */
 function getMockCryptoPrices(): array {
     return [

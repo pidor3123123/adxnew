@@ -95,8 +95,50 @@ function getAssetId(string $symbol): ?int {
     return $result ? (int)$result['id'] : null;
 }
 
-// Симуляция получения рыночной цены
+// Получение рыночной цены из реального API
 function getMarketPrice(string $symbol): float {
+    $symbolUpper = strtoupper($symbol);
+    
+    // Для криптовалют используем CoinGecko API
+    if (in_array($symbolUpper, ['BTC', 'ETH', 'BNB', 'XRP', 'SOL', 'ADA', 'DOGE', 'DOT', 'MATIC', 'LTC'])) {
+        try {
+            $coinIds = [
+                'BTC' => 'bitcoin',
+                'ETH' => 'ethereum',
+                'BNB' => 'binancecoin',
+                'XRP' => 'ripple',
+                'SOL' => 'solana',
+                'ADA' => 'cardano',
+                'DOGE' => 'dogecoin',
+                'DOT' => 'polkadot',
+                'MATIC' => 'polygon-ecosystem-token',
+                'LTC' => 'litecoin'
+            ];
+            
+            $coinId = $coinIds[$symbolUpper] ?? null;
+            if ($coinId) {
+                $url = "https://api.coingecko.com/api/v3/simple/price?ids={$coinId}&vs_currencies=usd";
+                $context = stream_context_create([
+                    'http' => [
+                        'timeout' => 5,
+                        'header' => 'Accept: application/json'
+                    ]
+                ]);
+                
+                $response = @file_get_contents($url, false, $context);
+                if ($response !== false) {
+                    $data = json_decode($response, true);
+                    if ($data && isset($data[$coinId]['usd'])) {
+                        return (float)$data[$coinId]['usd'];
+                    }
+                }
+            }
+        } catch (Exception $e) {
+            error_log("Error fetching price for {$symbolUpper} from CoinGecko: " . $e->getMessage());
+        }
+    }
+    
+    // Fallback: моковые цены (используются только если API недоступен или для не-криптовалют)
     $prices = [
         'BTC' => 43250.00,
         'ETH' => 2285.50,
@@ -125,9 +167,16 @@ function getMarketPrice(string $symbol): float {
         'DAX' => 16000.00,
     ];
     
-    // Добавляем небольшую случайность
-    $basePrice = $prices[strtoupper($symbol)] ?? 100.00;
-    return $basePrice * (1 + (rand(-100, 100) / 10000));
+    // Для криптовалют не добавляем случайность (используем реальную цену)
+    // Для других активов можно добавить небольшую случайность для симуляции
+    $basePrice = $prices[$symbolUpper] ?? 100.00;
+    
+    // Для не-криптовалют добавляем небольшую случайность (симуляция)
+    if (!in_array($symbolUpper, ['BTC', 'ETH', 'BNB', 'XRP', 'SOL', 'ADA', 'DOGE', 'DOT', 'MATIC', 'LTC'])) {
+        return $basePrice * (1 + (rand(-100, 100) / 10000));
+    }
+    
+    return $basePrice;
 }
 
 $method = $_SERVER['REQUEST_METHOD'];

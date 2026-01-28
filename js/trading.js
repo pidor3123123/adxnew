@@ -5,8 +5,8 @@
 let currentAsset = {
     symbol: 'BTC',
     name: 'Bitcoin',
-    price: 43250.00,
-    change: 2.45,
+    price: 0, // Будет загружено из API
+    change: 0,
     decimals: 8
 };
 
