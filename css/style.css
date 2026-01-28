@@ -257,9 +257,9 @@ h6 { font-size: 1rem; }
     min-height: var(--header-height) !important;
     padding: 0 24px !important;
     margin: 0 auto !important;
-    overflow: hidden !important;
+    overflow: visible !important;
     overflow-x: hidden !important;
-    overflow-y: hidden !important;
+    overflow-y: visible !important;
     box-sizing: border-box !important;
     position: relative !important;
     scrollbar-width: none !important;
@@ -361,8 +361,6 @@ h6 { font-size: 1rem; }
 .header-inner *,
 .header .container,
 .header .container *,
-.header-actions,
-.header-actions *,
 .user-menu-trigger,
 .user-menu-trigger *,
 .user-info,
@@ -375,6 +373,14 @@ h6 { font-size: 1rem; }
     scrollbar-width: none !important; /* Firefox */
     -ms-overflow-style: none !important; /* IE and Edge */
     max-height: var(--header-height) !important;
+}
+
+/* Исключаем header-actions из overflow: hidden, чтобы dropdown мог выходить за пределы */
+.header-actions {
+    overflow: visible !important;
+    overflow-x: visible !important;
+    overflow-y: visible !important;
+    max-height: none !important;
 }
 
 /* Dropdown профиля должен выходить за пределы header (иначе он обрезается) */
@@ -419,9 +425,9 @@ h6 { font-size: 1rem; }
     justify-content: space-between;
     gap: var(--gap-md);
     width: 100% !important;
-    overflow: hidden !important;
-    overflow-x: hidden !important;
-    overflow-y: hidden !important;
+    overflow: visible !important;
+    overflow-x: visible !important;
+    overflow-y: visible !important;
     margin: 0 !important;
     padding: 0 !important;
     box-sizing: border-box !important;
@@ -504,9 +510,9 @@ h6 { font-size: 1rem; }
     align-items: center;
     gap: var(--gap-md);
     flex-shrink: 0;
-    overflow: hidden !important;
-    overflow-x: hidden !important;
-    overflow-y: hidden !important;
+    overflow: visible !important;
+    overflow-x: visible !important;
+    overflow-y: visible !important;
 }
 
 .theme-toggle {
@@ -534,9 +540,7 @@ h6 { font-size: 1rem; }
 .user-menu {
     position: relative;
     flex-shrink: 0;
-    overflow: hidden !important;
-    overflow-x: hidden !important;
-    overflow-y: hidden !important;
+    /* overflow управляется правилом выше (строки 387-390) */
 }
 
 .user-menu-trigger {
@@ -614,12 +618,24 @@ h6 { font-size: 1rem; }
     overflow-x: visible !important;
     overflow-y: visible !important;
     max-height: none !important;
+    pointer-events: auto !important;
+}
+
+.user-dropdown * {
+    pointer-events: auto !important;
 }
 
 .user-menu.open .user-dropdown {
     opacity: 1;
     visibility: visible;
     transform: translateY(0);
+    pointer-events: auto !important;
+}
+
+/* Убеждаемся, что dropdown и его элементы могут получать клики */
+.user-menu.open .user-dropdown,
+.user-menu.open .user-dropdown * {
+    pointer-events: auto !important;
 }
 
 .user-menu.open .user-menu-trigger {
@@ -2794,8 +2810,6 @@ html, body {
 .header,
 .header *,
 .header > *,
-.header .container,
-.header .container *,
 .header .header-inner,
 .header .header-inner *,
 .header .header-actions,
@@ -2812,11 +2826,25 @@ html, body {
     -webkit-overflow-scrolling: auto !important;
 }
 
-/* ОСОБОЕ ВНИМАНИЕ К CONTAINER - ПОЛНОЕ УДАЛЕНИЕ СКРОЛЛА И СВОЙСТВА SCROLL */
+/* Исключаем .header .container из overflow: hidden, чтобы dropdown мог выходить за пределы */
 .header .container {
-    overflow: hidden !important;
+    overflow: visible !important;
     overflow-x: hidden !important;
-    overflow-y: hidden !important;
+    overflow-y: visible !important;
+}
+
+/* Исключаем .header .container * из overflow: hidden, но только для user-menu */
+.header .container .user-menu,
+.header .container .user-menu * {
+    overflow: visible !important;
+}
+
+/* ОСОБОЕ ВНИМАНИЕ К CONTAINER - ПОЛНОЕ УДАЛЕНИЕ СКРОЛЛА И СВОЙСТВА SCROLL */
+/* overflow изменен на visible для поддержки dropdown меню */
+.header .container {
+    overflow: visible !important;
+    overflow-x: hidden !important;
+    overflow-y: visible !important;
     scrollbar-width: none !important;
     -ms-overflow-style: none !important;
     scroll-behavior: auto !important;
