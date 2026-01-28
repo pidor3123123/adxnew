@@ -464,6 +464,11 @@ async function submitOrder(isQuick = false) {
             
             // Update balances
             await loadUserBalances();
+            
+            // Обновляем баланс в header
+            if (typeof Auth !== 'undefined' && typeof Auth.loadBalance === 'function') {
+                await Auth.loadBalance();
+            }
         } else {
             NovaTrade.showToast('Ошибка', result.error || 'Не удалось создать ордер', 'error');
         }

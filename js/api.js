@@ -56,7 +56,13 @@ const API = {
      */
     get(endpoint, params = {}) {
         const queryString = new URLSearchParams(params).toString();
-        const url = queryString ? `${endpoint}?${queryString}` : endpoint;
+        if (!queryString) {
+            return this.request(endpoint);
+        }
+        
+        // Проверяем, содержит ли endpoint уже query string
+        const separator = endpoint.includes('?') ? '&' : '?';
+        const url = `${endpoint}${separator}${queryString}`;
         return this.request(url);
     },
     

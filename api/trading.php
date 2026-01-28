@@ -133,6 +133,8 @@ function getMarketPrice(string $symbol): float {
 $method = $_SERVER['REQUEST_METHOD'];
 $action = $_GET['action'] ?? '';
 
+error_log("Trading API called with action: " . $action . ", method: " . $method);
+
 try {
     $user = getAuthUser();
     

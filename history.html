@@ -457,16 +457,24 @@
                 }
             } catch (error) {
                 console.error('Error loading orders:', error);
-                document.getElementById('ordersList').innerHTML = `
-                    <div class="empty-state">
-                        <i class="bi bi-exclamation-triangle"></i>
-                        <h3>Ошибка загрузки</h3>
-                        <p>Не удалось загрузить историю ордеров: ${error.message || 'Неизвестная ошибка'}</p>
-                        <p style="font-size: 0.75rem; margin-top: 8px; color: var(--text-tertiary);">
-                            Проверьте консоль браузера для деталей
-                        </p>
-                    </div>
-                `;
+                const container = document.getElementById('ordersList');
+                if (container) {
+                    const errorMessage = error.message || 'Неизвестная ошибка';
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            <h3>Ошибка загрузки истории</h3>
+                            <p>Не удалось загрузить историю ордеров: ${errorMessage}</p>
+                            <p style="font-size: 0.75rem; margin-top: 8px; color: var(--text-tertiary);">
+                                Проверьте консоль браузера для деталей
+                            </p>
+                            <button class="btn btn-primary" onclick="loadOrders()" style="margin-top: 16px;">
+                                <i class="bi bi-arrow-clockwise"></i>
+                                Попробовать снова
+                            </button>
+                        </div>
+                    `;
+                }
             }
         }
         

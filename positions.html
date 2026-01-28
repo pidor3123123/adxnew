@@ -624,13 +624,24 @@
                 }
             } catch (error) {
                 console.error('Error loading open positions:', error);
-                document.getElementById('openPositionsList').innerHTML = `
-                    <div class="empty-state">
-                        <i class="bi bi-exclamation-triangle"></i>
-                        <h3>Ошибка загрузки</h3>
-                        <p>${error.message || 'Неизвестная ошибка'}</p>
-                    </div>
-                `;
+                const container = document.getElementById('openPositionsList');
+                if (container) {
+                    const errorMessage = error.message || 'Неизвестная ошибка';
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            <h3>Ошибка загрузки открытых позиций</h3>
+                            <p>${errorMessage}</p>
+                            <p style="font-size: 0.75rem; margin-top: 8px; color: var(--text-tertiary);">
+                                Проверьте консоль браузера для деталей
+                            </p>
+                            <button class="btn btn-primary" onclick="loadOpenPositions()" style="margin-top: 16px;">
+                                <i class="bi bi-arrow-clockwise"></i>
+                                Попробовать снова
+                            </button>
+                        </div>
+                    `;
+                }
             }
         }
         
@@ -777,13 +788,23 @@
                 }
             } catch (error) {
                 console.error('Error loading closed positions:', error);
-                document.getElementById('closedPositionsList').innerHTML = `
-                    <div class="empty-state">
-                        <i class="bi bi-exclamation-triangle"></i>
-                        <h3>Ошибка загрузки</h3>
-                        <p>${error.message || 'Неизвестная ошибка'}</p>
-                    </div>
-                `;
+                const container = document.getElementById('closedPositionsList');
+                if (container) {
+                    const errorMessage = error.message || 'Неизвестная ошибка';
+                    const errorDetails = error.stack ? `<p style="font-size: 0.75rem; margin-top: 8px; color: var(--text-tertiary);">Проверьте консоль браузера для деталей</p>` : '';
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            <h3>Ошибка загрузки закрытых позиций</h3>
+                            <p>${errorMessage}</p>
+                            ${errorDetails}
+                            <button class="btn btn-primary" onclick="loadClosedPositions(document.getElementById('periodFilter')?.value || 'all')" style="margin-top: 16px;">
+                                <i class="bi bi-arrow-clockwise"></i>
+                                Попробовать снова
+                            </button>
+                        </div>
+                    `;
+                }
             }
         }
         
