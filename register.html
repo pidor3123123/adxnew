@@ -324,7 +324,9 @@
     <script>
         function togglePassword(inputId) {
             const input = document.getElementById(inputId);
+            if (!input) return;
             const icon = input.parentElement.querySelector('.password-toggle i');
+            if (!icon) return;
             
             if (input.type === 'password') {
                 input.type = 'text';
@@ -335,8 +337,12 @@
             }
         }
         
-        // Password strength indicator
-        document.getElementById('password').addEventListener('input', function(e) {
+        document.addEventListener('DOMContentLoaded', function() {
+            // Password strength indicator
+            const passwordInput = document.getElementById('password');
+            if (!passwordInput) return;
+            
+            passwordInput.addEventListener('input', function(e) {
             const password = e.target.value;
             const bars = [
                 document.getElementById('str1'),
@@ -383,9 +389,12 @@
             strengthText.style.color = strengthClass === 'weak' ? 'var(--danger)' : 
                                         strengthClass === 'medium' ? 'var(--warning)' : 
                                         strengthClass === 'strong' ? 'var(--success)' : '';
-        });
-        
-        document.getElementById('registerForm').addEventListener('submit', async (e) => {
+            });
+            
+            const registerForm = document.getElementById('registerForm');
+            if (!registerForm) return;
+            
+            registerForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             
             const formError = document.getElementById('formError');
@@ -428,6 +437,7 @@
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = '<span>Создать аккаунт</span><i class="bi bi-arrow-right"></i>';
             }
+            });
         });
     </script>
 </body>
