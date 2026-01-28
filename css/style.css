@@ -363,8 +363,6 @@ h6 { font-size: 1rem; }
 .header .container *,
 .header-actions,
 .header-actions *,
-.user-menu,
-.user-menu *,
 .user-menu-trigger,
 .user-menu-trigger *,
 .user-info,
@@ -377,6 +375,22 @@ h6 { font-size: 1rem; }
     scrollbar-width: none !important; /* Firefox */
     -ms-overflow-style: none !important; /* IE and Edge */
     max-height: var(--header-height) !important;
+}
+
+/* Dropdown профиля должен выходить за пределы header (иначе он обрезается) */
+.user-menu {
+    position: relative;
+    overflow: visible !important;
+    max-height: none !important;
+}
+
+.user-menu * {
+    overflow: visible !important;
+    max-height: none !important;
+}
+
+.user-dropdown {
+    z-index: 2000;
 }
 
 /* Скрываем скроллбар в WebKit браузерах (Chrome, Safari) */

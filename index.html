@@ -538,7 +538,7 @@
                             <a href="register.html" class="btn btn-primary">Регистрация</a>
                         </div>
                         
-                        <div class="user-menu" data-auth="true" style="display: none;">
+                        <div class="user-menu" data-auth="true">
                             <button class="user-menu-trigger">
                                 <div class="user-avatar" data-user-avatar>U</div>
                                 <div class="user-info">
@@ -951,13 +951,17 @@
                 headerContainer.removeAttribute('scroll');
             }
             
-            // Инициализация user menu (если еще не инициализирован)
-            if (typeof initUserMenu === 'function') {
-                initUserMenu();
+            // Обновление UI для авторизации
+            if (typeof Auth !== 'undefined' && Auth.updateUI) {
+                Auth.updateUI();
             }
             
-            // Проверка авторизации
-            Auth.updateUI();
+            // Инициализация user menu (после обновления UI)
+            setTimeout(() => {
+                if (typeof initUserMenu === 'function') {
+                    initUserMenu();
+                }
+            }, 100);
             
             // Загрузка рыночных данных
             await loadMarketData('crypto');

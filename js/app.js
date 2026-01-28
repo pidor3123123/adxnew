@@ -249,8 +249,20 @@ function initUserMenu() {
     const userMenu = document.querySelector('.user-menu');
     if (!userMenu) return;
     
+    // Проверяем, видно ли меню (может быть скрыто через data-auth)
+    const computedStyle = window.getComputedStyle(userMenu);
+    if (computedStyle.display === 'none') {
+        // Меню скрыто, возможно еще не обновлен UI - попробуем позже
+        return;
+    }
+    
     const trigger = userMenu.querySelector('.user-menu-trigger');
     if (!trigger) return;
+    
+    // Проверяем, не инициализировано ли уже меню
+    if (trigger.dataset.initialized === 'true') {
+        return;
+    }
     
     // Удаляем старые обработчики если есть
     const newTrigger = trigger.cloneNode(true);
@@ -263,12 +275,21 @@ function initUserMenu() {
         userMenu.classList.toggle('open');
     });
     
-    // Закрываем меню при клике вне его
-    document.addEventListener('click', (e) => {
-        if (!userMenu.contains(e.target)) {
-            userMenu.classList.remove('open');
-        }
-    });
+    // Помечаем как инициализированное
+    newTrigger.dataset.initialized = 'true';
+    
+    // Закрываем меню при клике вне его (только один обработчик на документ)
+    if (!document.userMenuClickHandler) {
+        document.userMenuClickHandler = (e) => {
+            const allUserMenus = document.querySelectorAll('.user-menu');
+            allUserMenus.forEach(menu => {
+                if (!menu.contains(e.target)) {
+                    menu.classList.remove('open');
+                }
+            });
+        };
+        document.addEventListener('click', document.userMenuClickHandler);
+    }
     
     // Закрываем меню при клике на элемент внутри dropdown
     const dropdownItems = userMenu.querySelectorAll('.dropdown-item');

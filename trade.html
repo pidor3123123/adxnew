@@ -17,7 +17,7 @@
             grid-template-rows: auto 1fr;
             gap: 20px;
             height: calc(100vh - var(--header-height) - 48px);
-            padding: 24px 0;
+            padding: 16px 0;
         }
         
         @media (max-width: 1200px) {
@@ -263,15 +263,15 @@
         
         #tradingChart {
             flex: 1;
-            min-height: 450px;
-            height: 450px;
+            min-height: 360px;
+            height: 360px;
             width: 100%;
         }
         
         #tradingViewChart {
             flex: 1;
-            min-height: 450px;
-            height: 450px;
+            min-height: 360px;
+            height: 360px;
             width: 100%;
             position: relative;
         }
@@ -850,7 +850,7 @@
                             <a href="register.html" class="btn btn-primary">Регистрация</a>
                         </div>
                         
-                        <div class="user-menu" data-auth="true" style="display: none;">
+                        <div class="user-menu" data-auth="true">
                             <button class="user-menu-trigger">
                                 <div class="user-avatar" data-user-avatar>U</div>
                                 <div class="user-info">
@@ -1164,6 +1164,13 @@
         // Инициализация торговой страницы
         document.addEventListener('DOMContentLoaded', async () => {
             Auth.updateUI();
+            
+            // Инициализация user menu (после обновления UI)
+            setTimeout(() => {
+                if (typeof initUserMenu === 'function') {
+                    initUserMenu();
+                }
+            }, 100);
             
             // Получение параметров из URL
             const urlParams = new URLSearchParams(window.location.search);
