@@ -109,7 +109,8 @@ async function initChart() {
         }
         resizeTimeout = setTimeout(() => {
             const width = container.clientWidth || container.offsetWidth || 800;
-            const height = container.clientHeight || container.offsetHeight || 450;
+            // Ограничиваем максимальную высоту 280px
+            const height = Math.min(container.clientHeight || container.offsetHeight || 280, 280);
             if (chart && width > 0 && height > 0) {
                 chart.applyOptions({
                     width: width,
@@ -121,7 +122,8 @@ async function initChart() {
     
     // Устанавливаем начальные размеры
     const initialWidth = container.clientWidth || container.offsetWidth || 800;
-    const initialHeight = container.clientHeight || container.offsetHeight || 450;
+    // Ограничиваем максимальную высоту 280px
+    const initialHeight = Math.min(container.clientHeight || container.offsetHeight || 280, 280);
     chart.applyOptions({
         width: initialWidth,
         height: initialHeight,

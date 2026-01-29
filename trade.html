@@ -31,6 +31,8 @@
             grid-row: span 2;
             display: flex;
             flex-direction: column;
+            max-height: 400px;
+            overflow: hidden;
         }
         
         .chart-toolbar {
@@ -262,18 +264,20 @@
         .chart-price-display .change.down { color: var(--danger-text); }
         
         #tradingChart {
-            flex: 1;
             min-height: 280px;
+            max-height: 280px;
             height: 280px;
             width: 100%;
+            flex-shrink: 0;
         }
         
         #tradingViewChart {
-            flex: 1;
             min-height: 280px;
+            max-height: 280px;
             height: 280px;
             width: 100%;
             position: relative;
+            flex-shrink: 0;
         }
         
         #tradingViewChart .tradingview-widget-container {
@@ -890,7 +894,7 @@
                 <div class="trade-layout">
                     <!-- Chart Section -->
                     <div class="chart-section">
-                        <div class="card" style="flex: 1; display: flex; flex-direction: column;">
+                        <div class="card" style="display: flex; flex-direction: column; height: fit-content;">
                             <div class="card-header">
                                 <div class="chart-toolbar">
                                     <div class="asset-selector-wrapper">
@@ -961,10 +965,10 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="card-body" style="flex: 1; padding: 0; position: relative; min-height: 280px;">
-                                <div id="tradingChart" style="width: 100%; height: 100%; min-height: 280px;"></div>
+                            <div class="card-body" style="padding: 0; position: relative; height: 280px; max-height: 280px; overflow: hidden;">
+                                <div id="tradingChart" style="width: 100%; height: 280px; max-height: 280px;"></div>
                                 <!-- TradingView Widget -->
-                                <div id="tradingViewChart" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; min-height: 280px; display: none;">
+                                <div id="tradingViewChart" style="position: absolute; top: 0; left: 0; width: 100%; height: 280px; max-height: 280px; display: none;">
                                     <div class="tradingview-widget-container" style="width: 100%; height: 100%;">
                                         <div class="tradingview-widget-container__widget" style="width: 100%; height: 100%;"></div>
                                     </div>
