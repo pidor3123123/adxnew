@@ -533,18 +533,21 @@ function syncOrderToSupabase(int $orderId): void {
  * Синхронизация баланса из Supabase в MySQL
  * Используется когда баланс обновляется через админ панель
  */
-function syncBalanceFromSupabase(string $supabaseUserId, string $currency, float $availableBalance, float $lockedBalance): void {
+function syncBalanceFromSupabase(string $supabaseUserId, string $currency, float $availableBalance, float $lockedBalance, ?string $email = null): void {
     try {
         $db = getDB();
         $supabase = getSupabaseClient();
         
-        // Получаем email пользователя из Supabase
-        $user = $supabase->get('users', 'id', $supabaseUserId, 'email');
-        if (!$user || !isset($user['email'])) {
-            throw new Exception("User not found in Supabase: $supabaseUserId");
+        // Используем переданный email или получаем из Supabase
+        if (!$email) {
+            $user = $supabase->get('users', 'id', $supabaseUserId, 'email');
+            if (!$user || !isset($user['email'])) {
+                throw new Exception("User not found in Supabase: $supabaseUserId");
+            }
+            $email = $user['email'];
         }
         
-        $email = $user['email'];
+        error_log("syncBalanceFromSupabase: supabaseUserId=$supabaseUserId, email=$email, currency=$currency, available=$availableBalance, locked=$lockedBalance");
         
         // Находим MySQL user_id по email
         $stmt = $db->prepare('SELECT id FROM users WHERE email = ?');
