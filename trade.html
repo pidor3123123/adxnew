@@ -9,7 +9,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="css/style.css">
-    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
     <style>
         .trade-layout {
             display: grid;
@@ -262,14 +261,6 @@
         
         .chart-price-display .change.up { color: var(--success-text); }
         .chart-price-display .change.down { color: var(--danger-text); }
-        
-        #tradingChart {
-            min-height: 450px;
-            max-height: 450px;
-            height: 450px;
-            width: 100%;
-            flex-shrink: 0;
-        }
         
         #tradingViewChart {
             min-height: 450px;
@@ -574,11 +565,6 @@
                 gap: 16px;
             }
             
-            #tradingChart {
-                min-height: 300px;
-                height: 300px;
-            }
-            
             .chart-toolbar {
                 flex-direction: column;
                 align-items: stretch;
@@ -662,10 +648,6 @@
                 gap: 12px;
             }
             
-            #tradingChart {
-                min-height: 250px;
-                height: 250px;
-            }
             
             .chart-toolbar {
                 gap: 8px;
@@ -727,10 +709,6 @@
         }
         
         @media (max-width: 360px) {
-            #tradingChart {
-                min-height: 200px;
-                height: 200px;
-            }
             
             .trade-time-buttons {
                 grid-template-columns: 1fr;
@@ -947,15 +925,6 @@
                                         </button>
                                     </div>
                                     
-                                    <div class="chart-type-toggle" style="display: flex; gap: 4px; margin-left: 12px;">
-                                        <button class="chart-type-btn active" data-chart-type="lightweight" onclick="switchChartType('lightweight')" title="Lightweight Charts">
-                                            <i class="bi bi-bar-chart"></i>
-                                        </button>
-                                        <button class="chart-type-btn" data-chart-type="tradingview" onclick="switchChartType('tradingview')" title="TradingView">
-                                            <i class="bi bi-graph-up-arrow"></i>
-                                        </button>
-                                    </div>
-                                    
                                     <div class="chart-price-display">
                                         <div class="price" id="currentPrice">$43,250.00</div>
                                         <div class="change up" id="currentChange">
@@ -966,9 +935,8 @@
                                 </div>
                             </div>
                             <div class="card-body" style="padding: 0; position: relative; height: 450px; max-height: 450px; overflow: hidden;">
-                                <div id="tradingChart" style="width: 100%; height: 450px; max-height: 450px;"></div>
                                 <!-- TradingView Widget -->
-                                <div id="tradingViewChart" style="position: absolute; top: 0; left: 0; width: 100%; height: 450px; max-height: 450px; display: none;">
+                                <div id="tradingViewChart" style="width: 100%; height: 450px; max-height: 450px; display: block;">
                                     <div class="tradingview-widget-container" style="width: 100%; height: 100%;">
                                         <div class="tradingview-widget-container__widget" style="width: 100%; height: 100%;"></div>
                                     </div>
@@ -1162,7 +1130,6 @@
     <script src="js/app.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/api.js"></script>
-    <script src="js/charts.js"></script>
     <script src="js/trading.js"></script>
     <script>
         // Инициализация торговой страницы
@@ -1187,20 +1154,6 @@
             // Обновляем активную ссылку в навигации
             updateNavActiveState(mode);
             
-            // Инициализация графика
-            await initChart();
-            
-            // Убеждаемся, что Lightweight Charts показывается по умолчанию
-            const lightweightChart = document.getElementById('tradingChart');
-            const tradingViewChart = document.getElementById('tradingViewChart');
-            if (lightweightChart && tradingViewChart) {
-                lightweightChart.style.display = 'block';
-                tradingViewChart.style.display = 'none';
-            }
-            
-            // Инициализация TradingView графика (по умолчанию скрыт, показывается при переключении)
-            // Не инициализируем сразу, чтобы не блокировать загрузку страницы
-            
             // Загрузка списка активов
             try {
                 await loadAssetList();
@@ -1208,19 +1161,34 @@
                 console.error('Error loading asset list:', error);
             }
             
-            // Сразу загружаем данные для графика
-            try {
-                await loadChartData(symbol, currentInterval || '5m');
-            } catch (error) {
-                console.error('Error loading chart data:', error);
-            }
-            
-            // Выбор актива (обновит UI)
+            // Выбор актива (обновит UI и цену)
             try {
                 await selectAsset(symbol);
             } catch (error) {
                 console.error('Error selecting asset:', error);
             }
+            
+            // Инициализация TradingView графика после выбора актива (чтобы цена уже была загружена)
+            setTimeout(() => {
+                try {
+                    if (typeof initTradingViewChart === 'function') {
+                        initTradingViewChart(symbol, currentTradingViewInterval || '5m', currentChartStyle || 'candles');
+                    }
+                    
+                    // Запускаем обновление цены в реальном времени
+                    setTimeout(() => {
+                        try {
+                            if (typeof startTradingViewPriceUpdates === 'function') {
+                                startTradingViewPriceUpdates();
+                            }
+                        } catch (error) {
+                            console.error('Error starting TradingView price updates:', error);
+                        }
+                    }, 500);
+                } catch (error) {
+                    console.error('Error initializing TradingView chart:', error);
+                }
+            }, 300);
             
             // Обработчики вкладок режима торговли
             document.querySelectorAll('.trade-mode-tab').forEach(tab => {
@@ -1344,11 +1312,6 @@
                     document.querySelectorAll('.chart-timeframe').forEach(b => b.classList.remove('active'));
                     btn.classList.add('active');
                     const interval = btn.dataset.interval;
-                    
-                    // Обновляем Lightweight Charts
-                    if (typeof updateChartInterval === 'function') {
-                        updateChartInterval(interval);
-                    }
                     
                     // Обновляем TradingView график
                     updateTradingViewInterval(interval);
@@ -1581,63 +1544,6 @@
             }
         });
         
-        // Переключение типа графика
-        function switchChartType(type) {
-            try {
-                const lightweightChart = document.getElementById('tradingChart');
-                const tradingViewChart = document.getElementById('tradingViewChart');
-                const buttons = document.querySelectorAll('.chart-type-btn');
-                
-                if (!lightweightChart || !tradingViewChart) {
-                    console.error('Chart containers not found');
-                    return;
-                }
-                
-                if (buttons.length > 0) {
-                    buttons.forEach(btn => btn.classList.remove('active'));
-                }
-                
-                const activeButton = document.querySelector(`[data-chart-type="${type}"]`);
-                if (activeButton) {
-                    activeButton.classList.add('active');
-                } else {
-                    console.warn(`Button for chart type "${type}" not found`);
-                }
-                
-                if (type === 'lightweight') {
-                    lightweightChart.style.display = 'block';
-                    tradingViewChart.style.display = 'none';
-                    
-                    // Останавливаем обновление цены для TradingView
-                    if (typeof stopTradingViewPriceUpdates === 'function') {
-                        stopTradingViewPriceUpdates();
-                    }
-                } else {
-                    lightweightChart.style.display = 'none';
-                    tradingViewChart.style.display = 'block';
-                    
-                    // Инициализируем TradingView график при переключении
-                    const urlParams = new URLSearchParams(window.location.search);
-                    const symbol = urlParams.get('symbol') || 'BTC';
-                    
-                    if (typeof initTradingViewChart === 'function') {
-                        initTradingViewChart(symbol, currentTradingViewInterval, currentChartStyle);
-                    } else {
-                        console.error('initTradingViewChart function not found');
-                    }
-                    
-                    // Запускаем обновление цены в реальном времени с небольшой задержкой
-                    setTimeout(() => {
-                        if (typeof startTradingViewPriceUpdates === 'function') {
-                            startTradingViewPriceUpdates();
-                        }
-                    }, 500);
-                }
-            } catch (error) {
-                console.error('Error in switchChartType:', error);
-            }
-        }
-        
         // Глобальные переменные для TradingView графика
         let currentTradingViewInterval = '5m';
         let currentChartStyle = 'candles'; // 'candles' или 'line'
@@ -1747,6 +1653,26 @@
         // Инициализация TradingView графика
         function initTradingViewChart(symbol, interval = null, style = null) {
             try {
+                // Ждем, пока DOM полностью загрузится
+                const checkContainer = () => {
+                    const widgetContainer = document.querySelector('#tradingViewChart .tradingview-widget-container__widget');
+                    if (!widgetContainer) {
+                        console.warn('TradingView widget container not found, retrying...');
+                        setTimeout(checkContainer, 100);
+                        return;
+                    }
+                    
+                    initializeWidget(widgetContainer, symbol, interval, style);
+                };
+                
+                checkContainer();
+            } catch (error) {
+                console.error('Error in initTradingViewChart:', error);
+            }
+        }
+        
+        function initializeWidget(widgetContainer, symbol, interval, style) {
+            try {
                 const urlParams = new URLSearchParams(window.location.search);
                 const currentSymbol = urlParams.get('symbol') || symbol || 'BTC';
                 
@@ -1778,13 +1704,6 @@
                     range = '1D';
                 }
                 
-                // Обновляем виджет TradingView
-                const widgetContainer = document.querySelector('#tradingViewChart .tradingview-widget-container__widget');
-                if (!widgetContainer) {
-                    console.error('TradingView widget container not found');
-                    return;
-                }
-                
                 // Очищаем контейнер перед добавлением нового скрипта
                 widgetContainer.innerHTML = '';
                 
@@ -1794,43 +1713,51 @@
                 script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
                 script.async = true;
                 
-                try {
-                    script.text = JSON.stringify({
-                        "autosize": true,
-                        "symbol": tvSymbol,
-                        "interval": tvInterval,
-                        "timezone": "Etc/UTC",
-                        "theme": "dark",
-                        "style": chartStyle === 'candles' ? "1" : "2",
-                        "locale": "ru",
-                        "backgroundColor": "transparent",
-                        "gridColor": "rgba(45, 45, 53, 1)",
-                        "hide_top_toolbar": false,
-                        "hide_legend": false,
-                        "save_image": true,
-                        "support_host": "https://www.tradingview.com",
-                        "withdateranges": true,
-                        "range": range,
-                        "hide_volume": false,
-                        "scalePosition": "right",
-                        "scaleMode": "Normal",
-                        "fontFamily": "-apple-system, BlinkMacSystemFont, Trebuchet MS, Roboto, Ubuntu, sans-serif",
-                        "fontSize": "10",
-                        "noTimeScale": false,
-                        "valuescale_width": 50,
-                        "container_id": "tradingViewChart",
-                        "enable_publishing": false,
-                        "allow_symbol_change": false,
-                        "calendar": false,
-                        "studies": []
-                    });
-                    
-                    widgetContainer.appendChild(script);
-                } catch (error) {
-                    console.error('Error creating TradingView script:', error);
-                }
+                // Конфигурация виджета
+                const widgetConfig = {
+                    "autosize": true,
+                    "symbol": tvSymbol,
+                    "interval": tvInterval,
+                    "timezone": "Etc/UTC",
+                    "theme": "dark",
+                    "style": chartStyle === 'candles' ? "1" : "2",
+                    "locale": "ru",
+                    "backgroundColor": "transparent",
+                    "gridColor": "rgba(45, 45, 53, 1)",
+                    "hide_top_toolbar": false,
+                    "hide_legend": false,
+                    "save_image": true,
+                    "support_host": "https://www.tradingview.com",
+                    "withdateranges": true,
+                    "range": range,
+                    "hide_volume": false,
+                    "scalePosition": "right",
+                    "scaleMode": "Normal",
+                    "fontFamily": "-apple-system, BlinkMacSystemFont, Trebuchet MS, Roboto, Ubuntu, sans-serif",
+                    "fontSize": "10",
+                    "noTimeScale": false,
+                    "valuescale_width": 50,
+                    "container_id": "tradingViewChart",
+                    "enable_publishing": false,
+                    "allow_symbol_change": false,
+                    "calendar": false,
+                    "studies": []
+                };
+                
+                // Устанавливаем содержимое скрипта
+                script.textContent = JSON.stringify(widgetConfig);
+                
+                // Добавляем обработчик ошибок
+                script.onerror = function() {
+                    console.error('Failed to load TradingView widget script');
+                };
+                
+                // Добавляем скрипт в контейнер
+                widgetContainer.appendChild(script);
+                
+                console.log('TradingView widget initialized for', tvSymbol, 'with interval', tvInterval);
             } catch (error) {
-                console.error('Error in initTradingViewChart:', error);
+                console.error('Error initializing TradingView widget:', error);
             }
         }
         
@@ -1847,13 +1774,10 @@
                     }
                 }
                 
-                // Обновляем график только если TradingView активен
-                const tradingViewChart = document.getElementById('tradingViewChart');
-                if (tradingViewChart && tradingViewChart.style.display !== 'none') {
-                    const urlParams = new URLSearchParams(window.location.search);
-                    const symbol = urlParams.get('symbol') || 'BTC';
-                    initTradingViewChart(symbol, currentTradingViewInterval, style);
-                }
+                // Обновляем TradingView график
+                const urlParams = new URLSearchParams(window.location.search);
+                const symbol = urlParams.get('symbol') || 'BTC';
+                initTradingViewChart(symbol, currentTradingViewInterval, style);
             } catch (error) {
                 console.error('Error switching chart style:', error);
             }
@@ -1867,25 +1791,13 @@
             try {
                 currentTradingViewInterval = interval;
                 
-                // Обновляем график только если TradingView активен
-                const tradingViewChart = document.getElementById('tradingViewChart');
-                if (tradingViewChart && tradingViewChart.style.display !== 'none') {
-                    const urlParams = new URLSearchParams(window.location.search);
-                    const symbol = urlParams.get('symbol') || 'BTC';
-                    initTradingViewChart(symbol, interval, currentChartStyle);
-                }
+                // Обновляем TradingView график
+                const urlParams = new URLSearchParams(window.location.search);
+                const symbol = urlParams.get('symbol') || 'BTC';
+                initTradingViewChart(symbol, interval, currentChartStyle);
             } catch (error) {
                 console.error('Error updating TradingView interval:', error);
             }
-        }
-        
-        // Обновление TradingView графика при смене символа
-        const originalLoadChartData = window.loadChartData;
-        if (originalLoadChartData) {
-            window.loadChartData = async function(symbol, interval) {
-                await originalLoadChartData(symbol, interval);
-                updateTradingViewInterval(interval || currentTradingViewInterval);
-            };
         }
         
         // Реальное время обновление цены для TradingView
@@ -1897,98 +1809,17 @@
                 clearInterval(tradingViewPriceUpdateInterval);
             }
             
-            // Обновляем цену каждую секунду
+            // Используем глобальную функцию updateAssetPrice для синхронизации (каждые 2 секунды)
+            // Это избегает дублирования логики и обеспечивает единый источник истины для цены
             tradingViewPriceUpdateInterval = setInterval(async () => {
-                const urlParams = new URLSearchParams(window.location.search);
-                const symbol = urlParams.get('symbol') || 'BTC';
-                
                 try {
-                    // Получаем текущую цену из API
-                    let currentPrice = null;
-                    let changePercent = 0;
-                    
-                    // Определяем тип актива и получаем цену
-                    const symbolUpper = symbol.toUpperCase();
-                    
-                    // Определяем тип актива и получаем цену
-                    const tvSymbol = getTradingViewSymbolForAsset(symbol);
-                    
-                    // Криптовалюты (BINANCE:)
-                    if (tvSymbol.startsWith('BINANCE:')) {
-                        const cryptoData = await MarketAPI.getCryptoPrices();
-                        const coin = cryptoData.find(c => c.symbol.toUpperCase() === symbolUpper);
-                        if (coin) {
-                            currentPrice = coin.current_price;
-                            changePercent = coin.price_change_percentage_24h || 0;
-                        }
-                    }
-                    // Акции (NASDAQ:)
-                    else if (tvSymbol.startsWith('NASDAQ:') || tvSymbol.startsWith('NYSE:')) {
-                        const stocksData = await MarketAPI.getStockPrices();
-                        const stock = stocksData.find(s => s.symbol === symbolUpper);
-                        if (stock) {
-                            currentPrice = stock.price;
-                            changePercent = stock.changePercent || 0;
-                        }
-                    }
-                    // Форекс (FX:)
-                    else if (tvSymbol.startsWith('FX:')) {
-                        const forexData = await MarketAPI.getForexRates();
-                        const pair = forexData.find(f => f.symbol === symbolUpper);
-                        if (pair) {
-                            currentPrice = pair.price;
-                            changePercent = pair.changePercent || 0;
-                        }
-                    }
-                    // Индексы (SP:, DJ:, NASDAQ:NDX)
-                    else if (tvSymbol.startsWith('SP:') || tvSymbol.startsWith('DJ:') || tvSymbol.includes('NDX')) {
-                        const indicesData = await MarketAPI.getIndicesPrices();
-                        const index = indicesData.find(i => i.symbol === symbolUpper);
-                        if (index) {
-                            currentPrice = index.price;
-                            changePercent = index.changePercent || 0;
-                        }
-                    }
-                    // Сырье (TVC:)
-                    else if (tvSymbol.startsWith('TVC:')) {
-                        // Для сырья используем данные из API или симулируем
-                        // В реальном приложении здесь должен быть API для сырья
-                        const commoditiesData = await MarketAPI.getCommoditiesPrices?.() || [];
-                        const commodity = commoditiesData.find(c => c.symbol === symbolUpper);
-                        if (commodity) {
-                            currentPrice = commodity.price;
-                            changePercent = commodity.changePercent || 0;
-                        }
-                    }
-                    
-                    // Обновляем отображение цены
-                    if (currentPrice !== null) {
-                        const priceEl = document.getElementById('currentPrice');
-                        const changeEl = document.getElementById('currentChange');
-                        
-                        if (priceEl) {
-                            priceEl.textContent = NovaTrade.formatCurrency(currentPrice);
-                        }
-                        
-                        if (changeEl) {
-                            const isPositive = changePercent >= 0;
-                            changeEl.innerHTML = `
-                                <i class="bi bi-caret-${isPositive ? 'up' : 'down'}-fill"></i>
-                                ${NovaTrade.formatChange(changePercent)}
-                            `;
-                            changeEl.className = `change ${isPositive ? 'up' : 'down'}`;
-                        }
-                        
-                        // Обновляем глобальную переменную
-                        if (window.currentAsset) {
-                            window.currentAsset.price = currentPrice;
-                            window.currentAsset.change = changePercent;
-                        }
+                    if (typeof updateAssetPrice === 'function') {
+                        await updateAssetPrice();
                     }
                 } catch (error) {
-                    console.error('Error updating price:', error);
+                    console.error('Error in TradingView price update:', error);
                 }
-            }, 1000); // Обновление каждую секунду
+            }, 2000);
         }
         
         function stopTradingViewPriceUpdates() {

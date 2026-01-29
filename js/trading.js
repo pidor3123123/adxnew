@@ -189,8 +189,6 @@ async function selectAsset(symbol) {
     // Load chart with current selected interval
     const activeInterval = document.querySelector('.chart-timeframe.active');
     const interval = activeInterval ? activeInterval.dataset.interval : '4h';
-    await loadChartData(symbol, interval);
-    
     // Update summary
     updateTradeSummary();
     
