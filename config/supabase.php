@@ -215,21 +215,66 @@ class SupabaseClient {
         
         $decoded = json_decode($response, true);
         
+        // Логируем полный ответ для отладки
+        error_log("createAuthUser response for $email: HTTP $httpCode, Response: " . json_encode($decoded));
+        
         if ($httpCode >= 400) {
-            $errorMessage = $decoded['message'] ?? $decoded['error'] ?? $decoded['msg'] ?? "HTTP $httpCode";
-            // Если пользователь уже существует, это не критическая ошибка
-            if (strpos($errorMessage, 'already registered') !== false || strpos($errorMessage, 'already exists') !== false) {
-                // Пытаемся найти существующего пользователя
-                return $this->findAuthUserByEmail($email);
+            $errorMessage = $decoded['message'] ?? $decoded['error'] ?? $decoded['msg'] ?? $decoded['error_description'] ?? "HTTP $httpCode";
+            error_log("createAuthUser error for $email: $errorMessage");
+            
+            // Если пользователь уже существует, пытаемся найти его
+            if (strpos(strtolower($errorMessage), 'already') !== false || 
+                strpos(strtolower($errorMessage), 'exists') !== false ||
+                strpos(strtolower($errorMessage), 'registered') !== false ||
+                $httpCode === 422) { // 422 часто означает, что пользователь уже существует
+                
+                error_log("User $email already exists, attempting to find existing user...");
+                $existingUserId = $this->findAuthUserByEmail($email);
+                
+                if ($existingUserId) {
+                    error_log("Found existing auth user for $email with UUID: $existingUserId");
+                    return $existingUserId;
+                } else {
+                    // Пользователь должен существовать, но не найден - это странно
+                    error_log("WARNING: User $email should exist but findAuthUserByEmail returned null");
+                    // Попробуем еще раз через небольшую задержку (на случай задержки репликации)
+                    sleep(1);
+                    $existingUserId = $this->findAuthUserByEmail($email);
+                    if ($existingUserId) {
+                        return $existingUserId;
+                    }
+                    throw new Exception("User $email already exists but could not be found: $errorMessage");
+                }
             }
             throw new Exception("Supabase Auth API Error: $errorMessage", $httpCode);
         }
         
-        if (!isset($decoded['user']['id'])) {
-            throw new Exception("Failed to create auth user: no ID returned");
+        // Проверяем разные возможные структуры ответа
+        $userId = null;
+        if (isset($decoded['user']['id'])) {
+            $userId = $decoded['user']['id'];
+        } elseif (isset($decoded['id'])) {
+            $userId = $decoded['id'];
+        } elseif (isset($decoded['data']['user']['id'])) {
+            $userId = $decoded['data']['user']['id'];
+        } elseif (isset($decoded['data']['id'])) {
+            $userId = $decoded['data']['id'];
         }
         
-        return $decoded['user']['id'];
+        if (!$userId) {
+            // Если ID не найден, но HTTP код успешный, возможно пользователь был создан
+            // Попробуем найти его по email
+            error_log("WARNING: No ID in response for $email, attempting to find user by email...");
+            $foundUserId = $this->findAuthUserByEmail($email);
+            if ($foundUserId) {
+                error_log("Found user $email with UUID: $foundUserId");
+                return $foundUserId;
+            }
+            throw new Exception("Failed to create auth user: no ID returned. Response: " . json_encode($decoded));
+        }
+        
+        error_log("Successfully created/found auth user for $email with UUID: $userId");
+        return $userId;
     }
     
     /**
