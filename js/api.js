@@ -119,19 +119,23 @@ const MarketAPI = {
     },
     
     /**
-     * Получить цены криптовалют (CoinGecko API)
+     * Получить цены криптовалют через PHP API (избегаем CORS)
      */
     async getCryptoPrices(coins = ['bitcoin', 'ethereum', 'binancecoin', 'ripple', 'solana', 'cardano', 'dogecoin', 'polkadot', 'polygon', 'litecoin']) {
         return this.getCached('crypto_prices', async () => {
             try {
-                const ids = coins.join(',');
-                const response = await fetch(
-                    `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${ids}&order=market_cap_desc&sparkline=true&price_change_percentage=24h`
-                );
+                // Используем наш PHP API вместо прямого запроса к CoinGecko (избегаем CORS)
+                const response = await fetch('/api/market.php?action=crypto');
                 
-                if (!response.ok) throw new Error('CoinGecko API error');
+                if (!response.ok) throw new Error('Market API error');
                 
-                return await response.json();
+                const result = await response.json();
+                
+                if (result.success && result.data) {
+                    return result.data;
+                } else {
+                    throw new Error('Invalid API response');
+                }
             } catch (error) {
                 console.error('Error fetching crypto prices:', error);
                 return this.getMockCryptoPrices();
@@ -302,13 +306,23 @@ const MarketAPI = {
         
         try {
             const response = await fetch(`/api/market.php?action=chart&${params.toString()}`);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
             const result = await response.json();
             
-            if (result.success && result.data) {
+            if (result.success && result.data && Array.isArray(result.data) && result.data.length > 0) {
+                console.log(`Loaded ${result.data.length} candles for ${symbol} (${interval})`);
                 return result.data;
+            } else {
+                console.warn('API returned empty or invalid data, using fallback');
+                throw new Error('Empty or invalid data from API');
             }
         } catch (error) {
             console.error('Error fetching chart data from API:', error);
+            console.log('Falling back to mock data generation');
         }
         
         // Fallback: генерируем моковые данные если API недоступен

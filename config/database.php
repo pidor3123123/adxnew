@@ -84,3 +84,41 @@ function getDB(): PDO {
     
     return $pdo;
 }
+
+/**
+ * Простое кэширование данных в памяти (для одного запроса)
+ */
+static $cache = [];
+
+/**
+ * Получение данных из кэша
+ */
+function getCachedData(string $key) {
+    global $cache;
+    
+    if (isset($cache[$key])) {
+        $cached = $cache[$key];
+        // Проверяем время жизни кэша (5 минут по умолчанию)
+        $ttl = $cached['ttl'] ?? 300;
+        if (time() - $cached['timestamp'] < $ttl) {
+            return $cached['data'];
+        }
+        // Удаляем устаревший кэш
+        unset($cache[$key]);
+    }
+    
+    return null;
+}
+
+/**
+ * Сохранение данных в кэш
+ */
+function setCachedData(string $key, $data, int $ttl = 300): void {
+    global $cache;
+    
+    $cache[$key] = [
+        'data' => $data,
+        'timestamp' => time(),
+        'ttl' => $ttl
+    ];
+}

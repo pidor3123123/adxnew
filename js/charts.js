@@ -213,6 +213,13 @@ async function loadChartData(symbol, interval) {
         // Получаем исторические данные
         const data = await MarketAPI.getChartData(symbol, interval);
         
+        if (!data || !Array.isArray(data) || data.length === 0) {
+            console.error('No chart data received or data is empty');
+            return;
+        }
+        
+        console.log(`Formatting ${data.length} candles for chart`);
+        
         // Форматируем данные для свечей
         const candleData = data.map(item => ({
             time: item.time,
@@ -225,14 +232,17 @@ async function loadChartData(symbol, interval) {
         // Форматируем данные для объёмов
         const volumeData = data.map(item => ({
             time: item.time,
-            value: item.volume,
+            value: item.volume || 0,
             color: item.close >= item.open 
                 ? 'rgba(34, 197, 94, 0.5)' 
                 : 'rgba(239, 68, 68, 0.5)',
         }));
         
+        // Устанавливаем данные в график
         candlestickSeries.setData(candleData);
         volumeSeries.setData(volumeData);
+        
+        console.log('Chart data set successfully');
         
         // Центрируем на последних данных с небольшой задержкой для корректного отображения
         setTimeout(() => {
@@ -254,6 +264,7 @@ async function loadChartData(symbol, interval) {
         
     } catch (error) {
         console.error('Error loading chart data:', error);
+        console.error('Error details:', error.message, error.stack);
     }
 }
 

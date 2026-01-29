@@ -614,6 +614,12 @@ function generateChartData(string $symbol, int $limit = 100, ?float $currentPric
 
 $action = $_GET['action'] ?? '';
 
+// Включаем отображение ошибок только для разработки (не для production)
+if (getenv('APP_ENV') !== 'production') {
+    error_reporting(E_ALL);
+    ini_set('display_errors', 0); // Не показываем ошибки в выводе, только логируем
+}
+
 try {
     switch ($action) {
         case 'crypto':
@@ -786,8 +792,17 @@ try {
     $code = (int)$code;
     http_response_code($code);
     
+    // Логируем ошибку для диагностики
+    error_log('API market.php error: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
+    error_log('Stack trace: ' . $e->getTraceAsString());
+    
+    // Для production не показываем детали ошибки
+    $errorMessage = (getenv('APP_ENV') === 'production') 
+        ? 'Internal server error' 
+        : $e->getMessage();
+    
     echo json_encode([
         'success' => false,
-        'error' => $e->getMessage()
+        'error' => $errorMessage
     ]);
 }
