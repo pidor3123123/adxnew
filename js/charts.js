@@ -109,8 +109,8 @@ async function initChart() {
         }
         resizeTimeout = setTimeout(() => {
             const width = container.clientWidth || container.offsetWidth || 800;
-            // Ограничиваем максимальную высоту 280px
-            const height = Math.min(container.clientHeight || container.offsetHeight || 280, 280);
+            // Ограничиваем максимальную высоту 450px
+            const height = Math.min(container.clientHeight || container.offsetHeight || 450, 450);
             if (chart && width > 0 && height > 0) {
                 chart.applyOptions({
                     width: width,
@@ -122,8 +122,8 @@ async function initChart() {
     
     // Устанавливаем начальные размеры
     const initialWidth = container.clientWidth || container.offsetWidth || 800;
-    // Ограничиваем максимальную высоту 280px
-    const initialHeight = Math.min(container.clientHeight || container.offsetHeight || 280, 280);
+    // Ограничиваем максимальную высоту 450px
+    const initialHeight = Math.min(container.clientHeight || container.offsetHeight || 450, 450);
     chart.applyOptions({
         width: initialWidth,
         height: initialHeight,
@@ -250,6 +250,12 @@ async function loadChartData(symbol, interval) {
         // Запускаем real-time обновления
         startRealtimeUpdates();
         
+        // Если это криптовалюта, убеждаемся, что WebSocket подключен
+        const cryptoSymbols = ['BTC', 'ETH', 'BNB', 'XRP', 'SOL', 'ADA', 'DOGE', 'DOT', 'MATIC', 'LTC'];
+        if (cryptoSymbols.includes(symbol.toUpperCase()) && typeof window.connectPriceWebSocket === 'function') {
+            window.connectPriceWebSocket(symbol);
+        }
+        
     } catch (error) {
         console.error('Error loading chart data:', error);
     }
@@ -319,6 +325,21 @@ function startRealtimeUpdates() {
         });
     }
     
+    // Регистрируем колбэк для обновления графика при получении новой цены из WebSocket
+    if (typeof window.onPriceUpdate === 'function') {
+        window.onPriceUpdate((price, change24h) => {
+            if (!lastCandle || !candlestickSeries || !chart) return;
+            
+            const now = Date.now();
+            const interval = intervalMs[currentInterval] || intervalMs['5m'];
+            const currentCandleTime = Math.floor(now / interval) * interval;
+            const lastCandleTimeMs = lastCandle.time * 1000;
+            
+            // Обновляем график с реальной ценой из WebSocket
+            updateChartWithPrice(price, currentCandleTime, lastCandleTimeMs);
+        });
+    }
+    
     realtimeUpdateInterval = setInterval(() => {
         if (!lastCandle || !candlestickSeries || !chart) return;
         
@@ -327,7 +348,7 @@ function startRealtimeUpdates() {
         const currentCandleTime = Math.floor(now / interval) * interval;
         const lastCandleTimeMs = lastCandle.time * 1000;
         
-        // Получаем текущую цену из trading.js если доступна
+        // Получаем текущую цену из trading.js если доступна (из WebSocket или API)
         const currentPrice = window.currentAsset?.price || lastCandle.close;
         
         // Проверяем, нужно ли создать новую свечу
@@ -412,6 +433,84 @@ function stopRealtimeUpdates() {
         clearInterval(realtimeUpdateInterval);
         realtimeUpdateInterval = null;
     }
+    
+    // Отключаемся от WebSocket при остановке обновлений
+    if (typeof window.disconnectPriceWebSocket === 'function') {
+        window.disconnectPriceWebSocket();
+    }
+}
+
+/**
+ * Обновление графика с реальной ценой из WebSocket
+ */
+function updateChartWithPrice(price, currentCandleTime, lastCandleTimeMs) {
+    if (!lastCandle || !candlestickSeries || !chart) return;
+    
+    // Проверяем, нужно ли создать новую свечу
+    if (currentCandleTime > lastCandleTimeMs) {
+        // Создаём новую свечу
+        const newCandleTime = Math.floor(currentCandleTime / 1000);
+        lastCandle = {
+            time: newCandleTime,
+            open: price,
+            high: price,
+            low: price,
+            close: price,
+            volume: Math.floor(Math.random() * 100000)
+        };
+        
+        // Добавляем новую свечу
+        candlestickSeries.update({
+            time: lastCandle.time,
+            open: lastCandle.open,
+            high: lastCandle.high,
+            low: lastCandle.low,
+            close: lastCandle.close
+        });
+        
+        volumeSeries.update({
+            time: lastCandle.time,
+            value: lastCandle.volume,
+            color: lastCandle.close >= lastCandle.open 
+                ? 'rgba(34, 197, 94, 0.5)' 
+                : 'rgba(239, 68, 68, 0.5)'
+        });
+        
+        // Прокручиваем к реальному времени
+        if (isScrolledToRealTime && !userScrolled) {
+            try {
+                chart.timeScale().scrollToRealTime();
+            } catch (e) {
+                // Игнорируем ошибки скролла
+            }
+        }
+    } else {
+        // Обновляем текущую свечу
+        lastCandle.close = price;
+        lastCandle.high = Math.max(lastCandle.high, price);
+        lastCandle.low = Math.min(lastCandle.low, price);
+        lastCandle.volume += Math.floor(Math.random() * 1000);
+        
+        // Обновляем существующую свечу
+        candlestickSeries.update({
+            time: lastCandle.time,
+            open: lastCandle.open,
+            high: lastCandle.high,
+            low: lastCandle.low,
+            close: lastCandle.close
+        });
+        
+        volumeSeries.update({
+            time: lastCandle.time,
+            value: lastCandle.volume,
+            color: lastCandle.close >= lastCandle.open 
+                ? 'rgba(34, 197, 94, 0.5)' 
+                : 'rgba(239, 68, 68, 0.5)'
+        });
+    }
+    
+    // Обновляем отображение цены
+    updatePriceDisplay(price, null);
 }
 
 /**
@@ -423,13 +522,30 @@ function updatePriceDisplay(price, data) {
     
     if (!priceEl || !changeEl) return;
     
-    priceEl.textContent = NovaTrade.formatCurrency(price);
+    // Используем актуальную цену из currentAsset, если она доступна
+    const actualPrice = window.currentAsset?.price || price;
+    priceEl.textContent = NovaTrade.formatCurrency(actualPrice);
+    
+    // Обновляем currentAsset.price, если она отличается
+    if (window.currentAsset && Math.abs((window.currentAsset.price || 0) - actualPrice) > 0.01) {
+        window.currentAsset.price = actualPrice;
+    }
     
     // Вычисляем изменение за период
     if (data && data.length > 1) {
         const firstPrice = data[0].open;
-        const change = ((price - firstPrice) / firstPrice) * 100;
-        const changeAmount = price - firstPrice;
+        const change = ((actualPrice - firstPrice) / firstPrice) * 100;
+        const changeAmount = actualPrice - firstPrice;
+        
+        changeEl.innerHTML = `
+            <i class="bi bi-caret-${change >= 0 ? 'up' : 'down'}-fill"></i>
+            ${change >= 0 ? '+' : ''}${change.toFixed(2)}% (${NovaTrade.formatCurrency(changeAmount)})
+        `;
+        changeEl.className = `change ${change >= 0 ? 'up' : 'down'}`;
+    } else if (window.currentAsset && window.currentAsset.change !== undefined) {
+        // Если данных нет, используем изменение из currentAsset
+        const change = window.currentAsset.change;
+        const changeAmount = actualPrice * (change / 100);
         
         changeEl.innerHTML = `
             <i class="bi bi-caret-${change >= 0 ? 'up' : 'down'}-fill"></i>

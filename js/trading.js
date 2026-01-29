@@ -23,6 +23,10 @@ let tradeSide = 'buy';
 let orderType = 'market';
 let assetList = [];
 
+// WebSocket соединение для реального времени
+let priceWebSocket = null;
+let priceUpdateCallbacks = [];
+
 /**
  * Load asset list (crypto, stocks, forex)
  */
@@ -160,6 +164,18 @@ async function selectAsset(symbol) {
     document.getElementById('currentAsset').textContent = asset.market === 'forex' ? asset.symbol : `${asset.symbol}/USD`;
     document.getElementById('currentAssetName').textContent = asset.name;
     document.getElementById('quantitySuffix').textContent = asset.symbol;
+    
+    // Подключаемся к WebSocket для криптовалют или обновляем цену из API для других рынков
+    const symbolUpper = asset.symbol.toUpperCase();
+    const cryptoSymbols = ['BTC', 'ETH', 'BNB', 'XRP', 'SOL', 'ADA', 'DOGE', 'DOT', 'MATIC', 'LTC'];
+    
+    if (cryptoSymbols.includes(symbolUpper)) {
+        // Для криптовалют используем WebSocket
+        connectPriceWebSocket(asset.symbol);
+    } else {
+        // Для акций и форекса обновляем из API
+        await updateAssetPrice();
+    }
     
     // Update icon based on market type
     const iconEl = document.getElementById('assetIcon');
@@ -509,26 +525,240 @@ async function loadUserBalances() {
 }
 
 /**
- * Realtime price updates simulation
+ * Подключение к WebSocket для получения цен в реальном времени
  */
-function startPriceUpdates() {
-    setInterval(() => {
-        // Simulate small price change
-        const change = (Math.random() - 0.5) * 0.002;
-        currentAsset.price = currentAsset.price * (1 + change);
+function connectPriceWebSocket(symbol) {
+    // Закрываем предыдущее соединение, если есть
+    if (priceWebSocket) {
+        priceWebSocket.close();
+        priceWebSocket = null;
+    }
+    
+    const symbolUpper = symbol.toUpperCase();
+    const cryptoSymbols = ['BTC', 'ETH', 'BNB', 'XRP', 'SOL', 'ADA', 'DOGE', 'DOT', 'MATIC', 'LTC'];
+    
+    // Маппинг символов на Binance формат
+    const binanceSymbolMap = {
+        'BTC': 'BTCUSDT',
+        'ETH': 'ETHUSDT',
+        'BNB': 'BNBUSDT',
+        'XRP': 'XRPUSDT',
+        'SOL': 'SOLUSDT',
+        'ADA': 'ADAUSDT',
+        'DOGE': 'DOGEUSDT',
+        'DOT': 'DOTUSDT',
+        'MATIC': 'MATICUSDT',
+        'LTC': 'LTCUSDT'
+    };
+    
+    // Подключаемся к WebSocket только для криптовалют
+    if (cryptoSymbols.includes(symbolUpper) && binanceSymbolMap[symbolUpper]) {
+        const binanceSymbol = binanceSymbolMap[symbolUpper].toLowerCase();
+        const wsUrl = `wss://stream.binance.com:9443/ws/${binanceSymbol}@ticker`;
         
-        // Update global reference
-        window.currentAsset = currentAsset;
-        
-        // Update price display
-        const priceEl = document.getElementById('currentPrice');
-        if (priceEl) {
-            priceEl.textContent = NovaTrade.formatCurrency(currentAsset.price);
+        try {
+            priceWebSocket = new WebSocket(wsUrl);
+            
+            priceWebSocket.onopen = () => {
+                console.log(`WebSocket connected for ${symbol}`);
+            };
+            
+            priceWebSocket.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    const price = parseFloat(data.c); // текущая цена (last price)
+                    const change24h = parseFloat(data.P); // изменение за 24 часа в процентах
+                    
+                    if (price && price > 0) {
+                        // Обновляем цену актива
+                        const oldPrice = currentAsset.price || 0;
+                        currentAsset.price = price;
+                        currentAsset.change = change24h;
+                        window.currentAsset = currentAsset;
+                        
+                        // Вызываем все зарегистрированные колбэки
+                        priceUpdateCallbacks.forEach(callback => {
+                            try {
+                                callback(price, change24h);
+                            } catch (e) {
+                                console.error('Error in price update callback:', e);
+                            }
+                        });
+                        
+                        // Обновляем UI
+                        const priceEl = document.getElementById('currentPrice');
+                        if (priceEl) {
+                            priceEl.textContent = NovaTrade.formatCurrency(price);
+                        }
+                        
+                        // Обновляем изменение
+                        if (oldPrice > 0) {
+                            const changeAmount = price - oldPrice;
+                            const changePercent = ((price - oldPrice) / oldPrice) * 100;
+                            const changeEl = document.getElementById('currentChange');
+                            if (changeEl) {
+                                changeEl.innerHTML = `
+                                    <i class="bi bi-caret-${changePercent >= 0 ? 'up' : 'down'}-fill"></i>
+                                    ${changePercent >= 0 ? '+' : ''}${changePercent.toFixed(2)}% (${NovaTrade.formatCurrency(changeAmount)})
+                                `;
+                                changeEl.className = `change ${changePercent >= 0 ? 'up' : 'down'}`;
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error parsing WebSocket data:', error);
+                }
+            };
+            
+            priceWebSocket.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+            
+            priceWebSocket.onclose = () => {
+                console.log(`WebSocket closed for ${symbol}`);
+                // Переподключаемся через 3 секунды
+                setTimeout(() => {
+                    if (currentAsset && currentAsset.symbol === symbol) {
+                        connectPriceWebSocket(symbol);
+                    }
+                }, 3000);
+            };
+        } catch (error) {
+            console.error('Error connecting to WebSocket:', error);
         }
+    }
+}
+
+/**
+ * Отключение от WebSocket
+ */
+function disconnectPriceWebSocket() {
+    if (priceWebSocket) {
+        priceWebSocket.close();
+        priceWebSocket = null;
+    }
+    priceUpdateCallbacks = [];
+}
+
+/**
+ * Регистрация колбэка для обновления цены
+ */
+function onPriceUpdate(callback) {
+    if (typeof callback === 'function') {
+        priceUpdateCallbacks.push(callback);
+    }
+}
+
+/**
+ * Удаление колбэка для обновления цены
+ */
+function offPriceUpdate(callback) {
+    priceUpdateCallbacks = priceUpdateCallbacks.filter(cb => cb !== callback);
+}
+
+/**
+ * Обновление цены актива из API (fallback для акций и форекса)
+ */
+async function updateAssetPrice() {
+    if (!currentAsset || !currentAsset.symbol) return;
+    
+    try {
+        const symbol = currentAsset.symbol.toUpperCase();
+        
+        // Определяем тип рынка
+        const cryptoSymbols = ['BTC', 'ETH', 'BNB', 'XRP', 'SOL', 'ADA', 'DOGE', 'DOT', 'MATIC', 'LTC'];
+        const stockSymbols = ['AAPL', 'GOOGL', 'MSFT', 'AMZN', 'TSLA', 'META', 'NVDA', 'JPM', 'V', 'JNJ'];
+        const forexSymbols = ['EURUSD', 'GBPUSD', 'USDJPY', 'USDCHF', 'AUDUSD', 'USDCAD', 'NZDUSD', 'EURGBP', 'EURJPY', 'GBPJPY'];
+        
+        let newPrice = null;
+        
+        if (cryptoSymbols.includes(symbol)) {
+            // Криптовалюты: получаем из CoinGecko
+            const cryptoData = await MarketAPI.getCryptoPrices();
+            const coin = cryptoData.find(c => c.symbol.toUpperCase() === symbol);
+            if (coin && coin.current_price) {
+                newPrice = coin.current_price;
+            }
+        } else if (stockSymbols.includes(symbol)) {
+            // Акции: получаем из Alpha Vantage или списка акций
+            const stocksData = await MarketAPI.getStockPrices();
+            const stock = stocksData.find(s => s.symbol.toUpperCase() === symbol);
+            if (stock && stock.price) {
+                newPrice = stock.price;
+            }
+        } else if (forexSymbols.includes(symbol)) {
+            // Форекс: получаем из списка форекс
+            const forexData = await MarketAPI.getForexRates();
+            const forex = forexData.find(f => f.symbol.toUpperCase() === symbol);
+            if (forex && forex.price) {
+                newPrice = forex.price;
+            }
+        }
+        
+        // Обновляем цену, если получили новую
+        if (newPrice !== null && newPrice > 0) {
+            const oldPrice = currentAsset.price;
+            currentAsset.price = newPrice;
+            
+            // Вычисляем изменение
+            if (oldPrice > 0) {
+                currentAsset.change = ((newPrice - oldPrice) / oldPrice) * 100;
+            }
+            
+            // Update global reference
+            window.currentAsset = currentAsset;
+            
+            // Update price display
+            const priceEl = document.getElementById('currentPrice');
+            const changeEl = document.getElementById('currentChange');
+            
+            if (priceEl) {
+                priceEl.textContent = NovaTrade.formatCurrency(currentAsset.price);
+            }
+            
+            if (changeEl && oldPrice > 0) {
+                const changeAmount = newPrice - oldPrice;
+                changeEl.innerHTML = `
+                    <i class="bi bi-caret-${currentAsset.change >= 0 ? 'up' : 'down'}-fill"></i>
+                    ${currentAsset.change >= 0 ? '+' : ''}${currentAsset.change.toFixed(2)}% (${NovaTrade.formatCurrency(changeAmount)})
+                `;
+                changeEl.className = `change ${currentAsset.change >= 0 ? 'up' : 'down'}`;
+            }
+        }
+    } catch (error) {
+        console.error('Error updating asset price:', error);
+    }
+}
+
+/**
+ * Realtime price updates from API
+ */
+let priceUpdateInterval = null;
+
+function startPriceUpdates() {
+    // Останавливаем предыдущий интервал, если он есть
+    if (priceUpdateInterval) {
+        clearInterval(priceUpdateInterval);
+    }
+    
+    const symbolUpper = currentAsset?.symbol?.toUpperCase() || '';
+    const cryptoSymbols = ['BTC', 'ETH', 'BNB', 'XRP', 'SOL', 'ADA', 'DOGE', 'DOT', 'MATIC', 'LTC'];
+    
+    // Для криптовалют WebSocket уже подключен, не нужно обновлять через интервал
+    if (cryptoSymbols.includes(symbolUpper)) {
+        return;
+    }
+    
+    // Обновляем цену сразу
+    updateAssetPrice();
+    
+    // Обновляем цену каждые 2 секунды для акций и форекса
+    priceUpdateInterval = setInterval(() => {
+        updateAssetPrice();
         
         // Update trade summary if quantity entered
         updateTradeSummary();
-    }, 1500); // Update every 1.5 seconds
+    }, 2000); // Update every 2 seconds
 }
 
 // Initialize on load
@@ -659,3 +889,8 @@ window.closeAssetDropdown = closeAssetDropdown;
 window.filterByMarket = filterByMarket;
 window.filterDropdownAssets = filterDropdownAssets;
 window.selectAssetFromDropdown = selectAssetFromDropdown;
+window.updateAssetPrice = updateAssetPrice;
+window.connectPriceWebSocket = connectPriceWebSocket;
+window.disconnectPriceWebSocket = disconnectPriceWebSocket;
+window.onPriceUpdate = onPriceUpdate;
+window.offPriceUpdate = offPriceUpdate;
