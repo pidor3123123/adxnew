@@ -559,6 +559,7 @@ function updatePriceDisplay(price, data) {
  * Обновление интервала графика
  */
 function updateChartInterval(interval) {
+    currentInterval = interval;
     loadChartData(currentSymbol, interval);
 }
 

@@ -1190,6 +1190,14 @@
             // Инициализация графика
             await initChart();
             
+            // Убеждаемся, что Lightweight Charts показывается по умолчанию
+            const lightweightChart = document.getElementById('tradingChart');
+            const tradingViewChart = document.getElementById('tradingViewChart');
+            if (lightweightChart && tradingViewChart) {
+                lightweightChart.style.display = 'block';
+                tradingViewChart.style.display = 'none';
+            }
+            
             // Инициализация TradingView графика (по умолчанию скрыт, показывается при переключении)
             // Не инициализируем сразу, чтобы не блокировать загрузку страницы
             

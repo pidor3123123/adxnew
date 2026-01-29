@@ -578,13 +578,33 @@ const Auth = {
         const user = this.getUser();
         const isAuth = this.isAuthenticated();
         
-        // Показать/скрыть элементы для авторизованных
+        // Показать/скрыть элементы для авторизованных с !important для переопределения CSS
         document.querySelectorAll('[data-auth="true"]').forEach(el => {
-            el.style.display = isAuth ? '' : 'none';
+            if (isAuth) {
+                // Определяем правильное значение display на основе класса элемента
+                if (el.classList.contains('user-menu') || (el.classList.contains('header-actions') && !el.querySelector('[data-auth="false"]'))) {
+                    el.style.setProperty('display', 'flex', 'important');
+                } else if (el.classList.contains('header-actions')) {
+                    el.style.setProperty('display', 'flex', 'important');
+                } else {
+                    el.style.setProperty('display', 'block', 'important');
+                }
+            } else {
+                el.style.setProperty('display', 'none', 'important');
+            }
         });
         
         document.querySelectorAll('[data-auth="false"]').forEach(el => {
-            el.style.display = isAuth ? 'none' : '';
+            if (isAuth) {
+                el.style.setProperty('display', 'none', 'important');
+            } else {
+                // Определяем правильное значение display на основе класса элемента
+                if (el.classList.contains('header-actions')) {
+                    el.style.setProperty('display', 'flex', 'important');
+                } else {
+                    el.style.setProperty('display', 'block', 'important');
+                }
+            }
         });
         
         // Обновить данные пользователя
