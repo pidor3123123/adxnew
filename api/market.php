@@ -20,6 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
  */
 function getCryptoPrices(): array {
     $cacheKey = 'crypto_prices';
+    // Уменьшаем время кэширования до 30 секунд для более актуальных данных
     $cached = getCachedData($cacheKey);
     if ($cached !== null) {
         return $cached;
@@ -30,28 +31,40 @@ function getCryptoPrices(): array {
     $context = stream_context_create([
         'http' => [
             'timeout' => 10,
-            'header' => 'Accept: application/json'
+            'header' => 'Accept: application/json',
+            'user_agent' => 'Mozilla/5.0'
         ]
     ]);
     
     $response = @file_get_contents($url, false, $context);
     
     if ($response === false) {
+        error_log('CoinGecko API request failed, using mock data');
         // Возвращаем моковые данные если API недоступен
         $data = getMockCryptoPrices();
-        setCachedData($cacheKey, $data);
+        setCachedData($cacheKey, $data, 30); // Кэш на 30 секунд
         return $data;
     }
     
     $data = json_decode($response, true);
     
-    if (!$data) {
+    if (!$data || !is_array($data) || empty($data)) {
+        error_log('CoinGecko API returned invalid data, using mock data');
         $data = getMockCryptoPrices();
-        setCachedData($cacheKey, $data);
+        setCachedData($cacheKey, $data, 30);
         return $data;
     }
     
-    setCachedData($cacheKey, $data);
+    // Логируем полученную цену BTC для диагностики
+    foreach ($data as $coin) {
+        if (isset($coin['id']) && $coin['id'] === 'bitcoin' && isset($coin['current_price'])) {
+            error_log('BTC price from CoinGecko: $' . $coin['current_price']);
+            break;
+        }
+    }
+    
+    // Кэшируем на 30 секунд для более актуальных данных
+    setCachedData($cacheKey, $data, 30);
     return $data;
 }
 

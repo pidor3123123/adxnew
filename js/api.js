@@ -101,7 +101,7 @@ const API = {
  */
 const MarketAPI = {
     cache: new Map(),
-    cacheTime: 30000, // 30 секунд
+    cacheTime: 10000, // 10 секунд для более актуальных данных
     
     /**
      * Получить данные с кэшированием
@@ -113,9 +113,28 @@ const MarketAPI = {
             return cached.data;
         }
         
-        const data = await fetcher();
-        this.cache.set(key, { data, timestamp: Date.now() });
-        return data;
+        try {
+            const data = await fetcher();
+            this.cache.set(key, { data, timestamp: Date.now() });
+            
+            // Логируем для диагностики
+            if (key === 'crypto_prices' && Array.isArray(data)) {
+                const btc = data.find(c => (c.symbol || '').toUpperCase() === 'BTC' || (c.id || '').toLowerCase() === 'bitcoin');
+                if (btc && btc.current_price) {
+                    console.log(`[MarketAPI] BTC price from cache/API: $${btc.current_price}`);
+                }
+            }
+            
+            return data;
+        } catch (error) {
+            console.error(`[MarketAPI] Error in getCached for ${key}:`, error);
+            // Если есть кэшированные данные, возвращаем их даже если они устарели
+            if (cached) {
+                console.warn(`[MarketAPI] Using stale cache for ${key}`);
+                return cached.data;
+            }
+            throw error;
+        }
     },
     
     /**

@@ -537,9 +537,32 @@ async function updateAssetPrice() {
         if (cryptoSymbols.includes(symbol)) {
             // Криптовалюты: получаем из CoinGecko
             const cryptoData = await MarketAPI.getCryptoPrices();
-            const coin = cryptoData.find(c => c.symbol.toUpperCase() === symbol);
+            if (!cryptoData || !Array.isArray(cryptoData)) {
+                console.error('Invalid crypto data received:', cryptoData);
+                return;
+            }
+            
+            const coin = cryptoData.find(c => {
+                const coinSymbol = (c.symbol || '').toUpperCase();
+                const coinId = (c.id || '').toLowerCase();
+                return coinSymbol === symbol || 
+                       (symbol === 'BTC' && (coinSymbol === 'BTC' || coinId === 'bitcoin')) ||
+                       (symbol === 'ETH' && (coinSymbol === 'ETH' || coinId === 'ethereum')) ||
+                       (symbol === 'BNB' && (coinSymbol === 'BNB' || coinId === 'binancecoin')) ||
+                       (symbol === 'XRP' && (coinSymbol === 'XRP' || coinId === 'ripple')) ||
+                       (symbol === 'SOL' && (coinSymbol === 'SOL' || coinId === 'solana')) ||
+                       (symbol === 'ADA' && (coinSymbol === 'ADA' || coinId === 'cardano')) ||
+                       (symbol === 'DOGE' && (coinSymbol === 'DOGE' || coinId === 'dogecoin')) ||
+                       (symbol === 'DOT' && (coinSymbol === 'DOT' || coinId === 'polkadot')) ||
+                       (symbol === 'MATIC' && (coinSymbol === 'MATIC' || coinId === 'polygon-ecosystem-token')) ||
+                       (symbol === 'LTC' && (coinSymbol === 'LTC' || coinId === 'litecoin'));
+            });
+            
             if (coin && coin.current_price) {
                 newPrice = coin.current_price;
+                console.log(`Updated ${symbol} price: $${newPrice}`);
+            } else {
+                console.warn(`Coin not found for symbol ${symbol}`, cryptoData);
             }
         } else if (stockSymbols.includes(symbol)) {
             // Акции: получаем из Alpha Vantage или списка акций
@@ -559,33 +582,63 @@ async function updateAssetPrice() {
         
         // Обновляем цену, если получили новую
         if (newPrice !== null && newPrice > 0) {
-            const oldPrice = currentAsset.price;
-            currentAsset.price = newPrice;
+            const oldPrice = currentAsset.price || 0;
             
-            // Вычисляем изменение
-            if (oldPrice > 0) {
-                currentAsset.change = ((newPrice - oldPrice) / oldPrice) * 100;
+            // Обновляем цену только если она изменилась (более чем на 0.01%)
+            if (oldPrice === 0 || Math.abs((newPrice - oldPrice) / oldPrice) > 0.0001) {
+                currentAsset.price = newPrice;
+                
+                // Вычисляем изменение
+                if (oldPrice > 0) {
+                    currentAsset.change = ((newPrice - oldPrice) / oldPrice) * 100;
+                } else {
+                    // Если старая цена была 0, получаем изменение из API
+                    if (cryptoSymbols.includes(symbol)) {
+                        const cryptoData = await MarketAPI.getCryptoPrices();
+                        const coin = cryptoData.find(c => {
+                            const coinSymbol = (c.symbol || '').toUpperCase();
+                            return coinSymbol === symbol;
+                        });
+                        if (coin && coin.price_change_percentage_24h !== undefined) {
+                            currentAsset.change = coin.price_change_percentage_24h;
+                        } else {
+                            currentAsset.change = 0;
+                        }
+                    } else {
+                        currentAsset.change = 0;
+                    }
+                }
+                
+                // Update global reference
+                window.currentAsset = currentAsset;
+                
+                // Update price display
+                const priceEl = document.getElementById('currentPrice');
+                const changeEl = document.getElementById('currentChange');
+                
+                if (priceEl) {
+                    priceEl.textContent = NovaTrade.formatCurrency(currentAsset.price);
+                }
+                
+                if (changeEl) {
+                    if (oldPrice > 0) {
+                        const changeAmount = newPrice - oldPrice;
+                        changeEl.innerHTML = `
+                            <i class="bi bi-caret-${currentAsset.change >= 0 ? 'up' : 'down'}-fill"></i>
+                            ${currentAsset.change >= 0 ? '+' : ''}${currentAsset.change.toFixed(2)}% (${NovaTrade.formatCurrency(changeAmount)})
+                        `;
+                    } else {
+                        // Если старая цена была 0, показываем только процент изменения
+                        changeEl.innerHTML = `
+                            <i class="bi bi-caret-${currentAsset.change >= 0 ? 'up' : 'down'}-fill"></i>
+                            ${currentAsset.change >= 0 ? '+' : ''}${currentAsset.change.toFixed(2)}%
+                        `;
+                    }
+                    changeEl.className = `change ${currentAsset.change >= 0 ? 'up' : 'down'}`;
+                }
             }
-            
-            // Update global reference
-            window.currentAsset = currentAsset;
-            
-            // Update price display
-            const priceEl = document.getElementById('currentPrice');
-            const changeEl = document.getElementById('currentChange');
-            
-            if (priceEl) {
-                priceEl.textContent = NovaTrade.formatCurrency(currentAsset.price);
-            }
-            
-            if (changeEl && oldPrice > 0) {
-                const changeAmount = newPrice - oldPrice;
-                changeEl.innerHTML = `
-                    <i class="bi bi-caret-${currentAsset.change >= 0 ? 'up' : 'down'}-fill"></i>
-                    ${currentAsset.change >= 0 ? '+' : ''}${currentAsset.change.toFixed(2)}% (${NovaTrade.formatCurrency(changeAmount)})
-                `;
-                changeEl.className = `change ${currentAsset.change >= 0 ? 'up' : 'down'}`;
-            }
+        } else {
+            console.warn(`Failed to get price for ${symbol}, newPrice:`, newPrice);
         }
     } catch (error) {
         console.error('Error updating asset price:', error);
