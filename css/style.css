@@ -509,6 +509,20 @@ h6 { font-size: 1rem; }
     display: flex;
     align-items: center;
     gap: var(--gap-md);
+}
+
+/* Скрытие/показ элементов авторизации */
+.header-actions [data-auth="false"] {
+    display: flex !important;
+}
+
+.header-actions [data-auth="true"] {
+    display: flex !important;
+}
+
+.header-actions [data-auth="false"]:not(:has(*)) {
+    display: none !important;
+}
     flex-shrink: 0;
     overflow: visible !important;
     overflow-x: visible !important;

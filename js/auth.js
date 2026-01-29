@@ -578,31 +578,33 @@ const Auth = {
         const user = this.getUser();
         const isAuth = this.isAuthenticated();
         
+        console.log('[updateUI] isAuth:', isAuth, 'user:', user);
+        
         // Показать/скрыть элементы для авторизованных с !important для переопределения CSS
         document.querySelectorAll('[data-auth="true"]').forEach(el => {
             if (isAuth) {
                 // Определяем правильное значение display на основе класса элемента
-                if (el.classList.contains('user-menu') || (el.classList.contains('header-actions') && !el.querySelector('[data-auth="false"]'))) {
-                    el.style.setProperty('display', 'flex', 'important');
-                } else if (el.classList.contains('header-actions')) {
-                    el.style.setProperty('display', 'flex', 'important');
+                if (el.classList.contains('user-menu')) {
+                    el.style.cssText = 'display: flex !important;';
+                } else if (el.parentElement && el.parentElement.classList.contains('header-actions')) {
+                    el.style.cssText = 'display: flex !important;';
                 } else {
-                    el.style.setProperty('display', 'block', 'important');
+                    el.style.cssText = 'display: block !important;';
                 }
             } else {
-                el.style.setProperty('display', 'none', 'important');
+                el.style.cssText = 'display: none !important;';
             }
         });
         
         document.querySelectorAll('[data-auth="false"]').forEach(el => {
             if (isAuth) {
-                el.style.setProperty('display', 'none', 'important');
+                el.style.cssText = 'display: none !important;';
             } else {
                 // Определяем правильное значение display на основе класса элемента
-                if (el.classList.contains('header-actions')) {
-                    el.style.setProperty('display', 'flex', 'important');
+                if (el.parentElement && el.parentElement.classList.contains('header-actions')) {
+                    el.style.cssText = 'display: flex !important;';
                 } else {
-                    el.style.setProperty('display', 'block', 'important');
+                    el.style.cssText = 'display: block !important;';
                 }
             }
         });

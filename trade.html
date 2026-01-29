@@ -1889,16 +1889,16 @@
         }
         
         // Реальное время обновление цены для TradingView
-        let priceUpdateInterval = null;
+        let tradingViewPriceUpdateInterval = null;
         
         function startTradingViewPriceUpdates() {
             // Останавливаем предыдущий интервал если есть
-            if (priceUpdateInterval) {
-                clearInterval(priceUpdateInterval);
+            if (tradingViewPriceUpdateInterval) {
+                clearInterval(tradingViewPriceUpdateInterval);
             }
             
             // Обновляем цену каждую секунду
-            priceUpdateInterval = setInterval(async () => {
+            tradingViewPriceUpdateInterval = setInterval(async () => {
                 const urlParams = new URLSearchParams(window.location.search);
                 const symbol = urlParams.get('symbol') || 'BTC';
                 
@@ -1992,9 +1992,9 @@
         }
         
         function stopTradingViewPriceUpdates() {
-            if (priceUpdateInterval) {
-                clearInterval(priceUpdateInterval);
-                priceUpdateInterval = null;
+            if (tradingViewPriceUpdateInterval) {
+                clearInterval(tradingViewPriceUpdateInterval);
+                tradingViewPriceUpdateInterval = null;
             }
         }
         
