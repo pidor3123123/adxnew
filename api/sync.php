@@ -172,11 +172,19 @@ function syncUserToSupabase(int $mysqlUserId): void {
             $needToCreateAuthUser = true;
             error_log("Auth user not found for email $email, will create new one for MySQL user ID $mysqlUserId");
         } else {
-            // Auth пользователь существует - проверяем метаданные mysql_user_id
-            // Получаем информацию о auth пользователе через API для проверки метаданных
-            // Пока просто логируем и предполагаем, что нужно обновить метаданные
-            error_log("Found existing auth user for email $email with UUID: $authUserId");
-            $needToUpdateMetadata = true; // Обновим метаданные при создании/обновлении записи в users
+            // Auth пользователь существует - проверяем, не используется ли этот UUID другим email в таблице users
+            $existingUser = $supabase->get('users', 'id', $authUserId);
+            if ($existingUser && ($existingUser['email'] ?? '') !== $email) {
+                // КОНФЛИКТ: UUID уже используется другим email!
+                // Создаем нового auth пользователя для текущего email
+                error_log("WARNING: UUID $authUserId from findAuthUserByEmail is already used by email " . ($existingUser['email'] ?? 'unknown') . ". Creating new auth user for $email");
+                $needToCreateAuthUser = true;
+                $authUserId = null; // Сброс, чтобы создать нового
+            } else {
+                // UUID свободен или используется правильным email - продолжаем
+                error_log("Found existing auth user for email $email with UUID: $authUserId");
+                $needToUpdateMetadata = true; // Обновим метаданные при создании/обновлении записи в users
+            }
         }
         
         // Шаг 2: Создаем auth пользователя, если его нет
