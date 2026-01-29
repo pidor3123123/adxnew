@@ -293,41 +293,45 @@ const MarketAPI = {
      * Получить исторические данные для графика
      */
     async getChartData(symbol, interval = '4h', limit = 100) {
-        // Не кэшируем для real-time обновлений
+        // Делаем запрос к API с интервалом
+        const params = new URLSearchParams({
+            symbol: symbol,
+            interval: interval,
+            limit: limit
+        });
+        
+        try {
+            const response = await fetch(`/api/market.php?action=chart&${params.toString()}`);
+            const result = await response.json();
+            
+            if (result.success && result.data) {
+                return result.data;
+            }
+        } catch (error) {
+            console.error('Error fetching chart data from API:', error);
+        }
+        
+        // Fallback: генерируем моковые данные если API недоступен
         const intervalMs = this.intervals[interval] || this.intervals['4h'];
         const basePrice = this.basePrices[symbol] || 100;
-        
-        // Волатильность зависит от типа актива
         const volatility = basePrice > 1000 ? 0.02 : (basePrice > 100 ? 0.03 : (basePrice > 1 ? 0.04 : 0.05));
         
         const data = [];
         const now = Date.now();
-        
-        // Округляем время до текущего интервала
         const currentIntervalStart = Math.floor(now / intervalMs) * intervalMs;
         let time = currentIntervalStart - (limit - 1) * intervalMs;
-        
-        // Начинаем с цены немного отличающейся от базовой
         let open = basePrice * (0.95 + Math.random() * 0.1);
         
         for (let i = 0; i < limit; i++) {
-            // Волатильность меньше для коротких таймфреймов
             const timeframeVolatility = volatility * Math.sqrt(intervalMs / (24 * 60 * 60 * 1000));
-            
-            // Генерируем изменение цены
             const change = (Math.random() - 0.5) * 2 * timeframeVolatility;
             const close = open * (1 + change);
-            
-            // Вычисляем high и low корректно
             const maxPrice = Math.max(open, close);
             const minPrice = Math.min(open, close);
             const high = maxPrice * (1 + Math.random() * timeframeVolatility * 0.3);
             const low = minPrice * (1 - Math.random() * timeframeVolatility * 0.3);
-            
-            // Объём зависит от цены актива
             const baseVolume = basePrice > 1000 ? 50000 : (basePrice > 100 ? 500000 : 5000000);
             const volume = baseVolume * (0.5 + Math.random());
-            
             const decimals = basePrice < 1 ? 6 : 2;
             
             data.push({
@@ -343,7 +347,6 @@ const MarketAPI = {
             open = close;
         }
         
-        // Последняя свеча должна быть близка к текущей цене
         if (data.length > 0) {
             const lastCandle = data[data.length - 1];
             lastCandle.close = basePrice;

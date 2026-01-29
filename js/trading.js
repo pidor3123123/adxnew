@@ -23,9 +23,7 @@ let tradeSide = 'buy';
 let orderType = 'market';
 let assetList = [];
 
-// WebSocket соединение для реального времени
-let priceWebSocket = null;
-let priceUpdateCallbacks = [];
+// WebSocket больше не используется - используем только API опрос
 
 /**
  * Load asset list (crypto, stocks, forex)
@@ -165,17 +163,11 @@ async function selectAsset(symbol) {
     document.getElementById('currentAssetName').textContent = asset.name;
     document.getElementById('quantitySuffix').textContent = asset.symbol;
     
-    // Подключаемся к WebSocket для криптовалют или обновляем цену из API для других рынков
-    const symbolUpper = asset.symbol.toUpperCase();
-    const cryptoSymbols = ['BTC', 'ETH', 'BNB', 'XRP', 'SOL', 'ADA', 'DOGE', 'DOT', 'MATIC', 'LTC'];
+    // Обновляем цену из API для всех активов (криптовалюты, акции, форекс)
+    await updateAssetPrice();
     
-    if (cryptoSymbols.includes(symbolUpper)) {
-        // Для криптовалют используем WebSocket
-        connectPriceWebSocket(asset.symbol);
-    } else {
-        // Для акций и форекса обновляем из API
-        await updateAssetPrice();
-    }
+    // Запускаем обновление цен в реальном времени через API
+    startPriceUpdates();
     
     // Update icon based on market type
     const iconEl = document.getElementById('assetIcon');
@@ -524,137 +516,7 @@ async function loadUserBalances() {
     }
 }
 
-/**
- * Подключение к WebSocket для получения цен в реальном времени
- */
-function connectPriceWebSocket(symbol) {
-    // Закрываем предыдущее соединение, если есть
-    if (priceWebSocket) {
-        priceWebSocket.close();
-        priceWebSocket = null;
-    }
-    
-    const symbolUpper = symbol.toUpperCase();
-    const cryptoSymbols = ['BTC', 'ETH', 'BNB', 'XRP', 'SOL', 'ADA', 'DOGE', 'DOT', 'MATIC', 'LTC'];
-    
-    // Маппинг символов на Binance формат
-    const binanceSymbolMap = {
-        'BTC': 'BTCUSDT',
-        'ETH': 'ETHUSDT',
-        'BNB': 'BNBUSDT',
-        'XRP': 'XRPUSDT',
-        'SOL': 'SOLUSDT',
-        'ADA': 'ADAUSDT',
-        'DOGE': 'DOGEUSDT',
-        'DOT': 'DOTUSDT',
-        'MATIC': 'MATICUSDT',
-        'LTC': 'LTCUSDT'
-    };
-    
-    // Подключаемся к WebSocket только для криптовалют
-    if (cryptoSymbols.includes(symbolUpper) && binanceSymbolMap[symbolUpper]) {
-        const binanceSymbol = binanceSymbolMap[symbolUpper].toLowerCase();
-        const wsUrl = `wss://stream.binance.com:9443/ws/${binanceSymbol}@ticker`;
-        
-        try {
-            priceWebSocket = new WebSocket(wsUrl);
-            
-            priceWebSocket.onopen = () => {
-                console.log(`WebSocket connected for ${symbol}`);
-            };
-            
-            priceWebSocket.onmessage = (event) => {
-                try {
-                    const data = JSON.parse(event.data);
-                    const price = parseFloat(data.c); // текущая цена (last price)
-                    const change24h = parseFloat(data.P); // изменение за 24 часа в процентах
-                    
-                    if (price && price > 0) {
-                        // Обновляем цену актива
-                        const oldPrice = currentAsset.price || 0;
-                        currentAsset.price = price;
-                        currentAsset.change = change24h;
-                        window.currentAsset = currentAsset;
-                        
-                        // Вызываем все зарегистрированные колбэки
-                        priceUpdateCallbacks.forEach(callback => {
-                            try {
-                                callback(price, change24h);
-                            } catch (e) {
-                                console.error('Error in price update callback:', e);
-                            }
-                        });
-                        
-                        // Обновляем UI
-                        const priceEl = document.getElementById('currentPrice');
-                        if (priceEl) {
-                            priceEl.textContent = NovaTrade.formatCurrency(price);
-                        }
-                        
-                        // Обновляем изменение
-                        if (oldPrice > 0) {
-                            const changeAmount = price - oldPrice;
-                            const changePercent = ((price - oldPrice) / oldPrice) * 100;
-                            const changeEl = document.getElementById('currentChange');
-                            if (changeEl) {
-                                changeEl.innerHTML = `
-                                    <i class="bi bi-caret-${changePercent >= 0 ? 'up' : 'down'}-fill"></i>
-                                    ${changePercent >= 0 ? '+' : ''}${changePercent.toFixed(2)}% (${NovaTrade.formatCurrency(changeAmount)})
-                                `;
-                                changeEl.className = `change ${changePercent >= 0 ? 'up' : 'down'}`;
-                            }
-                        }
-                    }
-                } catch (error) {
-                    console.error('Error parsing WebSocket data:', error);
-                }
-            };
-            
-            priceWebSocket.onerror = (error) => {
-                console.error('WebSocket error:', error);
-            };
-            
-            priceWebSocket.onclose = () => {
-                console.log(`WebSocket closed for ${symbol}`);
-                // Переподключаемся через 3 секунды
-                setTimeout(() => {
-                    if (currentAsset && currentAsset.symbol === symbol) {
-                        connectPriceWebSocket(symbol);
-                    }
-                }, 3000);
-            };
-        } catch (error) {
-            console.error('Error connecting to WebSocket:', error);
-        }
-    }
-}
-
-/**
- * Отключение от WebSocket
- */
-function disconnectPriceWebSocket() {
-    if (priceWebSocket) {
-        priceWebSocket.close();
-        priceWebSocket = null;
-    }
-    priceUpdateCallbacks = [];
-}
-
-/**
- * Регистрация колбэка для обновления цены
- */
-function onPriceUpdate(callback) {
-    if (typeof callback === 'function') {
-        priceUpdateCallbacks.push(callback);
-    }
-}
-
-/**
- * Удаление колбэка для обновления цены
- */
-function offPriceUpdate(callback) {
-    priceUpdateCallbacks = priceUpdateCallbacks.filter(cb => cb !== callback);
-}
+// WebSocket функции удалены - используем только API опрос для всех активов
 
 /**
  * Обновление цены актива из API (fallback для акций и форекса)
@@ -741,18 +603,10 @@ function startPriceUpdates() {
         clearInterval(priceUpdateInterval);
     }
     
-    const symbolUpper = currentAsset?.symbol?.toUpperCase() || '';
-    const cryptoSymbols = ['BTC', 'ETH', 'BNB', 'XRP', 'SOL', 'ADA', 'DOGE', 'DOT', 'MATIC', 'LTC'];
-    
-    // Для криптовалют WebSocket уже подключен, не нужно обновлять через интервал
-    if (cryptoSymbols.includes(symbolUpper)) {
-        return;
-    }
-    
-    // Обновляем цену сразу
+    // Обновляем цену сразу для всех активов
     updateAssetPrice();
     
-    // Обновляем цену каждые 2 секунды для акций и форекса
+    // Обновляем цену каждые 2 секунды для всех активов (криптовалюты, акции, форекс)
     priceUpdateInterval = setInterval(() => {
         updateAssetPrice();
         
@@ -890,7 +744,3 @@ window.filterByMarket = filterByMarket;
 window.filterDropdownAssets = filterDropdownAssets;
 window.selectAssetFromDropdown = selectAssetFromDropdown;
 window.updateAssetPrice = updateAssetPrice;
-window.connectPriceWebSocket = connectPriceWebSocket;
-window.disconnectPriceWebSocket = disconnectPriceWebSocket;
-window.onPriceUpdate = onPriceUpdate;
-window.offPriceUpdate = offPriceUpdate;

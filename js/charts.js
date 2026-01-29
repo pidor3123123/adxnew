@@ -250,11 +250,7 @@ async function loadChartData(symbol, interval) {
         // Запускаем real-time обновления
         startRealtimeUpdates();
         
-        // Если это криптовалюта, убеждаемся, что WebSocket подключен
-        const cryptoSymbols = ['BTC', 'ETH', 'BNB', 'XRP', 'SOL', 'ADA', 'DOGE', 'DOT', 'MATIC', 'LTC'];
-        if (cryptoSymbols.includes(symbol.toUpperCase()) && typeof window.connectPriceWebSocket === 'function') {
-            window.connectPriceWebSocket(symbol);
-        }
+        // WebSocket больше не используется - цены обновляются через API опрос
         
     } catch (error) {
         console.error('Error loading chart data:', error);
@@ -325,20 +321,7 @@ function startRealtimeUpdates() {
         });
     }
     
-    // Регистрируем колбэк для обновления графика при получении новой цены из WebSocket
-    if (typeof window.onPriceUpdate === 'function') {
-        window.onPriceUpdate((price, change24h) => {
-            if (!lastCandle || !candlestickSeries || !chart) return;
-            
-            const now = Date.now();
-            const interval = intervalMs[currentInterval] || intervalMs['5m'];
-            const currentCandleTime = Math.floor(now / interval) * interval;
-            const lastCandleTimeMs = lastCandle.time * 1000;
-            
-            // Обновляем график с реальной ценой из WebSocket
-            updateChartWithPrice(price, currentCandleTime, lastCandleTimeMs);
-        });
-    }
+    // WebSocket больше не используется - цены обновляются через API опрос в setInterval ниже
     
     realtimeUpdateInterval = setInterval(() => {
         if (!lastCandle || !candlestickSeries || !chart) return;
@@ -434,10 +417,7 @@ function stopRealtimeUpdates() {
         realtimeUpdateInterval = null;
     }
     
-    // Отключаемся от WebSocket при остановке обновлений
-    if (typeof window.disconnectPriceWebSocket === 'function') {
-        window.disconnectPriceWebSocket();
-    }
+    // WebSocket больше не используется
 }
 
 /**

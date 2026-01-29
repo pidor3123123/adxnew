@@ -379,7 +379,7 @@ function getChartDataForForex(string $symbol, int $days = 30): ?array {
 /**
  * Получение исторических данных графика из CoinGecko API
  */
-function getChartDataFromCoinGecko(string $symbol, int $days = 30): ?array {
+function getChartDataFromCoinGecko(string $symbol, int $days = 30, string $interval = '4h'): ?array {
     // Маппинг символов на CoinGecko IDs
     $coinGeckoIds = [
         'BTC' => 'bitcoin',
@@ -433,37 +433,54 @@ function getChartDataFromCoinGecko(string $symbol, int $days = 30): ?array {
     $volumes = $data['total_volumes'];
     
     // Преобразуем данные в формат OHLCV
-    // Группируем по дням для создания дневных свечей
+    // Определяем интервал в секундах
+    $intervalSeconds = 14400; // По умолчанию 4 часа
+    switch ($interval) {
+        case '1m': $intervalSeconds = 60; break;
+        case '5m': $intervalSeconds = 300; break;
+        case '15m': $intervalSeconds = 900; break;
+        case '30m': $intervalSeconds = 1800; break;
+        case '1h': $intervalSeconds = 3600; break;
+        case '4h': $intervalSeconds = 14400; break;
+        case '24h': 
+        case '1d': $intervalSeconds = 86400; break;
+        case '1w': $intervalSeconds = 604800; break;
+        case '1M': $intervalSeconds = 2592000; break; // ~30 дней
+        case '1y': $intervalSeconds = 31536000; break; // ~365 дней
+        case 'all': $intervalSeconds = 86400; break;
+        default: $intervalSeconds = 14400; break; // 4h по умолчанию
+    }
+    
+    // Группируем данные по интервалу
     $candles = [];
-    $currentDay = null;
-    $dayData = null;
+    $currentInterval = null;
+    $intervalData = null;
     
     foreach ($prices as $index => $pricePoint) {
-        $timestamp = $pricePoint[0] / 1000; // Конвертируем из миллисекунд в секунды
+        $timestamp = (int)($pricePoint[0] / 1000); // Конвертируем из миллисекунд в секунды
         $price = $pricePoint[1];
         $volume = isset($volumes[$index]) ? $volumes[$index][1] : 0;
         
-        // Получаем день из timestamp
-        $day = date('Y-m-d', $timestamp);
+        // Округляем timestamp до интервала
+        $intervalTimestamp = (int)(floor($timestamp / $intervalSeconds) * $intervalSeconds);
         
-        if ($currentDay !== $day) {
-            // Сохраняем предыдущий день, если он есть
-            if ($dayData !== null) {
+        if ($currentInterval !== $intervalTimestamp) {
+            // Сохраняем предыдущий интервал, если он есть
+            if ($intervalData !== null) {
                 $candles[] = [
-                    'time' => $dayData['dayTimestamp'],
-                    'open' => round($dayData['open'], 2),
-                    'high' => round($dayData['high'], 2),
-                    'low' => round($dayData['low'], 2),
-                    'close' => round($dayData['close'], 2),
-                    'volume' => round($dayData['volume'], 2)
+                    'time' => $intervalData['intervalTimestamp'],
+                    'open' => round($intervalData['open'], 2),
+                    'high' => round($intervalData['high'], 2),
+                    'low' => round($intervalData['low'], 2),
+                    'close' => round($intervalData['close'], 2),
+                    'volume' => round($intervalData['volume'], 2)
                 ];
             }
             
-            // Начинаем новый день
-            $currentDay = $day;
-            $dayTimestamp = strtotime($day);
-            $dayData = [
-                'dayTimestamp' => $dayTimestamp,
+            // Начинаем новый интервал
+            $currentInterval = $intervalTimestamp;
+            $intervalData = [
+                'intervalTimestamp' => $intervalTimestamp,
                 'open' => $price,
                 'high' => $price,
                 'low' => $price,
@@ -471,28 +488,27 @@ function getChartDataFromCoinGecko(string $symbol, int $days = 30): ?array {
                 'volume' => $volume
             ];
         } else {
-            // Обновляем данные текущего дня
-            $dayData['high'] = max($dayData['high'], $price);
-            $dayData['low'] = min($dayData['low'], $price);
-            $dayData['close'] = $price;
-            $dayData['volume'] += $volume;
+            // Обновляем данные текущего интервала
+            $intervalData['high'] = max($intervalData['high'], $price);
+            $intervalData['low'] = min($intervalData['low'], $price);
+            $intervalData['close'] = $price;
+            $intervalData['volume'] += $volume;
         }
     }
     
-    // Добавляем последний день
-    if ($dayData !== null) {
+    // Добавляем последний интервал
+    if ($intervalData !== null) {
         $candles[] = [
-            'time' => $dayData['dayTimestamp'],
-            'open' => round($dayData['open'], 2),
-            'high' => round($dayData['high'], 2),
-            'low' => round($dayData['low'], 2),
-            'close' => round($dayData['close'], 2),
-            'volume' => round($dayData['volume'], 2)
+            'time' => $intervalData['intervalTimestamp'],
+            'open' => round($intervalData['open'], 2),
+            'high' => round($intervalData['high'], 2),
+            'low' => round($intervalData['low'], 2),
+            'close' => round($intervalData['close'], 2),
+            'volume' => round($intervalData['volume'], 2)
         ];
     }
     
     // Ограничиваем количество свечей до limit
-    // Берем последние N свечей
     if (count($candles) > $days) {
         $candles = array_slice($candles, -$days);
     }
@@ -630,6 +646,7 @@ try {
             
         case 'chart':
             $symbol = $_GET['symbol'] ?? 'BTC';
+            $interval = $_GET['interval'] ?? '4h';
             $limit = min((int)($_GET['limit'] ?? 100), 365);
             
             $chartData = null;
@@ -640,8 +657,8 @@ try {
             
             // Определяем тип актива и получаем данные
             if (in_array($symbolUpper, $cryptoSymbols)) {
-                // Криптовалюты: используем CoinGecko
-                $chartData = getChartDataFromCoinGecko($symbol, $limit);
+                // Криптовалюты: используем CoinGecko с учетом интервала
+                $chartData = getChartDataFromCoinGecko($symbol, $limit, $interval);
                 
                 // Если не удалось получить данные, используем fallback с актуальной ценой
                 if ($chartData === null || empty($chartData)) {
