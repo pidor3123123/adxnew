@@ -100,9 +100,13 @@ try {
             
             $db = getDB();
             $stmt = $db->prepare('
-                SELECT currency, available, reserved 
+                SELECT 
+                    currency, 
+                    SUM(available) as available, 
+                    SUM(reserved) as reserved 
                 FROM balances 
                 WHERE user_id = ?
+                GROUP BY currency
                 ORDER BY 
                     CASE currency 
                         WHEN "USD" THEN 0 
