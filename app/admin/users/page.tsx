@@ -124,12 +124,39 @@ export default function UsersPage() {
     )
   }
 
+  // Рыночные цены для конвертации в USD (можно обновлять через API)
+  const getCryptoPrices = (): Record<string, number> => {
+    return {
+      'USD': 1.0,
+      'BTC': 80000, // Примерная цена, можно получать через API
+      'ETH': 3000,
+      'BNB': 600,
+      'XRP': 0.6,
+      'SOL': 150,
+      'ADA': 0.6,
+      'DOGE': 0.1,
+      'DOT': 8,
+      'MATIC': 1,
+      'LTC': 100,
+    }
+  }
+
   function getMainBalance(user: UserWithSecurity): string {
-    if (!user.user_balances || user.user_balances.length === 0) return '0'
-    const mainBalance = user.user_balances.find(b => b.currency === 'USD') || user.user_balances[0]
-    if (!mainBalance) return '0'
-    const total = parseFloat(mainBalance.available_balance?.toString() || '0') + parseFloat(mainBalance.locked_balance?.toString() || '0')
-    return `${total.toFixed(2)} ${mainBalance.currency}`
+    if (!user.user_balances || user.user_balances.length === 0) return '$0.00'
+    
+    const prices = getCryptoPrices()
+    let totalUsd = 0
+    
+    // Суммируем все балансы, конвертируя в USD
+    user.user_balances.forEach(balance => {
+      const available = parseFloat(balance.available_balance?.toString() || '0')
+      const locked = parseFloat(balance.locked_balance?.toString() || '0')
+      const total = available + locked
+      const price = prices[balance.currency] || 0
+      totalUsd += total * price
+    })
+    
+    return `$${totalUsd.toFixed(2)}`
   }
 
   async function handleSyncUsers() {
