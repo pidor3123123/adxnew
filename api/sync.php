@@ -161,29 +161,44 @@ function syncUserToSupabase(int $mysqlUserId): void {
         
         $email = $user['email'];
         
-        // Шаг 1: Находим или создаем auth пользователя по email
-        // ВАЖНО: Таблица users имеет внешний ключ на auth.users, поэтому нужно использовать UUID из auth.users
-        $authUserId = $supabase->findAuthUserByEmail($email);
+        // Шаг 0: Проверяем существование пользователя по email в таблице users (приоритетная проверка)
+        // Это гарантирует, что каждый email будет иметь только одну запись
+        $existingUserByEmail = $supabase->get('users', 'email', $email);
+        $authUserId = null;
         $needToCreateAuthUser = false;
         $needToUpdateMetadata = false;
         
-        if (!$authUserId) {
-            // Auth пользователя нет - создаем нового
-            $needToCreateAuthUser = true;
-            error_log("Auth user not found for email $email, will create new one for MySQL user ID $mysqlUserId");
+        if ($existingUserByEmail) {
+            // Пользователь с таким email уже существует - используем его UUID
+            $authUserId = $existingUserByEmail['id'] ?? null;
+            error_log("Found existing user by email $email with UUID: $authUserId");
+            $needToUpdateMetadata = true;
         } else {
-            // Auth пользователь существует - проверяем, не используется ли этот UUID другим email в таблице users
-            $existingUser = $supabase->get('users', 'id', $authUserId);
-            if ($existingUser && ($existingUser['email'] ?? '') !== $email) {
-                // КОНФЛИКТ: UUID уже используется другим email!
-                // Создаем нового auth пользователя для текущего email
-                error_log("WARNING: UUID $authUserId from findAuthUserByEmail is already used by email " . ($existingUser['email'] ?? 'unknown') . ". Creating new auth user for $email");
+            // Пользователя с таким email нет - находим или создаем auth пользователя
+            error_log("User with email $email not found in users table, checking auth.users...");
+            
+            // Шаг 1: Находим или создаем auth пользователя по email
+            // ВАЖНО: Таблица users имеет внешний ключ на auth.users, поэтому нужно использовать UUID из auth.users
+            $authUserId = $supabase->findAuthUserByEmail($email);
+            
+            if (!$authUserId) {
+                // Auth пользователя нет - создаем нового
                 $needToCreateAuthUser = true;
-                $authUserId = null; // Сброс, чтобы создать нового
+                error_log("Auth user not found for email $email, will create new one for MySQL user ID $mysqlUserId");
             } else {
-                // UUID свободен или используется правильным email - продолжаем
-                error_log("Found existing auth user for email $email with UUID: $authUserId");
-                $needToUpdateMetadata = true; // Обновим метаданные при создании/обновлении записи в users
+                // Auth пользователь существует - проверяем, не используется ли этот UUID другим email в таблице users
+                $existingUserById = $supabase->get('users', 'id', $authUserId);
+                if ($existingUserById && ($existingUserById['email'] ?? '') !== $email) {
+                    // КОНФЛИКТ: UUID уже используется другим email!
+                    // Но мы уже проверили, что пользователя с таким email нет, поэтому создаем нового auth пользователя
+                    error_log("WARNING: UUID $authUserId from findAuthUserByEmail is already used by email " . ($existingUserById['email'] ?? 'unknown') . ". Creating new auth user for $email");
+                    $needToCreateAuthUser = true;
+                    $authUserId = null; // Сброс, чтобы создать нового
+                } else {
+                    // UUID свободен или используется правильным email - продолжаем
+                    error_log("Found existing auth user for email $email with UUID: $authUserId");
+                    $needToUpdateMetadata = true; // Обновим метаданные при создании/обновлении записи в users
+                }
             }
         }
         

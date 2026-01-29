@@ -108,6 +108,31 @@ class SupabaseClient {
     }
     
     /**
+     * Upsert по email (для таблицы users)
+     * Использует конфликт по уникальному индексу email
+     */
+    public function upsertByEmail(string $table, array $data): array {
+        // Для upsert по email используем PATCH с проверкой существования
+        // Сначала проверяем существование по email
+        $email = $data['email'] ?? null;
+        if (!$email) {
+            throw new Exception("Email is required for upsertByEmail");
+        }
+        
+        $existing = $this->get($table, 'email', $email);
+        if ($existing) {
+            // Обновляем существующую запись
+            $id = $existing['id'];
+            unset($data['id']); // Не обновляем id
+            unset($data['created_at']); // Не обновляем created_at
+            return $this->update($table, 'id', $id, $data);
+        } else {
+            // Вставляем новую запись
+            return $this->insert($table, $data);
+        }
+    }
+    
+    /**
      * Выборка записей
      */
     public function select(string $table, string $select = '*', array $filters = [], int $limit = null, int $offset = null): array {
