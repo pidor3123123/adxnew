@@ -835,7 +835,7 @@
                 </header>
                 
                 <!-- Main Grid -->
-                <div class="main-grid" style="display: grid; grid-template-columns: 70% 30%; height: calc(100% - 60px - 120px); overflow: hidden;">
+                <div class="main-grid" style="display: grid; grid-template-columns: 70% 30%; height: calc(100% - 60px - 150px); overflow: hidden;">
                     <!-- Chart Section -->
                     <div class="chart-section" style="background: var(--bg-primary); border-right: 1px solid var(--border-color); position: relative; overflow: hidden;">
                         <div id="tradingview-chart" style="width: 100%; height: 100%;"></div>
@@ -909,8 +909,8 @@
                 </div>
                 
                 <!-- Market Overview -->
-                <div class="market-overview" style="background: var(--bg-secondary); border-top: 1px solid var(--border-color); height: 120px; padding: 12px 20px; overflow-x: auto; overflow-y: hidden; flex-shrink: 0;">
-                    <div class="market-overview-content" id="marketOverview" style="display: flex; gap: 16px; height: 100%;">
+                <div class="market-overview" style="background: var(--bg-secondary); border-top: 1px solid var(--border-color); height: 150px; padding: 12px 20px; overflow: hidden; flex-shrink: 0;">
+                    <div class="market-overview-content" id="marketOverview" style="display: flex; gap: 8px; height: 100%; flex-wrap: nowrap; align-items: flex-start;">
                         <!-- Market items will be added here -->
                     </div>
                 </div>
@@ -1144,12 +1144,15 @@
         
         function updateMarketOverview() {
             document.querySelectorAll('.market-item').forEach(item => {
-                item.classList.remove('active');
                 const chartId = item.querySelector('[id^="chart-"]')?.id;
                 if (chartId) {
                     const symbol = chartId.replace('chart-', '');
                     if (symbol === currentSymbol) {
-                        item.classList.add('active');
+                        item.style.borderColor = '#6366f1';
+                        item.style.background = 'var(--bg-active)';
+                    } else {
+                        item.style.borderColor = 'var(--border-color)';
+                        item.style.background = 'var(--bg-tertiary)';
                     }
                 }
             });
@@ -1369,82 +1372,87 @@
             const container = document.getElementById('marketOverview');
             if (!container) return;
             
+            // Собираем все символы в один массив
+            const allSymbols = [];
             Object.entries(marketSymbols).forEach(([market, symbols]) => {
-                const group = document.createElement('div');
-                group.style.display = 'flex';
-                group.style.flexDirection = 'column';
-                group.style.gap = '8px';
-                
-                const label = document.createElement('div');
-                label.style.fontSize = '0.75rem';
-                label.style.fontWeight = '600';
-                label.style.color = 'var(--text-tertiary)';
-                label.style.textTransform = 'uppercase';
-                label.style.letterSpacing = '0.5px';
-                label.textContent = market;
-                group.appendChild(label);
-                
-                const items = document.createElement('div');
-                items.style.display = 'flex';
-                items.style.gap = '12px';
-                
                 symbols.forEach(symbol => {
-                    const item = document.createElement('div');
-                    item.style.minWidth = '120px';
-                    item.style.padding = '8px';
-                    item.style.background = 'var(--bg-tertiary)';
-                    item.style.border = '1px solid var(--border-color)';
-                    item.style.borderRadius = '6px';
-                    item.style.cursor = 'pointer';
-                    item.style.transition = 'all 150ms ease';
-                    if (symbol.tv === currentSymbol) {
-                        item.style.borderColor = '#6366f1';
-                        item.style.background = 'var(--bg-active)';
-                    }
-                    
-                    item.innerHTML = `
-                        <div style="font-size: 0.8125rem; font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">${symbol.symbol}</div>
-                        <div style="font-size: 0.75rem; color: var(--text-secondary);" id="price-${symbol.tv}">—</div>
-                        <div style="width: 100%; height: 40px; margin-top: 4px;" id="chart-${symbol.tv}"></div>
-                    `;
-                    
-                    item.addEventListener('click', () => {
-                        updateChart(symbol.tv);
-                        document.querySelectorAll('.market-item').forEach(i => {
-                            i.style.borderColor = 'var(--border-color)';
-                            i.style.background = 'var(--bg-tertiary)';
-                        });
-                        item.style.borderColor = '#6366f1';
-                        item.style.background = 'var(--bg-active)';
+                    allSymbols.push({ ...symbol, market });
+                });
+            });
+            
+            // Создаем все элементы в одну строку
+            allSymbols.forEach(symbol => {
+                const item = document.createElement('div');
+                item.className = 'market-item';
+                item.style.width = '100px';
+                item.style.height = '120px';
+                item.style.padding = '8px';
+                item.style.background = 'var(--bg-tertiary)';
+                item.style.border = '1px solid var(--border-color)';
+                item.style.borderRadius = '6px';
+                item.style.cursor = 'pointer';
+                item.style.transition = 'all 150ms ease';
+                item.style.display = 'flex';
+                item.style.flexDirection = 'column';
+                item.style.flexShrink = '0';
+                if (symbol.tv === currentSymbol) {
+                    item.style.borderColor = '#6366f1';
+                    item.style.background = 'var(--bg-active)';
+                }
+                
+                item.innerHTML = `
+                    <div style="font-size: 0.75rem; font-weight: 600; color: var(--text-primary); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${symbol.symbol}</div>
+                    <div style="font-size: 0.6875rem; color: var(--text-secondary); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="price-${symbol.tv}">—</div>
+                    <div style="width: 100%; height: 60px; margin-top: auto; flex-shrink: 0;" id="chart-${symbol.tv}"></div>
+                `;
+                
+                item.addEventListener('click', () => {
+                    updateChart(symbol.tv);
+                    document.querySelectorAll('.market-item').forEach(i => {
+                        i.style.borderColor = 'var(--border-color)';
+                        i.style.background = 'var(--bg-tertiary)';
                     });
-                    
-                    items.appendChild(item);
-                    
-                    setTimeout(() => {
-                        const chartContainer = document.getElementById(`chart-${symbol.tv}`);
-                        if (chartContainer) {
-                            const script = document.createElement('script');
-                            script.type = 'text/javascript';
-                            script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js';
-                            script.async = true;
-                            script.textContent = JSON.stringify({
-                                symbol: symbol.tv,
-                                width: '100%',
-                                height: '100%',
-                                locale: 'ru',
-                                dateRange: '1D',
-                                colorTheme: 'dark',
-                                isTransparent: false,
-                                autosize: true,
-                                largeChartUrl: ''
-                            });
-                            chartContainer.appendChild(script);
-                        }
-                    }, 100);
+                    item.style.borderColor = '#6366f1';
+                    item.style.background = 'var(--bg-active)';
                 });
                 
-                group.appendChild(items);
-                container.appendChild(group);
+                item.addEventListener('mouseenter', () => {
+                    if (symbol.tv !== currentSymbol) {
+                        item.style.borderColor = 'var(--border-light)';
+                        item.style.background = 'var(--bg-hover)';
+                    }
+                });
+                
+                item.addEventListener('mouseleave', () => {
+                    if (symbol.tv !== currentSymbol) {
+                        item.style.borderColor = 'var(--border-color)';
+                        item.style.background = 'var(--bg-tertiary)';
+                    }
+                });
+                
+                container.appendChild(item);
+                
+                setTimeout(() => {
+                    const chartContainer = document.getElementById(`chart-${symbol.tv}`);
+                    if (chartContainer) {
+                        const script = document.createElement('script');
+                        script.type = 'text/javascript';
+                        script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js';
+                        script.async = true;
+                        script.textContent = JSON.stringify({
+                            symbol: symbol.tv,
+                            width: '100%',
+                            height: '100%',
+                            locale: 'ru',
+                            dateRange: '1D',
+                            colorTheme: 'dark',
+                            isTransparent: false,
+                            autosize: true,
+                            largeChartUrl: ''
+                        });
+                        chartContainer.appendChild(script);
+                    }
+                }, 100);
             });
         }
         
