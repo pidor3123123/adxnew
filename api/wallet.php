@@ -3,21 +3,93 @@
  * ADX Finance - API кошелька
  */
 
-require_once __DIR__ . '/../config/database.php';
+// Включаем буферизацию вывода для предотвращения попадания предупреждений в JSON
+ob_start();
 
+// Глобальная обработка ошибок для конвертации всех PHP ошибок в JSON
+set_error_handler(function($severity, $message, $file, $line) {
+    // Игнорируем ошибки, которые не являются критическими
+    if (!(error_reporting() & $severity)) {
+        return false;
+    }
+    
+    // Очищаем буфер и устанавливаем заголовки
+    if (ob_get_level() > 0) {
+        ob_end_clean();
+    }
+    
+    if (!headers_sent()) {
+        header('Content-Type: application/json');
+        http_response_code(500);
+    }
+    
+    error_log("PHP Error in wallet.php: $message in $file:$line");
+    
+    echo json_encode([
+        'success' => false,
+        'error' => 'PHP Error: ' . $message . ' in ' . basename($file) . ':' . $line
+    ]);
+    exit;
+});
+
+// Обработка фатальных ошибок
+register_shutdown_function(function() {
+    $error = error_get_last();
+    if ($error !== null && in_array($error['type'], [E_ERROR, E_CORE_ERROR, E_COMPILE_ERROR, E_PARSE])) {
+        if (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        
+        if (!headers_sent()) {
+            header('Content-Type: application/json');
+            http_response_code(500);
+        }
+        
+        error_log("Fatal Error in wallet.php: {$error['message']} in {$error['file']}:{$error['line']}");
+        
+        echo json_encode([
+            'success' => false,
+            'error' => 'Fatal Error: ' . $error['message'] . ' in ' . basename($error['file']) . ':' . $error['line']
+        ]);
+        exit;
+    }
+});
+
+// Загружаем необходимые файлы
+try {
+    require_once __DIR__ . '/../config/database.php';
+    require_once __DIR__ . '/../config/supabase.php';
+    require_once __DIR__ . '/auth.php';
+} catch (Exception $e) {
+    if (ob_get_level() > 0) {
+        ob_end_clean();
+    }
+    
+    if (!headers_sent()) {
+        header('Content-Type: application/json');
+        http_response_code(500);
+    }
+    
+    error_log("Error loading required files in wallet.php: " . $e->getMessage());
+    
+    echo json_encode([
+        'success' => false,
+        'error' => 'Ошибка загрузки конфигурации: ' . $e->getMessage()
+    ]);
+    exit;
+}
+
+// Устанавливаем заголовки после загрузки всех файлов
 header('Content-Type: application/json');
 setCorsHeaders();
 header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    ob_end_clean();
     http_response_code(200);
     exit;
 }
-
-require_once __DIR__ . '/../config/database.php';
-require_once __DIR__ . '/../config/supabase.php';
-require_once __DIR__ . '/auth.php';
 
 // Получение рыночных цен для конвертации в USD (использует реальный API)
 function getUsdPrices(): array {
@@ -90,6 +162,19 @@ $method = $_SERVER['REQUEST_METHOD'];
 $action = $_GET['action'] ?? '';
 
 try {
+    // Проверяем существование необходимых функций
+    if (!function_exists('getAuthUser')) {
+        throw new Exception('Function getAuthUser() is not defined. Check if auth.php is loaded correctly.', 500);
+    }
+    
+    if (!function_exists('getDB')) {
+        throw new Exception('Function getDB() is not defined. Check if database.php is loaded correctly.', 500);
+    }
+    
+    if (!function_exists('setCorsHeaders')) {
+        throw new Exception('Function setCorsHeaders() is not defined. Check if database.php is loaded correctly.', 500);
+    }
+    
     $user = getAuthUser();
     
     // Логируем информацию о пользователе
@@ -156,6 +241,11 @@ try {
                 
                 // Логируем итоговую информацию
                 error_log("Wallet balances API: user_id={$user['id']}, balances_count=" . count($balances) . ", total_usd={$totalUsd}");
+                
+                // Очищаем буфер перед выводом JSON
+                if (ob_get_level() > 0) {
+                    ob_end_clean();
+                }
                 
                 echo json_encode([
                     'success' => true,
@@ -359,7 +449,42 @@ try {
             throw new Exception('Unknown action', 400);
     }
     
+} catch (PDOException $e) {
+    // Очищаем буфер перед выводом ошибки
+    if (ob_get_level() > 0) {
+        ob_end_clean();
+    }
+    
+    // Устанавливаем заголовки, если еще не установлены
+    if (!headers_sent()) {
+        header('Content-Type: application/json');
+    }
+    
+    $code = 500;
+    http_response_code($code);
+    
+    // Логируем детали ошибки базы данных
+    error_log("Wallet API PDOException: " . $e->getMessage());
+    error_log("Wallet API PDOException SQL State: " . $e->getCode());
+    error_log("Wallet API PDOException Trace: " . $e->getTraceAsString());
+    
+    echo json_encode([
+        'success' => false,
+        'error' => 'Database error occurred. Please try again later.',
+        'debug' => (defined('DEBUG') && DEBUG) ? $e->getMessage() : null
+    ], JSON_UNESCAPED_UNICODE);
+    
 } catch (Exception $e) {
+    // Очищаем буфер перед выводом ошибки
+    if (ob_get_level() > 0) {
+        ob_end_clean();
+    }
+    
+    // Устанавливаем заголовки, если еще не установлены
+    if (!headers_sent()) {
+        header('Content-Type: application/json');
+    }
+    
     $code = $e->getCode();
     // Валидация и приведение к int
     if (!is_numeric($code) || $code < 100 || $code > 599) {
@@ -368,8 +493,47 @@ try {
     $code = (int)$code;
     http_response_code($code);
     
+    // Логируем детали ошибки
+    error_log("Wallet API Exception: " . $e->getMessage());
+    error_log("Wallet API Exception Code: " . $code);
+    error_log("Wallet API Exception File: " . $e->getFile() . ":" . $e->getLine());
+    error_log("Wallet API Exception Trace: " . $e->getTraceAsString());
+    
     echo json_encode([
         'success' => false,
-        'error' => $e->getMessage()
-    ]);
+        'error' => $e->getMessage(),
+        'debug' => (defined('DEBUG') && DEBUG) ? [
+            'file' => basename($e->getFile()),
+            'line' => $e->getLine(),
+            'trace' => $e->getTraceAsString()
+        ] : null
+    ], JSON_UNESCAPED_UNICODE);
+    
+} catch (Throwable $e) {
+    // Обработка всех остальных ошибок (Error, TypeError и т.д.)
+    if (ob_get_level() > 0) {
+        ob_end_clean();
+    }
+    
+    if (!headers_sent()) {
+        header('Content-Type: application/json');
+    }
+    
+    http_response_code(500);
+    
+    error_log("Wallet API Throwable: " . $e->getMessage());
+    error_log("Wallet API Throwable Type: " . get_class($e));
+    error_log("Wallet API Throwable File: " . $e->getFile() . ":" . $e->getLine());
+    error_log("Wallet API Throwable Trace: " . $e->getTraceAsString());
+    
+    echo json_encode([
+        'success' => false,
+        'error' => 'An unexpected error occurred. Please try again later.',
+        'debug' => (defined('DEBUG') && DEBUG) ? [
+            'type' => get_class($e),
+            'message' => $e->getMessage(),
+            'file' => basename($e->getFile()),
+            'line' => $e->getLine()
+        ] : null
+    ], JSON_UNESCAPED_UNICODE);
 }
