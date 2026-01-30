@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест API Wallet - ADX Finance</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f0f0f;
+            color: #e0e0e0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header {
+            background: #1a1a1a;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 1px solid #333;
+        }
+        h1 { color: #fff; margin-bottom: 10px; }
+        .test-section {
+            background: #1a1a1a;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 1px solid #333;
+        }
+        .test-title { font-weight: 600; color: #fff; margin-bottom: 15px; font-size: 18px; }
+        .btn {
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        .btn:hover { background: #5568d3; }
+        .btn:disabled { background: #555; cursor: not-allowed; }
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            background: #0f0f0f;
+            border-radius: 4px;
+            border: 1px solid #333;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .result.success { border-color: #28a745; }
+        .result.error { border-color: #dc3545; }
+        .status {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-right: 10px;
+        }
+        .status.success { background: #28a745; color: white; }
+        .status.error { background: #dc3545; color: white; }
+        .status.info { background: #17a2b8; color: white; }
+        .info-box {
+            background: #252525;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            border-left: 4px solid #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 Тест API Wallet</h1>
+            <p style="color: #999;">Проверка работы /api/wallet.php</p>
+        </div>
+        
+        <div class="test-section">
+            <div class="test-title">Информация о авторизации</div>
+            <div class="info-box" id="authInfo">
+                Проверка...
+            </div>
+            <button class="btn" onclick="checkAuth()">🔄 Проверить авторизацию</button>
+        </div>
+        
+        <div class="test-section">
+            <div class="test-title">Тест 1: Получение балансов</div>
+            <button class="btn" onclick="testBalances()">📊 Получить балансы</button>
+            <div class="result" id="balancesResult" style="display: none;"></div>
+        </div>
+        
+        <div class="test-section">
+            <div class="test-title">Тест 2: Получение транзакций</div>
+            <button class="btn" onclick="testTransactions()">📝 Получить транзакции</button>
+            <div class="result" id="transactionsResult" style="display: none;"></div>
+        </div>
+        
+        <div class="test-section">
+            <div class="test-title">Тест 3: Полная проверка</div>
+            <button class="btn" onclick="testAll()">🚀 Запустить все тесты</button>
+            <div class="result" id="allResults" style="display: none;"></div>
+        </div>
+    </div>
+    
+    <script>
+        // Проверка авторизации
+        function checkAuth() {
+            const token = localStorage.getItem('auth_token');
+            const user = localStorage.getItem('auth_user');
+            
+            const infoBox = document.getElementById('authInfo');
+            
+            if (token) {
+                let userInfo = 'Неизвестно';
+                try {
+                    if (user) {
+                        const userObj = JSON.parse(user);
+                        userInfo = userObj.email || userObj.id || 'ID: ' + userObj.id;
+                    }
+                } catch (e) {
+                    userInfo = 'Ошибка парсинга';
+                }
+                
+                infoBox.innerHTML = `
+                    <div><span class="status success">✓ Авторизован</span></div>
+                    <div style="margin-top: 10px;">Пользователь: <strong>${userInfo}</strong></div>
+                    <div style="margin-top: 5px;">Токен: <code style="font-size: 11px;">${token.substring(0, 20)}...</code></div>
+                `;
+            } else {
+                infoBox.innerHTML = `
+                    <div><span class="status error">✗ Не авторизован</span></div>
+                    <div style="margin-top: 10px;">Войдите на сайте, чтобы протестировать API</div>
+                `;
+            }
+        }
+        
+        // Получение токена
+        function getToken() {
+            return localStorage.getItem('auth_token') || '';
+        }
+        
+        // Тест балансов
+        async function testBalances() {
+            const resultDiv = document.getElementById('balancesResult');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result';
+            resultDiv.textContent = 'Загрузка...';
+            
+            const token = getToken();
+            if (!token) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = 'Ошибка: Не авторизован. Войдите на сайте.';
+                return;
+            }
+            
+            try {
+                const startTime = performance.now();
+                const response = await fetch('/api/wallet.php?action=balances&_t=' + Date.now(), {
+                    headers: {
+                        'Authorization': 'Bearer ' + token
+                    }
+                });
+                const endTime = performance.now();
+                const responseTime = Math.round(endTime - startTime);
+                
+                const contentType = response.headers.get('content-type');
+                const isJson = contentType && contentType.includes('application/json');
+                
+                let data;
+                if (isJson) {
+                    data = await response.json();
+                } else {
+                    const text = await response.text();
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `ОШИБКА: Сервер вернул не JSON!\n\nStatus: ${response.status} ${response.statusText}\nContent-Type: ${contentType}\n\nОтвет:\n${text.substring(0, 500)}`;
+                    return;
+                }
+                
+                if (response.ok && data.success) {
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = `✓ УСПЕХ (${responseTime}ms)\n\n` + JSON.stringify(data, null, 2);
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `✗ ОШИБКА (${responseTime}ms)\n\nStatus: ${response.status}\n\n` + JSON.stringify(data, null, 2);
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `✗ ОШИБКА СЕТИ\n\n${error.message}\n\n${error.stack}`;
+            }
+        }
+        
+        // Тест транзакций
+        async function testTransactions() {
+            const resultDiv = document.getElementById('transactionsResult');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result';
+            resultDiv.textContent = 'Загрузка...';
+            
+            const token = getToken();
+            if (!token) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = 'Ошибка: Не авторизован. Войдите на сайте.';
+                return;
+            }
+            
+            try {
+                const startTime = performance.now();
+                const response = await fetch('/api/wallet.php?action=transactions&limit=10&_t=' + Date.now(), {
+                    headers: {
+                        'Authorization': 'Bearer ' + token
+                    }
+                });
+                const endTime = performance.now();
+                const responseTime = Math.round(endTime - startTime);
+                
+                const contentType = response.headers.get('content-type');
+                const isJson = contentType && contentType.includes('application/json');
+                
+                let data;
+                if (isJson) {
+                    data = await response.json();
+                } else {
+                    const text = await response.text();
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `ОШИБКА: Сервер вернул не JSON!\n\nStatus: ${response.status} ${response.statusText}\nContent-Type: ${contentType}\n\nОтвет:\n${text.substring(0, 500)}`;
+                    return;
+                }
+                
+                if (response.ok && data.success) {
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = `✓ УСПЕХ (${responseTime}ms)\n\n` + JSON.stringify(data, null, 2);
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `✗ ОШИБКА (${responseTime}ms)\n\nStatus: ${response.status}\n\n` + JSON.stringify(data, null, 2);
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `✗ ОШИБКА СЕТИ\n\n${error.message}\n\n${error.stack}`;
+            }
+        }
+        
+        // Полная проверка
+        async function testAll() {
+            const resultDiv = document.getElementById('allResults');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result';
+            resultDiv.textContent = 'Запуск всех тестов...\n\n';
+            
+            const token = getToken();
+            if (!token) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = 'Ошибка: Не авторизован. Войдите на сайте.';
+                return;
+            }
+            
+            let results = [];
+            
+            // Тест 1: Балансы
+            results.push('=== ТЕСТ 1: Балансы ===');
+            try {
+                const start1 = performance.now();
+                const res1 = await fetch('/api/wallet.php?action=balances&_t=' + Date.now(), {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                const time1 = Math.round(performance.now() - start1);
+                const contentType1 = res1.headers.get('content-type');
+                const isJson1 = contentType1 && contentType1.includes('application/json');
+                
+                if (isJson1) {
+                    const data1 = await res1.json();
+                    if (res1.ok && data1.success) {
+                        results.push(`✓ УСПЕХ (${time1}ms)`);
+                        results.push(JSON.stringify(data1, null, 2));
+                    } else {
+                        results.push(`✗ ОШИБКА (${time1}ms, Status: ${res1.status})`);
+                        results.push(JSON.stringify(data1, null, 2));
+                    }
+                } else {
+                    const text1 = await res1.text();
+                    results.push(`✗ ОШИБКА: Не JSON (Status: ${res1.status})`);
+                    results.push(text1.substring(0, 300));
+                }
+            } catch (err) {
+                results.push(`✗ ОШИБКА СЕТИ: ${err.message}`);
+            }
+            
+            results.push('\n\n=== ТЕСТ 2: Транзакции ===');
+            try {
+                const start2 = performance.now();
+                const res2 = await fetch('/api/wallet.php?action=transactions&limit=10&_t=' + Date.now(), {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                const time2 = Math.round(performance.now() - start2);
+                const contentType2 = res2.headers.get('content-type');
+                const isJson2 = contentType2 && contentType2.includes('application/json');
+                
+                if (isJson2) {
+                    const data2 = await res2.json();
+                    if (res2.ok && data2.success) {
+                        results.push(`✓ УСПЕХ (${time2}ms)`);
+                        results.push(JSON.stringify(data2, null, 2));
+                    } else {
+                        results.push(`✗ ОШИБКА (${time2}ms, Status: ${res2.status})`);
+                        results.push(JSON.stringify(data2, null, 2));
+                    }
+                } else {
+                    const text2 = await res2.text();
+                    results.push(`✗ ОШИБКА: Не JSON (Status: ${res2.status})`);
+                    results.push(text2.substring(0, 300));
+                }
+            } catch (err) {
+                results.push(`✗ ОШИБКА СЕТИ: ${err.message}`);
+            }
+            
+            resultDiv.textContent = results.join('\n');
+            
+            // Определяем класс результата
+            const hasError = results.some(r => r.includes('✗'));
+            resultDiv.className = hasError ? 'result error' : 'result success';
+        }
+        
+        // Автоматическая проверка при загрузке
+        window.addEventListener('DOMContentLoaded', () => {
+            checkAuth();
+        });
+    </script>
+</body>
+</html>
