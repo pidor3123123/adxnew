@@ -4,29 +4,76 @@
  * Проверка доступности соединений с MySQL и Supabase
  */
 
-// Включаем буферизацию вывода
-ob_start();
+// ВАЖНО: Включаем буферизацию вывода ПЕРВЫМ делом
+if (!ob_get_level()) {
+    ob_start();
+}
 
-// Загружаем необходимые файлы
-try {
-    require_once __DIR__ . '/../config/database.php';
-    require_once __DIR__ . '/../config/supabase.php';
-} catch (Exception $e) {
-    ob_end_clean();
-    header('Content-Type: application/json');
-    setCorsHeaders();
-    echo json_encode([
-        'mysql' => false,
-        'supabase' => false,
-        'error' => 'Configuration error: ' . $e->getMessage(),
-        'timestamp' => date('Y-m-d H:i:s')
-    ]);
+// Функция для безопасного вывода JSON ответа
+function outputHealthJson($data, $code = 200) {
+    // Очищаем все уровни буфера
+    while (ob_get_level() > 0) {
+        ob_end_clean();
+    }
+    
+    // Устанавливаем заголовки если еще не установлены
+    if (!headers_sent()) {
+        header('Content-Type: application/json; charset=UTF-8');
+        http_response_code($code);
+        
+        // Устанавливаем CORS заголовки
+        if (function_exists('setCorsHeaders')) {
+            setCorsHeaders();
+        } else {
+            header('Access-Control-Allow-Origin: *');
+        }
+    }
+    
+    echo json_encode($data, JSON_UNESCAPED_UNICODE);
     exit;
 }
 
-// Устанавливаем заголовки
-header('Content-Type: application/json');
-setCorsHeaders();
+// Загружаем необходимые файлы с проверкой существования
+$requiredFiles = [
+    __DIR__ . '/../config/database.php',
+    __DIR__ . '/../config/supabase.php'
+];
+
+foreach ($requiredFiles as $file) {
+    if (!file_exists($file)) {
+        error_log("Required file not found in health.php: $file");
+        outputHealthJson([
+            'mysql' => false,
+            'supabase' => false,
+            'error' => 'Configuration file not found: ' . basename($file),
+            'timestamp' => date('Y-m-d H:i:s')
+        ], 500);
+    }
+    
+    try {
+        require_once $file;
+    } catch (Throwable $e) {
+        error_log("Error loading file in health.php: $file - " . $e->getMessage());
+        outputHealthJson([
+            'mysql' => false,
+            'supabase' => false,
+            'error' => 'Configuration error: ' . $e->getMessage() . ' in ' . basename($file),
+            'timestamp' => date('Y-m-d H:i:s')
+        ], 500);
+    }
+}
+
+// Устанавливаем заголовки после загрузки всех файлов
+if (!headers_sent()) {
+    header('Content-Type: application/json; charset=UTF-8');
+    
+    // Устанавливаем CORS заголовки если функция доступна
+    if (function_exists('setCorsHeaders')) {
+        setCorsHeaders();
+    } else {
+        header('Access-Control-Allow-Origin: *');
+    }
+}
 
 // Устанавливаем таймаут для быстрого ответа
 set_time_limit(5);
@@ -68,6 +115,5 @@ try {
     $result['supabase_error'] = $e->getMessage();
 }
 
-// Очищаем буфер и выводим результат
-ob_end_clean();
-echo json_encode($result, JSON_UNESCAPED_UNICODE);
+// Выводим результат через безопасную функцию
+outputHealthJson($result, 200);

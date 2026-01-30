@@ -3,10 +3,73 @@
  * ADX Finance - API кошелька
  * Работает ТОЛЬКО с Supabase (Single Source of Truth)
  * Все операции с балансом выполняются через транзакции
+ * 
+ * Версия: 2.0.1
+ * Дата обновления: 2026-01-30
+ * Исправления: Улучшена обработка ошибок, все ответы в формате JSON
  */
 
-// Включаем буферизацию вывода для предотвращения попадания предупреждений в JSON
-ob_start();
+// ВАЖНО: Включаем буферизацию вывода ПЕРВЫМ делом, до любых других операций
+// Это должно быть ПЕРВОЙ строкой после открывающего тега PHP
+if (!ob_get_level()) {
+    @ob_start();
+}
+
+// Функция для безопасного вывода JSON ошибки
+// Должна быть определена ДО установки обработчиков ошибок
+function outputJsonError($message, $code = 500, $details = null) {
+    // Очищаем все уровни буфера
+    while (ob_get_level() > 0) {
+        @ob_end_clean();
+    }
+    
+    // Устанавливаем заголовки если еще не установлены
+    if (!headers_sent()) {
+        @header('Content-Type: application/json; charset=UTF-8');
+        @http_response_code($code);
+        @header('Access-Control-Allow-Origin: *');
+        @header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
+        @header('Access-Control-Allow-Headers: Content-Type, Authorization');
+    }
+    
+    $response = [
+        'success' => false,
+        'error' => $message,
+        'version' => '2.0.1' // Для диагностики версии файла
+    ];
+    
+    if ($details !== null) {
+        $response['details'] = $details;
+    }
+    
+    @echo json_encode($response, JSON_UNESCAPED_UNICODE);
+    @exit;
+}
+
+// Функция для безопасного вывода JSON успешного ответа
+function outputJsonSuccess($data, $code = 200) {
+    // Очищаем все уровни буфера
+    while (ob_get_level() > 0) {
+        @ob_end_clean();
+    }
+    
+    // Устанавливаем заголовки если еще не установлены
+    if (!headers_sent()) {
+        @header('Content-Type: application/json; charset=UTF-8');
+        @http_response_code($code);
+        if (function_exists('setCorsHeaders')) {
+            @setCorsHeaders();
+        } else {
+            @header('Access-Control-Allow-Origin: *');
+        }
+        @header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
+        @header('Access-Control-Allow-Headers: Content-Type, Authorization');
+    }
+    
+    $response = array_merge(['success' => true], $data);
+    @echo json_encode($response, JSON_UNESCAPED_UNICODE);
+    @exit;
+}
 
 // Глобальная обработка ошибок для конвертации всех PHP ошибок в JSON
 set_error_handler(function($severity, $message, $file, $line) {
@@ -15,82 +78,79 @@ set_error_handler(function($severity, $message, $file, $line) {
         return false;
     }
     
-    // Очищаем буфер и устанавливаем заголовки
-    if (ob_get_level() > 0) {
-        ob_end_clean();
-    }
+    // Логируем ошибку
+    error_log("PHP Error in wallet.php [Severity: $severity]: $message in $file:$line");
     
-    if (!headers_sent()) {
-        header('Content-Type: application/json');
-        http_response_code(500);
-    }
+    // Выводим JSON ошибку
+    outputJsonError(
+        'PHP Error: ' . $message . ' in ' . basename($file) . ':' . $line,
+        500,
+        ['severity' => $severity, 'file' => basename($file), 'line' => $line]
+    );
     
-    error_log("PHP Error in wallet.php: $message in $file:$line");
-    
-    echo json_encode([
-        'success' => false,
-        'error' => 'PHP Error: ' . $message . ' in ' . basename($file) . ':' . $line
-    ]);
-    exit;
-});
+    return true;
+}, E_ALL & ~E_NOTICE & ~E_WARNING);
 
 // Обработка фатальных ошибок
 register_shutdown_function(function() {
     $error = error_get_last();
-    if ($error !== null && in_array($error['type'], [E_ERROR, E_CORE_ERROR, E_COMPILE_ERROR, E_PARSE])) {
-        if (ob_get_level() > 0) {
-            ob_end_clean();
-        }
+    if ($error !== null && in_array($error['type'], [E_ERROR, E_CORE_ERROR, E_COMPILE_ERROR, E_PARSE, E_RECOVERABLE_ERROR])) {
+        error_log("Fatal Error in wallet.php [Type: {$error['type']}]: {$error['message']} in {$error['file']}:{$error['line']}");
         
-        if (!headers_sent()) {
-            header('Content-Type: application/json');
-            http_response_code(500);
-        }
-        
-        error_log("Fatal Error in wallet.php: {$error['message']} in {$error['file']}:{$error['line']}");
-        
-        echo json_encode([
-            'success' => false,
-            'error' => 'Fatal Error: ' . $error['message'] . ' in ' . basename($error['file']) . ':' . $error['line']
-        ]);
-        exit;
+        outputJsonError(
+            'Fatal Error: ' . $error['message'] . ' in ' . basename($error['file']) . ':' . $error['line'],
+            500,
+            ['type' => $error['type'], 'file' => basename($error['file']), 'line' => $error['line']]
+        );
     }
 });
 
-// Загружаем необходимые файлы
-try {
-    require_once __DIR__ . '/../config/database.php';
-    require_once __DIR__ . '/../config/supabase.php';
-    require_once __DIR__ . '/auth.php';
+// Загружаем необходимые файлы с проверкой существования
+$requiredFiles = [
+    __DIR__ . '/../config/database.php',
+    __DIR__ . '/../config/supabase.php',
+    __DIR__ . '/auth.php'
+];
+
+foreach ($requiredFiles as $file) {
+    if (!file_exists($file)) {
+        error_log("Required file not found in wallet.php: $file");
+        outputJsonError("Ошибка загрузки: файл не найден - " . basename($file), 500);
+    }
     
-    // Загружаем sync.php для функции syncUserToSupabase
-    if (file_exists(__DIR__ . '/sync.php')) {
+    try {
+        require_once $file;
+    } catch (Throwable $e) {
+        error_log("Error loading file in wallet.php: $file - " . $e->getMessage());
+        outputJsonError("Ошибка загрузки файла: " . basename($file) . " - " . $e->getMessage(), 500);
+    }
+}
+
+// Загружаем sync.php для функции syncUserToSupabase (опционально)
+if (file_exists(__DIR__ . '/sync.php')) {
+    try {
         require_once __DIR__ . '/sync.php';
+    } catch (Throwable $e) {
+        error_log("Warning: Could not load sync.php in wallet.php: " . $e->getMessage());
+        // Не критично, продолжаем работу
     }
-} catch (Exception $e) {
-    if (ob_get_level() > 0) {
-        ob_end_clean();
-    }
-    
-    if (!headers_sent()) {
-        header('Content-Type: application/json');
-        http_response_code(500);
-    }
-    
-    error_log("Error loading required files in wallet.php: " . $e->getMessage());
-    
-    echo json_encode([
-        'success' => false,
-        'error' => 'Ошибка загрузки конфигурации: ' . $e->getMessage()
-    ]);
-    exit;
 }
 
 // Устанавливаем заголовки после загрузки всех файлов
-header('Content-Type: application/json');
-setCorsHeaders();
-header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
+if (!headers_sent()) {
+    header('Content-Type: application/json; charset=UTF-8');
+    
+    // Устанавливаем CORS заголовки если функция доступна
+    if (function_exists('setCorsHeaders')) {
+        setCorsHeaders();
+    } else {
+        // Fallback если функция не загружена
+        header('Access-Control-Allow-Origin: *');
+    }
+    
+    header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
+    header('Access-Control-Allow-Headers: Content-Type, Authorization');
+}
 
 /**
  * Установка заголовков для предотвращения кеширования
@@ -103,9 +163,17 @@ function setNoCacheHeaders(): void {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    ob_end_clean();
-    http_response_code(200);
-    exit;
+    while (ob_get_level() > 0) {
+        @ob_end_clean();
+    }
+    if (!headers_sent()) {
+        @header('Content-Type: application/json; charset=UTF-8');
+        @header('Access-Control-Allow-Origin: *');
+        @header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
+        @header('Access-Control-Allow-Headers: Content-Type, Authorization');
+    }
+    @http_response_code(200);
+    @exit;
 }
 
 /**
@@ -334,30 +402,20 @@ try {
                             error_log("Wallet balances API: Sync exception trace: " . $syncError->getTraceAsString());
                             
                             // Возвращаем пустой баланс, если синхронизация не удалась
-                            if (ob_get_level() > 0) {
-                                ob_end_clean();
-                            }
-                            echo json_encode([
-                                'success' => true,
+                            outputJsonSuccess([
                                 'balances' => [],
                                 'total_usd' => 0,
                                 'warning' => 'User not synchronized with Supabase. Please contact support.'
-                            ], JSON_UNESCAPED_UNICODE);
-                            exit;
+                            ]);
                         }
                     } else {
                         // Если синхронизация недоступна, возвращаем пустой баланс
                         error_log("Wallet balances API: syncUserToSupabase function not available or user ID missing. User ID: " . ($user['id'] ?? 'N/A'));
-                        if (ob_get_level() > 0) {
-                            ob_end_clean();
-                        }
-                        echo json_encode([
-                            'success' => true,
+                        outputJsonSuccess([
                             'balances' => [],
                             'total_usd' => 0,
                             'warning' => 'User not synchronized with Supabase. Please contact support.'
-                        ], JSON_UNESCAPED_UNICODE);
-                        exit;
+                        ]);
                     }
                 }
                 

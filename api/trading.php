@@ -3,12 +3,89 @@
  * ADX Finance - API торговли
  */
 
-require_once __DIR__ . '/../config/database.php';
+// ВАЖНО: Включаем буферизацию вывода ПЕРВЫМ делом
+if (!ob_get_level()) {
+    ob_start();
+}
 
-header('Content-Type: application/json');
-setCorsHeaders();
-header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
+// Функция для безопасного вывода JSON ошибки
+function outputJsonError($message, $code = 500, $details = null) {
+    while (ob_get_level() > 0) {
+        ob_end_clean();
+    }
+    
+    if (!headers_sent()) {
+        header('Content-Type: application/json; charset=UTF-8');
+        http_response_code($code);
+        if (function_exists('setCorsHeaders')) {
+            setCorsHeaders();
+        } else {
+            header('Access-Control-Allow-Origin: *');
+        }
+        header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
+        header('Access-Control-Allow-Headers: Content-Type, Authorization');
+    }
+    
+    $response = ['success' => false, 'error' => $message];
+    if ($details !== null) {
+        $response['details'] = $details;
+    }
+    
+    echo json_encode($response, JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+// Глобальная обработка ошибок
+set_error_handler(function($severity, $message, $file, $line) {
+    if (!(error_reporting() & $severity)) {
+        return false;
+    }
+    error_log("PHP Error in trading.php [Severity: $severity]: $message in $file:$line");
+    outputJsonError('PHP Error: ' . $message . ' in ' . basename($file) . ':' . $line, 500);
+    return true;
+}, E_ALL & ~E_NOTICE & ~E_WARNING);
+
+// Обработка фатальных ошибок
+register_shutdown_function(function() {
+    $error = error_get_last();
+    if ($error !== null && in_array($error['type'], [E_ERROR, E_CORE_ERROR, E_COMPILE_ERROR, E_PARSE, E_RECOVERABLE_ERROR])) {
+        error_log("Fatal Error in trading.php [Type: {$error['type']}]: {$error['message']} in {$error['file']}:{$error['line']}");
+        outputJsonError('Fatal Error: ' . $error['message'] . ' in ' . basename($error['file']) . ':' . $error['line'], 500);
+    }
+});
+
+// Загружаем необходимые файлы с проверкой
+$requiredFiles = [
+    __DIR__ . '/../config/database.php',
+    __DIR__ . '/auth.php',
+    __DIR__ . '/../config/supabase.php'
+];
+
+foreach ($requiredFiles as $file) {
+    if (!file_exists($file)) {
+        error_log("Required file not found in trading.php: $file");
+        outputJsonError("Ошибка загрузки: файл не найден - " . basename($file), 500);
+    }
+    
+    try {
+        require_once $file;
+    } catch (Throwable $e) {
+        error_log("Error loading file in trading.php: $file - " . $e->getMessage());
+        outputJsonError("Ошибка загрузки файла: " . basename($file) . " - " . $e->getMessage(), 500);
+    }
+}
+
+// Устанавливаем заголовки после загрузки всех файлов
+if (!headers_sent()) {
+    header('Content-Type: application/json; charset=UTF-8');
+    if (function_exists('setCorsHeaders')) {
+        setCorsHeaders();
+    } else {
+        header('Access-Control-Allow-Origin: *');
+    }
+    header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
+    header('Access-Control-Allow-Headers: Content-Type, Authorization');
+}
 
 /**
  * Установка заголовков для предотвращения кеширования
@@ -20,13 +97,10 @@ function setNoCacheHeaders(): void {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    ob_end_clean();
     http_response_code(200);
     exit;
 }
-
-require_once __DIR__ . '/../config/database.php';
-require_once __DIR__ . '/auth.php';
-require_once __DIR__ . '/../config/supabase.php';
 
 // Получение пользователя из токена
 function getAuthUser(): ?array {

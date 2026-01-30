@@ -21,6 +21,8 @@ const DBMonitor = {
      * Проверка соединений с базами данных
      */
     async checkConnections() {
+        const fullUrl = this.HEALTH_CHECK_URL + '?_t=' + Date.now();
+        
         try {
             const startTime = performance.now();
             
@@ -28,25 +30,82 @@ const DBMonitor = {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 5000);
             
-            const response = await fetch(this.HEALTH_CHECK_URL + '?_t=' + Date.now(), {
-                method: 'GET',
-                headers: {
-                    'Cache-Control': 'no-cache, no-store, must-revalidate',
-                    'Pragma': 'no-cache'
-                },
-                cache: 'no-store',
-                signal: controller.signal
-            });
+            let response;
+            try {
+                response = await fetch(fullUrl, {
+                    method: 'GET',
+                    headers: {
+                        'Cache-Control': 'no-cache, no-store, must-revalidate',
+                        'Pragma': 'no-cache'
+                    },
+                    cache: 'no-store',
+                    signal: controller.signal
+                });
+            } catch (fetchError) {
+                clearTimeout(timeoutId);
+                const responseTime = Math.round(performance.now() - startTime);
+                
+                // Детальное логирование ошибки fetch
+                if (window.Logger) {
+                    window.Logger.error('Database health check failed (fetch error)', {
+                        error: fetchError.message,
+                        name: fetchError.name,
+                        url: fullUrl,
+                        responseTime: responseTime + 'ms',
+                        type: fetchError.name === 'AbortError' ? 'timeout' : 'network'
+                    });
+                }
+                
+                throw new Error(`Network error: ${fetchError.message} (${fetchError.name})`);
+            }
             
             clearTimeout(timeoutId);
             
             const responseTime = Math.round(performance.now() - startTime);
             
+            // Проверяем статус ответа
             if (!response.ok) {
-                throw new Error(`Health check failed: ${response.status} ${response.statusText}`);
+                // Пытаемся получить тело ответа для диагностики
+                let responseText = '';
+                try {
+                    responseText = await response.text();
+                } catch (e) {
+                    responseText = 'Could not read response body';
+                }
+                
+                // Детальное логирование ошибки HTTP
+                if (window.Logger) {
+                    window.Logger.error('Database health check failed (HTTP error)', {
+                        status: response.status,
+                        statusText: response.statusText,
+                        url: fullUrl,
+                        responseTime: responseTime + 'ms',
+                        contentType: response.headers.get('content-type'),
+                        responsePreview: responseText.substring(0, 200)
+                    });
+                }
+                
+                throw new Error(`HTTP ${response.status} ${response.statusText}: ${responseText.substring(0, 100)}`);
             }
             
-            const data = await response.json();
+            // Пытаемся распарсить JSON
+            let data;
+            try {
+                const responseText = await response.text();
+                data = JSON.parse(responseText);
+            } catch (parseError) {
+                // Детальное логирование ошибки парсинга
+                if (window.Logger) {
+                    window.Logger.error('Database health check failed (JSON parse error)', {
+                        error: parseError.message,
+                        url: fullUrl,
+                        responseTime: responseTime + 'ms',
+                        contentType: response.headers.get('content-type')
+                    });
+                }
+                
+                throw new Error(`Invalid JSON response: ${parseError.message}`);
+            }
             
             const currentStatus = {
                 mysql: data.mysql === true,
@@ -105,18 +164,30 @@ const DBMonitor = {
             
             return currentStatus;
         } catch (error) {
-            // Ошибка сети или таймаут
+            // Ошибка сети, таймаут или парсинг
             const errorStatus = {
                 mysql: false,
                 supabase: false,
                 timestamp: new Date().toISOString(),
-                error: error.message
+                error: error.message,
+                errorType: error.name,
+                url: fullUrl
             };
             
+            // Детальное логирование с полной информацией
             if (window.Logger) {
                 window.Logger.error('Database health check failed', {
                     error: error.message,
-                    name: error.name
+                    name: error.name,
+                    url: fullUrl,
+                    stack: error.stack ? error.stack.split('\n').slice(0, 3).join(' | ') : null
+                });
+            } else {
+                // Fallback логирование в консоль
+                console.error('[DBMonitor] Health check failed:', {
+                    error: error.message,
+                    name: error.name,
+                    url: fullUrl
                 });
             }
             
