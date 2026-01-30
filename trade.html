@@ -843,11 +843,19 @@
                     
                     <!-- Trading Terminal -->
                     <div class="trading-terminal" style="background: var(--bg-secondary); padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px;">
-                        <!-- Buy/Sell Tabs -->
-                        <div class="trade-tabs" style="display: flex; gap: 4px; background: var(--bg-tertiary); padding: 4px; border-radius: 6px;">
-                            <button class="trade-tab buy active" data-side="buy" style="flex: 1; padding: 8px 12px; background: transparent; border: none; color: var(--text-secondary); font-size: 0.875rem; font-weight: 500; cursor: pointer; border-radius: 4px; transition: all 150ms ease;">Купить</button>
-                            <button class="trade-tab sell" data-side="sell" style="flex: 1; padding: 8px 12px; background: transparent; border: none; color: var(--text-secondary); font-size: 0.875rem; font-weight: 500; cursor: pointer; border-radius: 4px; transition: all 150ms ease;">Продать</button>
+                        <!-- Trade Mode Tabs -->
+                        <div class="trade-mode-tabs" style="display: flex; gap: 4px; background: var(--bg-tertiary); padding: 4px; border-radius: 6px; margin-bottom: 4px;">
+                            <button class="trade-mode-tab active" data-mode="normal" style="flex: 1; padding: 6px 10px; background: var(--bg-active); border: none; color: var(--text-primary); font-size: 0.8125rem; font-weight: 500; cursor: pointer; border-radius: 4px; transition: all 150ms ease;">Обычная</button>
+                            <button class="trade-mode-tab" data-mode="quick" style="flex: 1; padding: 6px 10px; background: transparent; border: none; color: var(--text-secondary); font-size: 0.8125rem; font-weight: 500; cursor: pointer; border-radius: 4px; transition: all 150ms ease;">Быстрая</button>
                         </div>
+                        
+                        <!-- Normal Trade Mode -->
+                        <div id="normalTradeMode" class="trade-mode-content" style="display: flex; flex-direction: column; gap: 12px;">
+                            <!-- Buy/Sell Tabs -->
+                            <div class="trade-tabs" style="display: flex; gap: 4px; background: var(--bg-tertiary); padding: 4px; border-radius: 6px;">
+                                <button class="trade-tab buy active" data-side="buy" style="flex: 1; padding: 8px 12px; background: #22c55e; border: none; color: #000; font-size: 0.875rem; font-weight: 500; cursor: pointer; border-radius: 4px; transition: all 150ms ease;">Купить</button>
+                                <button class="trade-tab sell" data-side="sell" style="flex: 1; padding: 8px 12px; background: transparent; border: none; color: var(--text-secondary); font-size: 0.875rem; font-weight: 500; cursor: pointer; border-radius: 4px; transition: all 150ms ease;">Продать</button>
+                            </div>
                         
                         <!-- Order Type Tabs -->
                         <div class="order-type-tabs" style="display: flex; gap: 4px; background: var(--bg-tertiary); padding: 4px; border-radius: 6px;">
@@ -901,10 +909,107 @@
                             </div>
                         </div>
                         
-                        <!-- Action Button -->
-                        <button type="button" class="trade-action-btn buy" id="submitTradeBtn" style="width: 100%; padding: 12px; border: none; border-radius: 6px; font-size: 0.9375rem; font-weight: 600; cursor: pointer; transition: all 150ms ease; background: #22c55e; color: #000;">
-                            Купить BTC
-                        </button>
+                            <!-- Action Button -->
+                            <button type="button" class="trade-action-btn buy" id="submitTradeBtn" style="width: 100%; padding: 12px; border: none; border-radius: 6px; font-size: 0.9375rem; font-weight: 600; cursor: pointer; transition: all 150ms ease; background: #22c55e; color: #000;">
+                                Купить BTC
+                            </button>
+                        </div>
+                        
+                        <!-- Quick Trade Mode -->
+                        <div id="quickTradeMode" class="trade-mode-content" style="display: none; flex-direction: column; gap: 12px;">
+                            <!-- Buy/Sell Tabs -->
+                            <div class="trade-tabs" style="display: flex; gap: 4px; background: var(--bg-tertiary); padding: 4px; border-radius: 6px;">
+                                <button class="trade-tab buy active" data-side="buy" data-mode="quick" style="flex: 1; padding: 8px 12px; background: #22c55e; border: none; color: #000; font-size: 0.875rem; font-weight: 500; cursor: pointer; border-radius: 4px; transition: all 150ms ease;">Купить</button>
+                                <button class="trade-tab sell" data-side="sell" data-mode="quick" style="flex: 1; padding: 8px 12px; background: transparent; border: none; color: var(--text-secondary); font-size: 0.875rem; font-weight: 500; cursor: pointer; border-radius: 4px; transition: all 150ms ease;">Продать</button>
+                            </div>
+                            
+                            <!-- Time Selection Buttons -->
+                            <div class="trade-time-buttons" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;">
+                                <button class="trade-time-btn" data-minutes="1" data-profit="2" style="padding: 8px 6px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-secondary); font-size: 0.75rem; font-weight: 500; cursor: pointer; transition: all 150ms ease; display: flex; flex-direction: column; align-items: center; gap: 2px;">
+                                    <span>1 мин</span>
+                                    <span style="font-size: 0.6875rem; color: var(--text-tertiary);">+2%</span>
+                                </button>
+                                <button class="trade-time-btn" data-minutes="5" data-profit="6" style="padding: 8px 6px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-secondary); font-size: 0.75rem; font-weight: 500; cursor: pointer; transition: all 150ms ease; display: flex; flex-direction: column; align-items: center; gap: 2px;">
+                                    <span>5 мин</span>
+                                    <span style="font-size: 0.6875rem; color: var(--text-tertiary);">+6%</span>
+                                </button>
+                                <button class="trade-time-btn" data-minutes="15" data-profit="10" style="padding: 8px 6px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-secondary); font-size: 0.75rem; font-weight: 500; cursor: pointer; transition: all 150ms ease; display: flex; flex-direction: column; align-items: center; gap: 2px;">
+                                    <span>15 мин</span>
+                                    <span style="font-size: 0.6875rem; color: var(--text-tertiary);">+10%</span>
+                                </button>
+                                <button class="trade-time-btn" data-minutes="30" data-profit="12" style="padding: 8px 6px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-secondary); font-size: 0.75rem; font-weight: 500; cursor: pointer; transition: all 150ms ease; display: flex; flex-direction: column; align-items: center; gap: 2px;">
+                                    <span>30 мин</span>
+                                    <span style="font-size: 0.6875rem; color: var(--text-tertiary);">+12%</span>
+                                </button>
+                                <button class="trade-time-btn" data-minutes="60" data-profit="15" style="padding: 8px 6px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-secondary); font-size: 0.75rem; font-weight: 500; cursor: pointer; transition: all 150ms ease; display: flex; flex-direction: column; align-items: center; gap: 2px;">
+                                    <span>1 час</span>
+                                    <span style="font-size: 0.6875rem; color: var(--text-tertiary);">+15%</span>
+                                </button>
+                                <button class="trade-time-btn" data-minutes="240" data-profit="18" style="padding: 8px 6px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-secondary); font-size: 0.75rem; font-weight: 500; cursor: pointer; transition: all 150ms ease; display: flex; flex-direction: column; align-items: center; gap: 2px;">
+                                    <span>4 часа</span>
+                                    <span style="font-size: 0.6875rem; color: var(--text-tertiary);">+18%</span>
+                                </button>
+                            </div>
+                            
+                            <!-- Quantity Input -->
+                            <div class="trade-input-group" style="flex-direction: column; gap: 6px;">
+                                <label style="font-size: 0.75rem; font-weight: 500; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.5px;">Количество</label>
+                                <div class="trade-input-wrapper" style="position: relative; display: flex; align-items: center;">
+                                    <input type="number" class="trade-input" id="quickQuantity" placeholder="0.00" step="0.0001" style="width: 100%; padding: 10px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 0.9375rem; font-family: 'JetBrains Mono', monospace;">
+                                    <span class="trade-input-suffix" id="quickQuantitySuffix" style="position: absolute; right: 12px; font-size: 0.875rem; color: var(--text-secondary); pointer-events: none;">BTC</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Percentage Buttons -->
+                            <div class="trade-percent-buttons" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;">
+                                <button type="button" class="trade-percent-btn" data-percent="25" data-mode="quick" style="padding: 6px 8px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-secondary); font-size: 0.75rem; font-weight: 500; cursor: pointer; transition: all 150ms ease;">25%</button>
+                                <button type="button" class="trade-percent-btn" data-percent="50" data-mode="quick" style="padding: 6px 8px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-secondary); font-size: 0.75rem; font-weight: 500; cursor: pointer; transition: all 150ms ease;">50%</button>
+                                <button type="button" class="trade-percent-btn" data-percent="75" data-mode="quick" style="padding: 6px 8px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-secondary); font-size: 0.75rem; font-weight: 500; cursor: pointer; transition: all 150ms ease;">75%</button>
+                                <button type="button" class="trade-percent-btn" data-percent="100" data-mode="quick" style="padding: 6px 8px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-secondary); font-size: 0.75rem; font-weight: 500; cursor: pointer; transition: all 150ms ease;">100%</button>
+                            </div>
+                            
+                            <!-- TP/SL Inputs -->
+                            <div class="trade-input-group" style="flex-direction: column; gap: 6px;">
+                                <label style="font-size: 0.75rem; font-weight: 500; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.5px;">Take Profit</label>
+                                <div class="trade-input-wrapper" style="position: relative; display: flex; align-items: center;">
+                                    <input type="number" class="trade-input" id="quickTakeProfit" placeholder="0.00" step="0.01" readonly style="width: 100%; padding: 10px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 0.9375rem; font-family: 'JetBrains Mono', monospace; opacity: 0.7;">
+                                    <span class="trade-input-suffix" style="position: absolute; right: 12px; font-size: 0.875rem; color: var(--text-secondary); pointer-events: none;">USD</span>
+                                </div>
+                            </div>
+                            
+                            <div class="trade-input-group" style="flex-direction: column; gap: 6px;">
+                                <label style="font-size: 0.75rem; font-weight: 500; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.5px;">Stop Loss</label>
+                                <div class="trade-input-wrapper" style="position: relative; display: flex; align-items: center;">
+                                    <input type="number" class="trade-input" id="quickStopLoss" placeholder="0.00" step="0.01" readonly style="width: 100%; padding: 10px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 0.9375rem; font-family: 'JetBrains Mono', monospace; opacity: 0.7;">
+                                    <span class="trade-input-suffix" style="position: absolute; right: 12px; font-size: 0.875rem; color: var(--text-secondary); pointer-events: none;">USD</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Quick Trade Summary -->
+                            <div class="trade-summary" style="display: flex; flex-direction: column; gap: 8px; padding: 12px; background: var(--bg-tertiary); border-radius: 6px; border: 1px solid var(--border-color);">
+                                <div class="trade-summary-row" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8125rem;">
+                                    <span class="trade-summary-label" style="color: var(--text-tertiary);">Доступно</span>
+                                    <span class="trade-summary-value" id="quickAvailableBalance" style="color: var(--text-primary); font-weight: 500; font-family: 'JetBrains Mono', monospace;">$10,000.00</span>
+                                </div>
+                                <div class="trade-summary-row" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8125rem;">
+                                    <span class="trade-summary-label" style="color: var(--text-tertiary);">Цена</span>
+                                    <span class="trade-summary-value" id="quickTradePrice" style="color: var(--text-primary); font-weight: 500; font-family: 'JetBrains Mono', monospace;">$0.00</span>
+                                </div>
+                                <div class="trade-summary-row" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8125rem;">
+                                    <span class="trade-summary-label" style="color: var(--text-tertiary);">Комиссия (0.1%)</span>
+                                    <span class="trade-summary-value" id="quickTradeFee" style="color: var(--text-primary); font-weight: 500; font-family: 'JetBrains Mono', monospace;">$0.00</span>
+                                </div>
+                                <div class="trade-summary-row" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8125rem; font-weight: 600;">
+                                    <span class="trade-summary-label" style="color: var(--text-tertiary);">Итого</span>
+                                    <span class="trade-summary-value" id="quickTradeTotal" style="color: var(--text-primary); font-weight: 500; font-family: 'JetBrains Mono', monospace;">$0.00</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Action Button -->
+                            <button type="button" class="trade-action-btn buy" id="submitQuickTradeBtn" style="width: 100%; padding: 12px; border: none; border-radius: 6px; font-size: 0.9375rem; font-weight: 600; cursor: pointer; transition: all 150ms ease; background: #22c55e; color: #000;">
+                                Купить BTC
+                            </button>
+                        </div>
                     </div>
                 </div>
                 
@@ -1199,10 +1304,110 @@
             });
         }
         
+        // Функции расчета TP/SL для быстрой торговли
+        function calculateTakeProfitFromTime(minutes, entryPrice, side) {
+            if (!entryPrice || entryPrice <= 0) return 0;
+            
+            const profitPercent = {
+                1: 2,    // 1 минута → +2%
+                5: 6,    // 5 минут → +6%
+                15: 10,  // 15 минут → +10%
+                30: 12,  // 30 минут → +12%
+                60: 15,  // 1 час → +15%
+                240: 18  // 4 часа → +18%
+            };
+            
+            const percent = profitPercent[minutes] || 2;
+            
+            if (side === 'buy') {
+                return entryPrice * (1 + percent / 100);
+            } else {
+                return entryPrice * (1 - percent / 100);
+            }
+        }
+        
+        function calculateStopLossFromTime(minutes, entryPrice, side) {
+            if (!entryPrice || entryPrice <= 0) return 0;
+            
+            // SL обычно составляет 50% от потенциальной прибыли
+            const profitPercent = {
+                1: 2,
+                5: 6,
+                15: 10,
+                30: 12,
+                60: 15,
+                240: 18
+            };
+            
+            const percent = (profitPercent[minutes] || 2) * 0.5; // 50% от TP
+            
+            if (side === 'buy') {
+                return entryPrice * (1 - percent / 100);
+            } else {
+                return entryPrice * (1 + percent / 100);
+            }
+        }
+        
+        function updateQuickTradeTPSL() {
+            const timeBtn = document.querySelector('.trade-time-btn.active');
+            if (!timeBtn) return;
+            
+            const minutes = parseInt(timeBtn.dataset.minutes) || 1;
+            const side = document.querySelector('#quickTradeMode .trade-tab.active')?.dataset.side || 'buy';
+            
+            // Получаем текущую цену актива
+            const priceEl = document.getElementById('quickTradePrice');
+            if (!priceEl) return;
+            
+            const entryPrice = parseFloat(priceEl.textContent.replace(/[^0-9.]/g, '')) || 0;
+            if (entryPrice <= 0) return;
+            
+            const tp = calculateTakeProfitFromTime(minutes, entryPrice, side);
+            const sl = calculateStopLossFromTime(minutes, entryPrice, side);
+            
+            const tpInput = document.getElementById('quickTakeProfit');
+            const slInput = document.getElementById('quickStopLoss');
+            
+            if (tpInput) tpInput.value = tp.toFixed(2);
+            if (slInput) slInput.value = sl.toFixed(2);
+        }
+        
         function initTradingTerminal() {
-            document.querySelectorAll('.trade-tab').forEach(tab => {
+            // Обработчики для вкладок режима торговли
+            document.querySelectorAll('.trade-mode-tab').forEach(tab => {
                 tab.addEventListener('click', () => {
-                    document.querySelectorAll('.trade-tab').forEach(t => {
+                    document.querySelectorAll('.trade-mode-tab').forEach(t => {
+                        t.classList.remove('active');
+                        t.style.background = 'transparent';
+                        t.style.color = 'var(--text-secondary)';
+                    });
+                    tab.classList.add('active');
+                    tab.style.background = 'var(--bg-active)';
+                    tab.style.color = 'var(--text-primary)';
+                    
+                    const mode = tab.dataset.mode;
+                    document.querySelectorAll('.trade-mode-content').forEach(content => {
+                        content.style.display = 'none';
+                    });
+                    
+                    if (mode === 'normal') {
+                        document.getElementById('normalTradeMode').style.display = 'flex';
+                    } else if (mode === 'quick') {
+                        document.getElementById('quickTradeMode').style.display = 'flex';
+                        // Выбираем первую кнопку времени по умолчанию
+                        const firstTimeBtn = document.querySelector('.trade-time-btn');
+                        if (firstTimeBtn && !document.querySelector('.trade-time-btn.active')) {
+                            firstTimeBtn.click();
+                        }
+                        updateQuickTradeTPSL();
+                    }
+                });
+            });
+            
+            // Обработчики для Buy/Sell вкладок (обычная торговля)
+            document.querySelectorAll('#normalTradeMode .trade-tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    document.querySelectorAll('#normalTradeMode .trade-tab').forEach(t => {
                         t.classList.remove('active');
                         t.style.background = 'transparent';
                         t.style.color = 'var(--text-secondary)';
@@ -1217,6 +1422,28 @@
                         tab.style.color = '#fff';
                     }
                     updateTradeButton();
+                });
+            });
+            
+            // Обработчики для Buy/Sell вкладок (быстрая торговля)
+            document.querySelectorAll('#quickTradeMode .trade-tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    document.querySelectorAll('#quickTradeMode .trade-tab').forEach(t => {
+                        t.classList.remove('active');
+                        t.style.background = 'transparent';
+                        t.style.color = 'var(--text-secondary)';
+                    });
+                    tab.classList.add('active');
+                    TradingState.tradeSide = tab.dataset.side;
+                    if (TradingState.tradeSide === 'buy') {
+                        tab.style.background = '#22c55e';
+                        tab.style.color = '#000';
+                    } else {
+                        tab.style.background = '#ef4444';
+                        tab.style.color = '#fff';
+                    }
+                    updateQuickTradeButton();
+                    updateQuickTradeTPSL();
                 });
             });
             
@@ -1248,7 +1475,7 @@
                 limitPriceInput.addEventListener('input', updateTradeSummary);
             }
             
-            document.querySelectorAll('.trade-percent-btn').forEach(btn => {
+            document.querySelectorAll('#normalTradeMode .trade-percent-btn').forEach(btn => {
                 btn.addEventListener('click', () => {
                     const percent = parseFloat(btn.dataset.percent);
                     const availableEl = document.getElementById('availableBalance');
@@ -1269,8 +1496,132 @@
             if (submitBtn) {
                 submitBtn.addEventListener('click', (e) => {
                     e.preventDefault();
-                    alert(`${TradingState.tradeSide === 'buy' ? 'Покупка' : 'Продажа'} ${currentSymbolName} - UI только`);
+                    if (typeof submitOrder === 'function') {
+                        submitOrder(false);
+                    } else {
+                        alert(`${TradingState.tradeSide === 'buy' ? 'Покупка' : 'Продажа'} ${currentSymbolName} - UI только`);
+                    }
                 });
+            }
+            
+            // Обработчики для быстрой торговли
+            document.querySelectorAll('.trade-time-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.trade-time-btn').forEach(b => {
+                        b.classList.remove('active');
+                        b.style.background = 'var(--bg-tertiary)';
+                        b.style.borderColor = 'var(--border-color)';
+                        b.style.color = 'var(--text-secondary)';
+                    });
+                    btn.classList.add('active');
+                    btn.style.background = 'var(--bg-active)';
+                    btn.style.borderColor = '#6366f1';
+                    btn.style.color = 'var(--text-primary)';
+                    updateQuickTradeTPSL();
+                });
+            });
+            
+            const quickQuantityInput = document.getElementById('quickQuantity');
+            if (quickQuantityInput) {
+                quickQuantityInput.addEventListener('input', () => {
+                    if (typeof updateQuickTradeSummary === 'function') {
+                        updateQuickTradeSummary();
+                    }
+                });
+            }
+            
+            document.querySelectorAll('#quickTradeMode .trade-percent-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const percent = parseFloat(btn.dataset.percent);
+                    const availableEl = document.getElementById('quickAvailableBalance');
+                    const priceEl = document.getElementById('quickTradePrice');
+                    if (availableEl && priceEl && quickQuantityInput) {
+                        const available = parseFloat(availableEl.textContent.replace(/[^0-9.]/g, ''));
+                        const price = parseFloat(priceEl.textContent.replace(/[^0-9.]/g, ''));
+                        if (price > 0) {
+                            const quantity = (available * percent / 100) / price;
+                            quickQuantityInput.value = quantity.toFixed(8);
+                            if (typeof updateQuickTradeSummary === 'function') {
+                                updateQuickTradeSummary();
+                            }
+                        }
+                    }
+                });
+            });
+            
+            const submitQuickBtn = document.getElementById('submitQuickTradeBtn');
+            if (submitQuickBtn) {
+                submitQuickBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    if (typeof submitOrder === 'function') {
+                        submitOrder(true);
+                    } else {
+                        alert(`${TradingState.tradeSide === 'buy' ? 'Покупка' : 'Продажа'} ${currentSymbolName} - UI только`);
+                    }
+                });
+            }
+        }
+        
+        function updateQuickTradeButton() {
+            const btn = document.getElementById('submitQuickTradeBtn');
+            if (btn) {
+                btn.className = `trade-action-btn ${TradingState.tradeSide}`;
+                btn.textContent = `${TradingState.tradeSide === 'buy' ? 'Купить' : 'Продать'} ${currentSymbolName}`;
+                btn.style.background = TradingState.tradeSide === 'buy' ? '#22c55e' : '#ef4444';
+                btn.style.color = TradingState.tradeSide === 'buy' ? '#000' : '#fff';
+            }
+        }
+        
+        // Функция обновления сводки быстрой торговли
+        function updateQuickTradeSummary() {
+            const quantityInput = document.getElementById('quickQuantity');
+            const priceEl = document.getElementById('quickTradePrice');
+            const feeEl = document.getElementById('quickTradeFee');
+            const totalEl = document.getElementById('quickTradeTotal');
+            
+            if (!quantityInput || !priceEl || !feeEl || !totalEl) return;
+            
+            const quantity = parseFloat(quantityInput.value) || 0;
+            const marketPrice = parseFloat(priceEl.textContent.replace(/[^0-9.]/g, '')) || 0;
+            
+            if (marketPrice > 0) {
+                const total = quantity * marketPrice;
+                const fee = total * 0.001;
+                const finalTotal = total + fee;
+                
+                feeEl.textContent = `$${fee.toFixed(2)}`;
+                totalEl.textContent = `$${finalTotal.toFixed(2)}`;
+                
+                // Обновляем TP/SL при изменении цены
+                updateQuickTradeTPSL();
+            }
+        }
+        
+        // Экспортируем функцию для использования в js/trading.js
+        window.updateQuickTradeSummary = updateQuickTradeSummary;
+        
+        // Обновляем цену для быстрой торговли при смене актива
+        function updateQuickTradePrice() {
+            const priceEl = document.getElementById('quickTradePrice');
+            if (!priceEl) return;
+            
+            // Пытаемся получить цену из обычной торговли
+            const normalPriceEl = document.getElementById('tradePrice');
+            if (normalPriceEl && normalPriceEl.textContent !== '$0.00') {
+                const price = parseFloat(normalPriceEl.textContent.replace(/[^0-9.]/g, ''));
+                if (price > 0) {
+                    priceEl.textContent = `$${price.toFixed(2)}`;
+                    updateQuickTradeTPSL();
+                    updateQuickTradeSummary();
+                    return;
+                }
+            }
+            
+            // Если нет цены в обычной торговле, используем currentAsset
+            if (typeof window.currentAsset !== 'undefined' && window.currentAsset.price) {
+                priceEl.textContent = `$${window.currentAsset.price.toFixed(2)}`;
+                updateQuickTradeTPSL();
+                updateQuickTradeSummary();
             }
         }
         
@@ -1316,13 +1667,39 @@
         
         function updateTradingTerminal() {
             updateTradeButton();
+            updateQuickTradeButton();
+            
             const symbolData = findSymbolData(currentSymbol);
             if (symbolData) {
                 const quantitySuffixEl = document.getElementById('quantitySuffix');
+                const quickQuantitySuffixEl = document.getElementById('quickQuantitySuffix');
                 if (quantitySuffixEl) {
                     quantitySuffixEl.textContent = symbolData.symbol.replace('USDT', '').replace('USD', '');
                 }
+                if (quickQuantitySuffixEl) {
+                    quickQuantitySuffixEl.textContent = symbolData.symbol.replace('USDT', '').replace('USD', '');
+                }
             }
+            
+            // Обновляем цену для быстрой торговли
+            updateQuickTradePrice();
+        }
+        
+        // Инициализация цены для быстрой торговли
+        function initQuickTradePrice() {
+            const priceEl = document.getElementById('quickTradePrice');
+            if (priceEl && typeof window.currentAsset !== 'undefined' && window.currentAsset.price) {
+                priceEl.textContent = `$${window.currentAsset.price.toFixed(2)}`;
+            } else if (priceEl) {
+                // Пытаемся получить цену из обычной торговли
+                const normalPriceEl = document.getElementById('tradePrice');
+                if (normalPriceEl && normalPriceEl.textContent !== '$0.00') {
+                    priceEl.textContent = normalPriceEl.textContent;
+                } else {
+                    priceEl.textContent = '$0.00';
+                }
+            }
+            updateQuickTradeTPSL();
         }
         
         function initAssetDropdown() {
