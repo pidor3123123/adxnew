@@ -441,12 +441,18 @@ async function submitOrder(isQuick = false) {
         const activeMode = isQuick ? document.querySelector('#quickTradeMode .trade-tab.active') : document.querySelector('#normalTradeMode .trade-tab.active');
         const side = activeMode?.dataset.side || (window.TradingState?.tradeSide || 'buy');
         
-        // Получаем тип ордера
-        const activeOrderType = isQuick ? document.querySelector('#quickTradeForm .tab.active') : document.querySelector('#tradeForm .tab.active');
-        const type = activeOrderType?.dataset.type || (window.TradingState?.orderType || 'market');
+        // Получаем тип ордера (быстрая торговля всегда рыночная)
+        const type = isQuick ? 'market' : (window.TradingState?.orderType || 'market');
         
         // Определяем цену входа для валидации TP/SL
-        const entryPrice = type === 'limit' && limitPrice ? limitPrice : (currentAsset.price || null);
+        let entryPrice;
+        if (isQuick) {
+            // Для быстрой торговли получаем цену из quickTradePrice
+            const quickPriceEl = document.getElementById('quickTradePrice');
+            entryPrice = quickPriceEl ? parseFloat(quickPriceEl.textContent.replace(/[^0-9.]/g, '')) : (currentAsset?.price || null);
+        } else {
+            entryPrice = type === 'limit' && limitPrice ? limitPrice : (currentAsset?.price || null);
+        }
         
         // Валидация TP/SL для быстрой торговли
         if (isQuick && entryPrice) {
@@ -674,6 +680,30 @@ async function updateAssetPrice() {
                 
                 // Update global reference
                 window.currentAsset = currentAsset;
+                
+                // Обновляем цену в UI для обычной торговли
+                const tradePriceEl = document.getElementById('tradePrice');
+                if (tradePriceEl) {
+                    tradePriceEl.textContent = NovaTrade.formatCurrency(newPrice);
+                }
+                
+                // Обновляем цену в UI для быстрой торговли (используем напрямую newPrice)
+                const quickTradePriceEl = document.getElementById('quickTradePrice');
+                if (quickTradePriceEl) {
+                    quickTradePriceEl.textContent = NovaTrade.formatCurrency(newPrice);
+                    // Обновляем TP/SL и сводку для быстрой торговли
+                    if (typeof window.updateQuickTradeTPSL === 'function') {
+                        window.updateQuickTradeTPSL();
+                    }
+                    if (typeof window.updateQuickTradeSummary === 'function') {
+                        window.updateQuickTradeSummary();
+                    }
+                }
+                
+                // Обновляем сводки
+                if (typeof updateTradeSummary === 'function') {
+                    updateTradeSummary();
+                }
                 
                 // Update price display
                 const priceEl = document.getElementById('currentPrice');

@@ -1599,27 +1599,30 @@
         
         // Экспортируем функцию для использования в js/trading.js
         window.updateQuickTradeSummary = updateQuickTradeSummary;
+        window.updateQuickTradePrice = updateQuickTradePrice;
         
         // Обновляем цену для быстрой торговли при смене актива
         function updateQuickTradePrice() {
             const priceEl = document.getElementById('quickTradePrice');
             if (!priceEl) return;
             
-            // Пытаемся получить цену из обычной торговли
-            const normalPriceEl = document.getElementById('tradePrice');
-            if (normalPriceEl && normalPriceEl.textContent !== '$0.00') {
-                const price = parseFloat(normalPriceEl.textContent.replace(/[^0-9.]/g, ''));
-                if (price > 0) {
-                    priceEl.textContent = `$${price.toFixed(2)}`;
-                    updateQuickTradeTPSL();
-                    updateQuickTradeSummary();
-                    return;
+            // Используем currentAsset.price напрямую (самый надежный источник)
+            let price = 0;
+            if (typeof window.currentAsset !== 'undefined' && window.currentAsset.price && window.currentAsset.price > 0) {
+                price = window.currentAsset.price;
+            } else {
+                // Fallback: пытаемся получить цену из обычной торговли
+                const normalPriceEl = document.getElementById('tradePrice');
+                if (normalPriceEl && normalPriceEl.textContent !== '$0.00') {
+                    const parsedPrice = parseFloat(normalPriceEl.textContent.replace(/[^0-9.]/g, ''));
+                    if (parsedPrice > 0 && parsedPrice < 1000000) { // Проверка на разумность цены
+                        price = parsedPrice;
+                    }
                 }
             }
             
-            // Если нет цены в обычной торговле, используем currentAsset
-            if (typeof window.currentAsset !== 'undefined' && window.currentAsset.price) {
-                priceEl.textContent = `$${window.currentAsset.price.toFixed(2)}`;
+            if (price > 0) {
+                priceEl.textContent = `$${price.toFixed(2)}`;
                 updateQuickTradeTPSL();
                 updateQuickTradeSummary();
             }
