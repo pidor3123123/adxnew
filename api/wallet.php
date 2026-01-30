@@ -1,6 +1,8 @@
 <?php
 /**
  * ADX Finance - API кошелька
+ * Работает ТОЛЬКО с Supabase (Single Source of Truth)
+ * Все операции с балансом выполняются через транзакции
  */
 
 // Включаем буферизацию вывода для предотвращения попадания предупреждений в JSON
@@ -91,7 +93,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
-// Получение рыночных цен для конвертации в USD (использует реальный API)
+/**
+ * Получение рыночных цен для конвертации в USD (использует реальный API)
+ */
 function getUsdPrices(): array {
     $prices = ['USD' => 1.0];
     
@@ -158,6 +162,67 @@ function getUsdPrices(): array {
     return $prices;
 }
 
+/**
+ * Получение Supabase UUID пользователя из MySQL user
+ * @param array $mysqlUser MySQL user массив с полями id, email
+ * @return string UUID пользователя в Supabase
+ */
+function getSupabaseUserId(array $mysqlUser): string {
+    $supabase = getSupabaseClient();
+    $email = $mysqlUser['email'] ?? null;
+    
+    if (!$email) {
+        throw new Exception('User email is required to get Supabase UUID', 400);
+    }
+    
+    // Ищем пользователя в Supabase по email
+    $supabaseUser = $supabase->get('users', 'email', $email);
+    
+    if ($supabaseUser && isset($supabaseUser['id'])) {
+        return $supabaseUser['id'];
+    }
+    
+    // Если пользователь не найден, пытаемся найти в auth.users
+    $authUserId = $supabase->findAuthUserByEmail($email);
+    
+    if ($authUserId) {
+        return $authUserId;
+    }
+    
+    // Если пользователь не найден, синхронизируем его
+    // Это должно быть сделано при регистрации, но на случай если пропустили
+    if (function_exists('syncUserToSupabase') && isset($mysqlUser['id'])) {
+        try {
+            syncUserToSupabase($mysqlUser['id']);
+            // Повторно ищем
+            $supabaseUser = $supabase->get('users', 'email', $email);
+            if ($supabaseUser && isset($supabaseUser['id'])) {
+                return $supabaseUser['id'];
+            }
+        } catch (Exception $e) {
+            error_log("Error syncing user to Supabase: " . $e->getMessage());
+        }
+    }
+    
+    throw new Exception("User not found in Supabase. Please contact support.", 404);
+}
+
+/**
+ * Генерация idempotency key для защиты от double spend
+ * @param string $type Тип транзакции
+ * @param string $userId UUID пользователя
+ * @param string|null $orderId ID ордера (если есть)
+ * @return string Idempotency key
+ */
+function generateIdempotencyKey(string $type, string $userId, ?string $orderId = null): string {
+    $parts = [$type, $userId];
+    if ($orderId !== null) {
+        $parts[] = $orderId;
+    }
+    $parts[] = time(); // Добавляем timestamp для уникальности
+    return implode('_', $parts);
+}
+
 $method = $_SERVER['REQUEST_METHOD'];
 $action = $_GET['action'] ?? '';
 
@@ -167,8 +232,8 @@ try {
         throw new Exception('Function getAuthUser() is not defined. Check if auth.php is loaded correctly.', 500);
     }
     
-    if (!function_exists('getDB')) {
-        throw new Exception('Function getDB() is not defined. Check if database.php is loaded correctly.', 500);
+    if (!function_exists('getSupabaseClient')) {
+        throw new Exception('Function getSupabaseClient() is not defined. Check if supabase.php is loaded correctly.', 500);
     }
     
     if (!function_exists('setCorsHeaders')) {
@@ -194,53 +259,56 @@ try {
             error_log("Wallet balances API: Starting balance fetch for user_id={$user['id']}");
             
             try {
-                $db = getDB();
-                $stmt = $db->prepare('
-                    SELECT 
-                        currency, 
-                        SUM(available) as available, 
-                        SUM(reserved) as reserved 
-                    FROM balances 
-                    WHERE user_id = ?
-                    GROUP BY currency
-                    ORDER BY 
-                        CASE currency 
-                            WHEN "USD" THEN 0 
-                            WHEN "BTC" THEN 1 
-                            WHEN "ETH" THEN 2 
-                            ELSE 3 
-                        END,
-                        currency
-                ');
-                $stmt->execute([$user['id']]);
-                $balances = $stmt->fetchAll();
+                $supabase = getSupabaseClient();
+                $supabaseUserId = getSupabaseUserId($user);
                 
-                error_log("Wallet balances API: Query executed successfully, found " . count($balances) . " balance records");
+                error_log("Wallet balances API: Supabase user_id={$supabaseUserId}");
                 
-                // Если балансов нет, создаем пустой массив
-                if (!$balances) {
-                    $balances = [];
-                    error_log("Wallet balances API: No balances found for user_id={$user['id']}");
-                } else {
-                    // Логируем детали каждого баланса
-                    foreach ($balances as $balance) {
-                        error_log("Wallet balances API: Balance - currency={$balance['currency']}, available={$balance['available']}, reserved={$balance['reserved']}");
-                    }
+                // Получаем все балансы через RPC
+                $result = $supabase->getAllWalletBalances($supabaseUserId);
+                
+                if (!$result['success']) {
+                    throw new Exception('Failed to fetch balances from Supabase', 500);
                 }
                 
-                // Добавляем USD эквивалент
-                $prices = getUsdPrices();
+                $balances = $result['balances'] ?? [];
+                
+                error_log("Wallet balances API: Found " . count($balances) . " balance records");
+                
+                // Преобразуем формат для совместимости с фронтендом
+                $formattedBalances = [];
                 $totalUsd = 0;
                 
-                foreach ($balances as &$balance) {
-                    $price = $prices[$balance['currency']] ?? 0;
-                    $balance['usd_value'] = (float)$balance['available'] * $price;
-                    $totalUsd += $balance['usd_value'];
-                    error_log("Wallet balances API: Calculated USD value for {$balance['currency']}: {$balance['usd_value']} (price={$price}, amount={$balance['available']})");
+                // Получаем цены для конвертации в USD
+                $prices = getUsdPrices();
+                
+                foreach ($balances as $balance) {
+                    $currency = $balance['currency'] ?? 'USD';
+                    $balanceAmount = (float)($balance['balance'] ?? 0);
+                    
+                    $price = $prices[$currency] ?? 0;
+                    $usdValue = $balanceAmount * $price;
+                    $totalUsd += $usdValue;
+                    
+                    $formattedBalances[] = [
+                        'currency' => $currency,
+                        'available' => $balanceAmount,
+                        'reserved' => 0, // В новой схеме нет reserved, все в balance
+                        'usd_value' => $usdValue
+                    ];
+                    
+                    error_log("Wallet balances API: Balance - currency={$currency}, balance={$balanceAmount}, usd_value={$usdValue}");
                 }
                 
-                // Логируем итоговую информацию
-                error_log("Wallet balances API: user_id={$user['id']}, balances_count=" . count($balances) . ", total_usd={$totalUsd}");
+                // Сортируем балансы
+                usort($formattedBalances, function($a, $b) {
+                    $order = ['USD' => 0, 'BTC' => 1, 'ETH' => 2];
+                    $orderA = $order[$a['currency']] ?? 3;
+                    $orderB = $order[$b['currency']] ?? 3;
+                    return $orderA <=> $orderB ?: strcmp($a['currency'], $b['currency']);
+                });
+                
+                error_log("Wallet balances API: user_id={$user['id']}, balances_count=" . count($formattedBalances) . ", total_usd={$totalUsd}");
                 
                 // Очищаем буфер перед выводом JSON
                 if (ob_get_level() > 0) {
@@ -249,15 +317,11 @@ try {
                 
                 echo json_encode([
                     'success' => true,
-                    'balances' => $balances,
+                    'balances' => $formattedBalances,
                     'total_usd' => $totalUsd
                 ], JSON_UNESCAPED_UNICODE);
-            } catch (PDOException $e) {
-                error_log("Wallet balances API: Database error for user_id={$user['id']}: " . $e->getMessage());
-                error_log("Wallet balances API: SQL State: " . $e->getCode());
-                throw new Exception('Database error: ' . $e->getMessage(), 500, $e);
             } catch (Exception $e) {
-                error_log("Wallet balances API: General error for user_id={$user['id']}: " . $e->getMessage());
+                error_log("Wallet balances API: Error for user_id={$user['id']}: " . $e->getMessage());
                 throw $e;
             }
             break;
@@ -284,55 +348,44 @@ try {
                 throw new Exception('Invalid amount', 400);
             }
             
-            $db = getDB();
-            $db->beginTransaction();
-            
             try {
-                // Проверяем/создаём баланс
-                $stmt = $db->prepare('SELECT id, available FROM balances WHERE user_id = ? AND currency = ?');
-                $stmt->execute([$user['id'], $currency]);
-                $balance = $stmt->fetch();
+                $supabase = getSupabaseClient();
+                $supabaseUserId = getSupabaseUserId($user);
                 
-                if ($balance) {
-                    $stmt = $db->prepare('UPDATE balances SET available = available + ? WHERE id = ?');
-                    $stmt->execute([$amount, $balance['id']]);
-                } else {
-                    $stmt = $db->prepare('INSERT INTO balances (user_id, currency, available) VALUES (?, ?, ?)');
-                    $stmt->execute([$user['id'], $currency, $amount]);
+                // Генерируем idempotency key для защиты от double spend
+                $idempotencyKey = generateIdempotencyKey('deposit', $supabaseUserId, null);
+                
+                // Применяем транзакцию через RPC
+                $result = $supabase->applyTransaction(
+                    $supabaseUserId,
+                    $amount,
+                    'deposit',
+                    $currency,
+                    $idempotencyKey,
+                    [
+                        'description' => "Пополнение {$amount} {$currency}",
+                        'source' => 'user_deposit'
+                    ]
+                );
+                
+                if (!$result['success']) {
+                    throw new Exception('Failed to process deposit', 500);
                 }
                 
-                // Создаём транзакцию
-                $stmt = $db->prepare('
-                    INSERT INTO transactions (user_id, type, currency, amount, status, description, completed_at)
-                    VALUES (?, "deposit", ?, ?, "completed", ?, NOW())
-                ');
-                $stmt->execute([
-                    $user['id'],
-                    $currency,
-                    $amount,
-                    "Пополнение {$amount} {$currency}"
-                ]);
-                
-                $db->commit();
-                
-                // Синхронизация баланса с Supabase (в фоне, не блокирует основную логику)
-                try {
-                    require_once __DIR__ . '/sync.php';
-                    if (function_exists('syncBalanceToSupabase')) {
-                        syncBalanceToSupabase($user['id'], $currency);
-                        error_log("Balance synced to Supabase: user_id={$user['id']}, currency=$currency (deposit)");
-                    }
-                } catch (Exception $e) {
-                    error_log('Supabase balance sync error: ' . $e->getMessage());
+                // Очищаем буфер перед выводом JSON
+                if (ob_get_level() > 0) {
+                    ob_end_clean();
                 }
                 
                 echo json_encode([
                     'success' => true,
-                    'message' => 'Deposit successful'
-                ]);
-                
+                    'message' => 'Deposit processed successfully',
+                    'transaction_id' => $result['transaction_id'],
+                    'balance' => $result['balance'],
+                    'duplicate' => $result['duplicate'] ?? false
+                ], JSON_UNESCAPED_UNICODE);
             } catch (Exception $e) {
-                $db->rollBack();
+                error_log("Wallet deposit API: Error for user_id={$user['id']}: " . $e->getMessage());
                 throw $e;
             }
             break;
@@ -360,56 +413,45 @@ try {
                 throw new Exception('Invalid amount', 400);
             }
             
-            $db = getDB();
-            
-            // Проверяем баланс
-            $stmt = $db->prepare('SELECT available FROM balances WHERE user_id = ? AND currency = ?');
-            $stmt->execute([$user['id'], $currency]);
-            $balance = $stmt->fetch();
-            
-            if (!$balance || (float)$balance['available'] < $amount) {
-                throw new Exception('Insufficient balance', 400);
-            }
-            
-            $db->beginTransaction();
-            
             try {
-                // Списываем средства
-                $stmt = $db->prepare('UPDATE balances SET available = available - ? WHERE user_id = ? AND currency = ?');
-                $stmt->execute([$amount, $user['id'], $currency]);
+                $supabase = getSupabaseClient();
+                $supabaseUserId = getSupabaseUserId($user);
                 
-                // Создаём транзакцию
-                $stmt = $db->prepare('
-                    INSERT INTO transactions (user_id, type, currency, amount, status, description)
-                    VALUES (?, "withdrawal", ?, ?, "pending", ?)
-                ');
-                $stmt->execute([
-                    $user['id'],
+                // Генерируем idempotency key
+                $idempotencyKey = generateIdempotencyKey('withdrawal', $supabaseUserId, null);
+                
+                // Применяем транзакцию (отрицательная сумма для списания)
+                $result = $supabase->applyTransaction(
+                    $supabaseUserId,
+                    -$amount, // Отрицательная сумма для списания
+                    'withdrawal',
                     $currency,
-                    -$amount,
-                    "Вывод {$amount} {$currency}" . ($address ? " на {$address}" : '')
-                ]);
+                    $idempotencyKey,
+                    [
+                        'description' => "Вывод {$amount} {$currency}" . ($address ? " на {$address}" : ''),
+                        'address' => $address,
+                        'source' => 'user_withdrawal'
+                    ]
+                );
                 
-                $db->commit();
+                if (!$result['success']) {
+                    throw new Exception('Failed to process withdrawal', 500);
+                }
                 
-                // Синхронизация баланса с Supabase (в фоне, не блокирует основную логику)
-                try {
-                    require_once __DIR__ . '/sync.php';
-                    if (function_exists('syncBalanceToSupabase')) {
-                        syncBalanceToSupabase($user['id'], $currency);
-                        error_log("Balance synced to Supabase: user_id={$user['id']}, currency=$currency (withdrawal)");
-                    }
-                } catch (Exception $e) {
-                    error_log('Supabase balance sync error: ' . $e->getMessage());
+                // Очищаем буфер перед выводом JSON
+                if (ob_get_level() > 0) {
+                    ob_end_clean();
                 }
                 
                 echo json_encode([
                     'success' => true,
-                    'message' => 'Withdrawal request submitted'
-                ]);
-                
+                    'message' => 'Withdrawal processed successfully',
+                    'transaction_id' => $result['transaction_id'],
+                    'balance' => $result['balance'],
+                    'duplicate' => $result['duplicate'] ?? false
+                ], JSON_UNESCAPED_UNICODE);
             } catch (Exception $e) {
-                $db->rollBack();
+                error_log("Wallet withdraw API: Error for user_id={$user['id']}: " . $e->getMessage());
                 throw $e;
             }
             break;
@@ -420,29 +462,60 @@ try {
             }
             
             $limit = min((int)($_GET['limit'] ?? 50), 100);
+            $offset = (int)($_GET['offset'] ?? 0);
             $type = $_GET['type'] ?? null;
+            $currency = $_GET['currency'] ?? null;
             
-            $db = getDB();
-            
-            $sql = 'SELECT * FROM transactions WHERE user_id = ?';
-            $params = [$user['id']];
-            
-            if ($type && in_array($type, ['deposit', 'withdrawal', 'trade', 'fee'])) {
-                $sql .= ' AND type = ?';
-                $params[] = $type;
+            try {
+                $supabase = getSupabaseClient();
+                $supabaseUserId = getSupabaseUserId($user);
+                
+                // Получаем транзакции через RPC
+                $result = $supabase->getTransactions($supabaseUserId, $currency, $limit, $offset);
+                
+                if (!$result['success']) {
+                    throw new Exception('Failed to fetch transactions from Supabase', 500);
+                }
+                
+                $transactions = $result['transactions'] ?? [];
+                
+                // Фильтруем по типу, если указан
+                if ($type) {
+                    $transactions = array_filter($transactions, function($t) use ($type) {
+                        return ($t['type'] ?? '') === $type;
+                    });
+                    $transactions = array_values($transactions); // Переиндексируем
+                }
+                
+                // Преобразуем формат для совместимости
+                $formattedTransactions = [];
+                foreach ($transactions as $tx) {
+                    $formattedTransactions[] = [
+                        'id' => $tx['id'],
+                        'type' => $tx['type'],
+                        'currency' => $tx['currency'],
+                        'amount' => (float)($tx['amount'] ?? 0),
+                        'description' => $tx['metadata']['description'] ?? '',
+                        'status' => 'completed', // В новой схеме все транзакции completed
+                        'created_at' => $tx['created_at'],
+                        'completed_at' => $tx['created_at']
+                    ];
+                }
+                
+                // Очищаем буфер перед выводом JSON
+                if (ob_get_level() > 0) {
+                    ob_end_clean();
+                }
+                
+                echo json_encode([
+                    'success' => true,
+                    'transactions' => $formattedTransactions,
+                    'total' => $result['total'] ?? count($formattedTransactions)
+                ], JSON_UNESCAPED_UNICODE);
+            } catch (Exception $e) {
+                error_log("Wallet transactions API: Error for user_id={$user['id']}: " . $e->getMessage());
+                throw $e;
             }
-            
-            $sql .= ' ORDER BY created_at DESC LIMIT ?';
-            $params[] = $limit;
-            
-            $stmt = $db->prepare($sql);
-            $stmt->execute($params);
-            $transactions = $stmt->fetchAll();
-            
-            echo json_encode([
-                'success' => true,
-                'transactions' => $transactions
-            ]);
             break;
             
         default:

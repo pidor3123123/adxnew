@@ -133,6 +133,45 @@ class SupabaseClient {
     }
     
     /**
+     * Вызов RPC функции
+     */
+    public function rpc(string $functionName, array $params = []): array {
+        $url = $this->baseUrl . '/rpc/' . $functionName;
+        
+        $headers = [
+            'apikey: ' . $this->apiKey,
+            'Authorization: Bearer ' . $this->apiKey,
+            'Content-Type: application/json',
+            'Prefer: return=representation'
+        ];
+        
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($params));
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
+        curl_close($ch);
+        
+        if ($error) {
+            throw new Exception("CURL Error calling RPC $functionName: $error");
+        }
+        
+        $decoded = json_decode($response, true);
+        
+        if ($httpCode >= 400) {
+            $errorMessage = $decoded['message'] ?? $decoded['error'] ?? $decoded['hint'] ?? "HTTP $httpCode";
+            throw new Exception("Supabase RPC Error ($functionName): $errorMessage", $httpCode);
+        }
+        
+        return $decoded;
+    }
+    
+    /**
      * Выборка записей
      */
     public function select(string $table, string $select = '*', array $filters = [], int $limit = null, int $offset = null): array {
@@ -342,5 +381,156 @@ class SupabaseClient {
         }
         
         return null;
+    }
+    
+    /**
+     * Вызов RPC функции
+     */
+    public function rpc(string $functionName, array $params = []): array {
+        $url = $this->baseUrl . '/rpc/' . $functionName;
+        
+        $headers = [
+            'apikey: ' . $this->apiKey,
+            'Authorization: Bearer ' . $this->apiKey,
+            'Content-Type: application/json',
+            'Prefer: return=representation'
+        ];
+        
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($params));
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
+        curl_close($ch);
+        
+        if ($error) {
+            throw new Exception("CURL Error calling RPC $functionName: $error");
+        }
+        
+        $decoded = json_decode($response, true);
+        
+        if ($httpCode >= 400) {
+            $errorMessage = $decoded['message'] ?? $decoded['error'] ?? $decoded['hint'] ?? "HTTP $httpCode";
+            throw new Exception("Supabase RPC Error ($functionName): $errorMessage", $httpCode);
+        }
+        
+        return $decoded;
+    }
+    
+    /**
+     * Wallet RPC Methods
+     */
+    
+    /**
+     * Применить транзакцию (с защитой от double spend)
+     * @param string $userId UUID пользователя
+     * @param float $amount Сумма транзакции (положительная для пополнения, отрицательная для списания)
+     * @param string $type Тип транзакции: 'admin_topup', 'deal_open', 'deal_close', 'profit', 'withdrawal', 'deposit'
+     * @param string $currency Валюта (по умолчанию 'USD')
+     * @param string|null $idempotencyKey Уникальный ключ для защиты от double spend
+     * @param array $metadata Дополнительные метаданные
+     * @return array Результат транзакции
+     */
+    public function applyTransaction(
+        string $userId,
+        float $amount,
+        string $type,
+        string $currency = 'USD',
+        ?string $idempotencyKey = null,
+        array $metadata = []
+    ): array {
+        $params = [
+            'p_user_id' => $userId,
+            'p_amount' => (string)$amount, // Преобразуем в строку для точности
+            'p_type' => $type,
+            'p_currency' => $currency,
+            'p_metadata' => $metadata
+        ];
+        
+        if ($idempotencyKey !== null) {
+            $params['p_idempotency_key'] = $idempotencyKey;
+        }
+        
+        return $this->rpc('apply_transaction', $params);
+    }
+    
+    /**
+     * Получить баланс пользователя
+     * @param string $userId UUID пользователя
+     * @param string $currency Валюта (по умолчанию 'USD')
+     * @return array Баланс пользователя
+     */
+    public function getWalletBalance(string $userId, string $currency = 'USD'): array {
+        return $this->rpc('get_wallet_balance', [
+            'p_user_id' => $userId,
+            'p_currency' => $currency
+        ]);
+    }
+    
+    /**
+     * Получить все балансы пользователя
+     * @param string $userId UUID пользователя
+     * @return array Все балансы пользователя
+     */
+    public function getAllWalletBalances(string $userId): array {
+        return $this->rpc('get_all_wallet_balances', [
+            'p_user_id' => $userId
+        ]);
+    }
+    
+    /**
+     * Получить историю транзакций
+     * @param string $userId UUID пользователя
+     * @param string|null $currency Валюта (null для всех валют)
+     * @param int $limit Лимит записей (по умолчанию 50)
+     * @param int $offset Смещение (по умолчанию 0)
+     * @return array История транзакций
+     */
+    public function getTransactions(
+        string $userId,
+        ?string $currency = null,
+        int $limit = 50,
+        int $offset = 0
+    ): array {
+        $params = [
+            'p_user_id' => $userId,
+            'p_limit' => $limit,
+            'p_offset' => $offset
+        ];
+        
+        if ($currency !== null) {
+            $params['p_currency'] = $currency;
+        }
+        
+        return $this->rpc('get_transactions', $params);
+    }
+    
+    /**
+     * Получить сводку по кошельку (балансы + последние транзакции)
+     * @param string $userId UUID пользователя
+     * @param string|null $currency Валюта (null для всех валют)
+     * @param int $transactionLimit Лимит транзакций (по умолчанию 10)
+     * @return array Сводка по кошельку
+     */
+    public function getWalletSummary(
+        string $userId,
+        ?string $currency = null,
+        int $transactionLimit = 10
+    ): array {
+        $params = [
+            'p_user_id' => $userId,
+            'p_transaction_limit' => $transactionLimit
+        ];
+        
+        if ($currency !== null) {
+            $params['p_currency'] = $currency;
+        }
+        
+        return $this->rpc('get_wallet_summary', $params);
     }
 }
