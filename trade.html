@@ -816,7 +816,7 @@
                 <!-- Terminal Header -->
                 <header class="terminal-header" style="background: var(--bg-secondary); border-bottom: 1px solid var(--border-color); padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-shrink: 0; height: 60px;">
                     <div class="symbol-section" style="display: flex; align-items: center; gap: 12px;">
-                        <span class="symbol-name" id="symbolName" style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); font-variant-numeric: tabular-nums;">BTCUSDT</span>
+                        <span class="symbol-name" id="symbolName" style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); font-variant-numeric: tabular-nums;">Bitcoin / TetherUS · 15 · Binance</span>
                         <span class="market-badge crypto" id="marketBadge" style="padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; background: #22c55e; color: #000;">Crypto</span>
                     </div>
                     <div class="asset-dropdown-wrapper" style="position: relative;">
@@ -1050,14 +1050,55 @@
             return 'crypto';
         }
         
+        function getExchangeName(tvSymbol) {
+            if (tvSymbol.startsWith('BINANCE:')) return 'Binance';
+            if (tvSymbol.startsWith('NASDAQ:')) return 'NASDAQ';
+            if (tvSymbol.startsWith('FX:')) return 'Forex';
+            if (tvSymbol.startsWith('SP:')) return 'S&P';
+            if (tvSymbol.startsWith('DJ:')) return 'Dow Jones';
+            if (tvSymbol.startsWith('LSE:')) return 'LSE';
+            if (tvSymbol.startsWith('XETR:')) return 'XETR';
+            if (tvSymbol.startsWith('TVC:')) return 'TradingView';
+            return 'Exchange';
+        }
+        
+        function getPairName(symbolData, market) {
+            if (!symbolData) return 'Unknown / Unknown';
+            
+            if (market === 'crypto') {
+                const base = symbolData.name;
+                const quote = symbolData.symbol.includes('USDT') ? 'TetherUS' : 'USD';
+                return `${base} / ${quote}`;
+            } else if (market === 'stocks') {
+                return `${symbolData.name} / USD`;
+            } else if (market === 'forex') {
+                return symbolData.name; // Уже в формате EUR/USD
+            } else if (market === 'indices') {
+                return `${symbolData.name} / USD`;
+            } else if (market === 'commodities') {
+                return `${symbolData.name} / USD`;
+            }
+            return `${symbolData.name} / USD`;
+        }
+        
         function updateUI() {
             const symbolData = findSymbolData(currentSymbol);
+            const timeframe = '15'; // Таймфрейм по умолчанию
+            
             if (symbolData) {
                 currentSymbolName = symbolData.symbol;
                 const symbolNameEl = document.getElementById('symbolName');
                 const quantitySuffixEl = document.getElementById('quantitySuffix');
-                if (symbolNameEl) symbolNameEl.textContent = symbolData.symbol;
-                if (quantitySuffixEl) quantitySuffixEl.textContent = symbolData.symbol.replace('USDT', '').replace('USD', '');
+                
+                if (symbolNameEl) {
+                    const pairName = getPairName(symbolData, currentMarket);
+                    const exchangeName = getExchangeName(currentSymbol);
+                    symbolNameEl.textContent = `${pairName} · ${timeframe} · ${exchangeName}`;
+                }
+                
+                if (quantitySuffixEl) {
+                    quantitySuffixEl.textContent = symbolData.symbol.replace('USDT', '').replace('USD', '');
+                }
             }
             
             const badge = marketBadges[currentMarket];
