@@ -412,6 +412,34 @@ function syncUserToSupabase(int $mysqlUserId): void {
         $supabase->upsert('user_security', $securityData, 'user_id');
         error_log("Synced user_security for MySQL user ID $mysqlUserId (UUID: $authUserId)");
         
+        // Шаг 5: Создаем начальный кошелек в Supabase (если еще не существует)
+        // Это гарантирует, что кошелек существует даже если пользователь еще не делал транзакций
+        try {
+            // Проверяем, существует ли уже кошелек
+            $existingWallet = $supabase->get('wallets', 'user_id', $authUserId);
+            
+            if (!$existingWallet) {
+                // Кошелек не существует - создаем его через apply_transaction с нулевым балансом
+                // Это создаст запись в wallets через триггер
+                $idempotencyKey = 'initial_wallet_' . $authUserId . '_USD_' . time();
+                $result = $supabase->applyTransaction($authUserId, 0, 'admin_topup', 'USD', $idempotencyKey, [
+                    'description' => 'Initial wallet creation',
+                    'mysql_user_id' => $mysqlUserId
+                ]);
+                
+                if (isset($result['success']) && $result['success']) {
+                    error_log("Created initial wallet for MySQL user ID $mysqlUserId (UUID: $authUserId) via apply_transaction");
+                } else {
+                    error_log("Failed to create initial wallet for MySQL user ID $mysqlUserId (UUID: $authUserId). Result: " . json_encode($result));
+                }
+            } else {
+                error_log("Wallet already exists for MySQL user ID $mysqlUserId (UUID: $authUserId)");
+            }
+        } catch (Exception $walletError) {
+            // Не критично, если не удалось создать кошелек - он создастся при первой транзакции
+            error_log("Warning: Could not create initial wallet for MySQL user ID $mysqlUserId (UUID: $authUserId): " . $walletError->getMessage());
+        }
+        
     } catch (Exception $e) {
         error_log("Supabase user sync error for user ID $mysqlUserId: " . $e->getMessage());
         throw $e;

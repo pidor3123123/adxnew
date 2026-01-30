@@ -5,12 +5,69 @@
 const Auth = {
     TOKEN_KEY: 'novatrade_token',
     USER_KEY: 'novatrade_user',
+    CACHE_TIMESTAMP_KEY: 'novatrade_cache_timestamp',
+    CACHE_MAX_AGE: 5 * 60 * 1000, // 5 минут в миллисекундах
     
     /**
      * Проверка авторизации
      */
     isAuthenticated() {
         return !!this.getToken();
+    },
+    
+    /**
+     * Очистка устаревших данных из localStorage
+     */
+    clearStaleCache() {
+        try {
+            const cacheTimestamp = localStorage.getItem(this.CACHE_TIMESTAMP_KEY);
+            const now = Date.now();
+            
+            // Если кеш старше 5 минут, очищаем все данные
+            if (cacheTimestamp && (now - parseInt(cacheTimestamp)) > this.CACHE_MAX_AGE) {
+                console.log('[clearStaleCache] Clearing stale cache data');
+                
+                // Очищаем все ключи, связанные с кешем (кроме токена и пользователя)
+                const keysToRemove = [];
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && (
+                        key.startsWith('wallet_') ||
+                        key.startsWith('portfolio_') ||
+                        key.startsWith('trading_') ||
+                        key === this.CACHE_TIMESTAMP_KEY
+                    )) {
+                        keysToRemove.push(key);
+                    }
+                }
+                
+                keysToRemove.forEach(key => {
+                    localStorage.removeItem(key);
+                    console.log(`[clearStaleCache] Removed: ${key}`);
+                });
+            }
+            
+            // Обновляем timestamp
+            localStorage.setItem(this.CACHE_TIMESTAMP_KEY, now.toString());
+        } catch (error) {
+            console.error('[clearStaleCache] Error:', error);
+        }
+    },
+    
+    /**
+     * Проверка актуальности кешированных данных
+     */
+    isCacheStale() {
+        try {
+            const cacheTimestamp = localStorage.getItem(this.CACHE_TIMESTAMP_KEY);
+            if (!cacheTimestamp) return true;
+            
+            const now = Date.now();
+            return (now - parseInt(cacheTimestamp)) > this.CACHE_MAX_AGE;
+        } catch (error) {
+            console.error('[isCacheStale] Error:', error);
+            return true; // В случае ошибки считаем кеш устаревшим
+        }
     },
     
     /**
@@ -400,18 +457,19 @@ const Auth = {
         }
         
         try {
-            // Добавляем timestamp для предотвращения кэширования при принудительном обновлении
-            const url = forceRefresh 
-                ? `/api/auth.php?action=me&_t=${Date.now()}`
-                : '/api/auth.php?action=me';
+            // Всегда добавляем cache-busting параметры
+            const separator = '/api/auth.php?action=me'.includes('?') ? '&' : '?';
+            const cacheBuster = `_t=${Date.now()}&_r=${Math.random().toString(36).substring(7)}`;
+            const url = `/api/auth.php?action=me${separator}${cacheBuster}`;
             
             const response = await fetch(url, {
+                method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${token}`,
-                    'Cache-Control': forceRefresh ? 'no-cache, no-store, must-revalidate' : 'default',
-                    'Pragma': forceRefresh ? 'no-cache' : 'default',
-                    'Expires': forceRefresh ? '0' : 'default'
-                }
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache'
+                },
+                cache: 'no-store' // Предотвращаем кеширование
             });
             
             // Проверяем HTTP статус
@@ -586,6 +644,9 @@ const Auth = {
      * Проверяет localStorage и обновляет UI
      */
     initAuth() {
+        // Очищаем устаревшие данные из кеша
+        this.clearStaleCache();
+        
         const token = this.getToken();
         const user = this.getUser();
         const isAuth = !!token;

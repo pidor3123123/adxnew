@@ -10,6 +10,16 @@ setCorsHeaders();
 header('Access-Control-Allow-Methods: POST, GET, PUT, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
 
+/**
+ * Установка заголовков для предотвращения кеширования
+ * Используется для динамических данных (баланс, транзакции, профиль)
+ */
+function setNoCacheHeaders(): void {
+    header('Cache-Control: no-cache, no-store, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+    header('Expires: 0');
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
     exit;
@@ -78,6 +88,7 @@ try {
     switch ($action) {
         case 'profile':
             if ($method === 'GET') {
+                setNoCacheHeaders();
                 echo json_encode([
                     'success' => true,
                     'user' => $user
@@ -98,6 +109,7 @@ try {
                 ');
                 $stmt->execute([$firstName, $lastName, $phone, $country, $user['id']]);
                 
+                setNoCacheHeaders();
                 echo json_encode([
                     'success' => true,
                     'message' => 'Profile updated'

@@ -10,6 +10,15 @@ setCorsHeaders();
 header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
 
+/**
+ * Установка заголовков для предотвращения кеширования
+ */
+function setNoCacheHeaders(): void {
+    header('Cache-Control: no-cache, no-store, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+    header('Expires: 0');
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
     exit;
@@ -374,6 +383,7 @@ try {
                 
                 $db->commit();
                 
+                setNoCacheHeaders();
                 echo json_encode([
                     'success' => true,
                     'order' => [

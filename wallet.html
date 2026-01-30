@@ -821,12 +821,76 @@
         let previousBalances = {};
         let balanceUpdateInterval = null;
         
+        /**
+         * Очистка устаревших данных из localStorage
+         */
+        function clearStaleCache() {
+            try {
+                const CACHE_MAX_AGE = 5 * 60 * 1000; // 5 минут
+                const now = Date.now();
+                
+                // Очищаем устаревшие уведомления
+                const savedNotifications = localStorage.getItem('wallet_notifications');
+                if (savedNotifications) {
+                    try {
+                        const notifications = JSON.parse(savedNotifications);
+                        const validNotifications = notifications.filter(n => {
+                            const notificationTime = n.timestamp || 0;
+                            return (now - notificationTime) < CACHE_MAX_AGE;
+                        });
+                        
+                        if (validNotifications.length !== notifications.length) {
+                            if (validNotifications.length > 0) {
+                                localStorage.setItem('wallet_notifications', JSON.stringify(validNotifications));
+                            } else {
+                                localStorage.removeItem('wallet_notifications');
+                            }
+                            console.log('[clearStaleCache] Removed', notifications.length - validNotifications.length, 'stale notifications');
+                        }
+                    } catch (e) {
+                        console.error('[clearStaleCache] Error parsing notifications:', e);
+                        localStorage.removeItem('wallet_notifications');
+                    }
+                }
+                
+                // Очищаем устаревшие балансы (если они старше 5 минут)
+                const savedBalances = localStorage.getItem('wallet_previous_balances');
+                if (savedBalances) {
+                    try {
+                        const balancesData = JSON.parse(savedBalances);
+                        // Если есть timestamp и он устарел, очищаем
+                        if (balancesData._timestamp && (now - balancesData._timestamp) > CACHE_MAX_AGE) {
+                            localStorage.removeItem('wallet_previous_balances');
+                            previousBalances = {};
+                            console.log('[clearStaleCache] Removed stale balances');
+                        }
+                    } catch (e) {
+                        console.error('[clearStaleCache] Error parsing balances:', e);
+                        localStorage.removeItem('wallet_previous_balances');
+                        previousBalances = {};
+                    }
+                }
+            } catch (error) {
+                console.error('[clearStaleCache] Error:', error);
+            }
+        }
+        
         function initBalanceTracking() {
+            // Очищаем устаревшие данные перед загрузкой
+            clearStaleCache();
+            
             // Загружаем сохраненные балансы из localStorage
             const saved = localStorage.getItem('wallet_previous_balances');
             if (saved) {
                 try {
-                    previousBalances = JSON.parse(saved);
+                    const balancesData = JSON.parse(saved);
+                    // Если это старый формат без timestamp, используем как есть
+                    if (balancesData._timestamp) {
+                        previousBalances = balancesData;
+                        delete previousBalances._timestamp;
+                    } else {
+                        previousBalances = balancesData;
+                    }
                 } catch (e) {
                     previousBalances = {};
                 }
@@ -838,7 +902,12 @@
             newBalances.forEach(b => {
                 previousBalances[b.currency] = parseFloat(b.available);
             });
-            localStorage.setItem('wallet_previous_balances', JSON.stringify(previousBalances));
+            // Добавляем timestamp для отслеживания актуальности
+            const balancesWithTimestamp = {
+                ...previousBalances,
+                _timestamp: Date.now()
+            };
+            localStorage.setItem('wallet_previous_balances', JSON.stringify(balancesWithTimestamp));
         }
         
         async function loadBalances(forceRefresh = false) {

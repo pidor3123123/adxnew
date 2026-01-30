@@ -92,6 +92,16 @@ setCorsHeaders();
 header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
 
+/**
+ * Установка заголовков для предотвращения кеширования
+ * Используется для динамических данных (баланс, транзакции, профиль)
+ */
+function setNoCacheHeaders(): void {
+    header('Cache-Control: no-cache, no-store, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+    header('Expires: 0');
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     ob_end_clean();
     http_response_code(200);
@@ -175,40 +185,72 @@ function getUsdPrices(): array {
 function getSupabaseUserId(array $mysqlUser): string {
     $supabase = getSupabaseClient();
     $email = $mysqlUser['email'] ?? null;
+    $mysqlUserId = $mysqlUser['id'] ?? null;
     
     if (!$email) {
+        error_log("getSupabaseUserId: User email is missing. MySQL user ID: " . ($mysqlUserId ?? 'N/A'));
         throw new Exception('User email is required to get Supabase UUID', 400);
     }
     
-    // Ищем пользователя в Supabase по email
-    $supabaseUser = $supabase->get('users', 'email', $email);
+    error_log("getSupabaseUserId: Looking for user with email: $email, MySQL ID: " . ($mysqlUserId ?? 'N/A'));
     
-    if ($supabaseUser && isset($supabaseUser['id'])) {
-        return $supabaseUser['id'];
+    // Ищем пользователя в Supabase по email
+    try {
+        $supabaseUser = $supabase->get('users', 'email', $email);
+        
+        if ($supabaseUser && isset($supabaseUser['id'])) {
+            error_log("getSupabaseUserId: Found user in Supabase users table. UUID: {$supabaseUser['id']}");
+            return $supabaseUser['id'];
+        }
+    } catch (Exception $e) {
+        error_log("getSupabaseUserId: Error searching in users table: " . $e->getMessage());
     }
     
     // Если пользователь не найден, пытаемся найти в auth.users
-    $authUserId = $supabase->findAuthUserByEmail($email);
-    
-    if ($authUserId) {
-        return $authUserId;
+    try {
+        $authUserId = $supabase->findAuthUserByEmail($email);
+        
+        if ($authUserId) {
+            error_log("getSupabaseUserId: Found user in auth.users. UUID: $authUserId");
+            return $authUserId;
+        }
+    } catch (Exception $e) {
+        error_log("getSupabaseUserId: Error searching in auth.users: " . $e->getMessage());
     }
     
     // Если пользователь не найден, синхронизируем его
     // Это должно быть сделано при регистрации, но на случай если пропустили
-    if (function_exists('syncUserToSupabase') && isset($mysqlUser['id'])) {
+    if (function_exists('syncUserToSupabase') && $mysqlUserId) {
+        error_log("getSupabaseUserId: User not found, attempting sync. MySQL ID: $mysqlUserId, Email: $email");
         try {
-            syncUserToSupabase($mysqlUser['id']);
+            syncUserToSupabase($mysqlUserId);
+            error_log("getSupabaseUserId: Sync completed, searching again for user");
+            
             // Повторно ищем
             $supabaseUser = $supabase->get('users', 'email', $email);
             if ($supabaseUser && isset($supabaseUser['id'])) {
+                error_log("getSupabaseUserId: User found after sync. UUID: {$supabaseUser['id']}");
                 return $supabaseUser['id'];
             }
+            
+            // Пробуем еще раз через auth.users
+            $authUserId = $supabase->findAuthUserByEmail($email);
+            if ($authUserId) {
+                error_log("getSupabaseUserId: User found in auth.users after sync. UUID: $authUserId");
+                return $authUserId;
+            }
+            
+            error_log("getSupabaseUserId: User still not found after sync. MySQL ID: $mysqlUserId, Email: $email");
         } catch (Exception $e) {
-            error_log("Error syncing user to Supabase: " . $e->getMessage());
+            error_log("getSupabaseUserId: Error syncing user to Supabase. MySQL ID: $mysqlUserId, Email: $email, Error: " . $e->getMessage());
+            error_log("getSupabaseUserId: Sync exception trace: " . $e->getTraceAsString());
+            throw new Exception("Failed to sync user to Supabase: " . $e->getMessage(), 500, $e);
         }
+    } else {
+        error_log("getSupabaseUserId: Cannot sync user - function not available or MySQL ID missing. MySQL ID: " . ($mysqlUserId ?? 'N/A'));
     }
     
+    error_log("getSupabaseUserId: User not found in Supabase and sync failed or unavailable. MySQL ID: " . ($mysqlUserId ?? 'N/A') . ", Email: $email");
     throw new Exception("User not found in Supabase. Please contact support.", 404);
 }
 
@@ -272,15 +314,25 @@ try {
                     error_log("Wallet balances API: Supabase user_id={$supabaseUserId}");
                 } catch (Exception $e) {
                     error_log("Wallet balances API: User not found in Supabase, attempting sync. Error: " . $e->getMessage());
+                    error_log("Wallet balances API: Exception type: " . get_class($e));
+                    error_log("Wallet balances API: Exception code: " . $e->getCode());
+                    error_log("Wallet balances API: Exception file: " . $e->getFile() . ":" . $e->getLine());
+                    error_log("Wallet balances API: Exception trace: " . $e->getTraceAsString());
                     
                     // Пытаемся синхронизировать пользователя
                     if (function_exists('syncUserToSupabase') && isset($user['id'])) {
                         try {
+                            error_log("Wallet balances API: Attempting to sync user ID {$user['id']} to Supabase");
                             syncUserToSupabase($user['id']);
                             $supabaseUserId = getSupabaseUserId($user);
                             error_log("Wallet balances API: User synced successfully, Supabase user_id={$supabaseUserId}");
                         } catch (Exception $syncError) {
                             error_log("Wallet balances API: Sync failed: " . $syncError->getMessage());
+                            error_log("Wallet balances API: Sync exception type: " . get_class($syncError));
+                            error_log("Wallet balances API: Sync exception code: " . $syncError->getCode());
+                            error_log("Wallet balances API: Sync exception file: " . $syncError->getFile() . ":" . $syncError->getLine());
+                            error_log("Wallet balances API: Sync exception trace: " . $syncError->getTraceAsString());
+                            
                             // Возвращаем пустой баланс, если синхронизация не удалась
                             if (ob_get_level() > 0) {
                                 ob_end_clean();
@@ -295,7 +347,7 @@ try {
                         }
                     } else {
                         // Если синхронизация недоступна, возвращаем пустой баланс
-                        error_log("Wallet balances API: syncUserToSupabase function not available");
+                        error_log("Wallet balances API: syncUserToSupabase function not available or user ID missing. User ID: " . ($user['id'] ?? 'N/A'));
                         if (ob_get_level() > 0) {
                             ob_end_clean();
                         }
@@ -340,7 +392,19 @@ try {
                     
                     // Если balances - это строка JSON, парсим её
                     if (is_string($balances)) {
-                        $balances = json_decode($balances, true) ?? [];
+                        $decoded = json_decode($balances, true);
+                        if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                            $balances = $decoded;
+                        } else {
+                            error_log("Wallet balances API: Failed to decode balances JSON string: " . json_last_error_msg());
+                            $balances = [];
+                        }
+                    }
+                    
+                    // Убеждаемся, что balances - это массив
+                    if (!is_array($balances)) {
+                        error_log("Wallet balances API: balances is not an array, type: " . gettype($balances) . ", value: " . json_encode($balances));
+                        $balances = [];
                     }
                     
                     error_log("Wallet balances API: Found " . count($balances) . " balance records");
@@ -385,6 +449,9 @@ try {
                         ob_end_clean();
                     }
                     
+                    // Устанавливаем заголовки против кеширования
+                    setNoCacheHeaders();
+                    
                     echo json_encode([
                         'success' => true,
                         'balances' => $formattedBalances,
@@ -416,6 +483,9 @@ try {
                 }
             } catch (Exception $e) {
                 error_log("Wallet balances API: Error for user_id={$user['id']}: " . $e->getMessage());
+                error_log("Wallet balances API: Exception type: " . get_class($e));
+                error_log("Wallet balances API: Exception code: " . $e->getCode());
+                error_log("Wallet balances API: Exception file: " . $e->getFile() . ":" . $e->getLine());
                 error_log("Wallet balances API: Error trace: " . $e->getTraceAsString());
                 throw $e;
             }
@@ -471,6 +541,9 @@ try {
                 if (ob_get_level() > 0) {
                     ob_end_clean();
                 }
+                
+                // Устанавливаем заголовки против кеширования
+                setNoCacheHeaders();
                 
                 echo json_encode([
                     'success' => true,
@@ -538,6 +611,9 @@ try {
                     ob_end_clean();
                 }
                 
+                // Устанавливаем заголовки против кеширования
+                setNoCacheHeaders();
+                
                 echo json_encode([
                     'success' => true,
                     'message' => 'Withdrawal processed successfully',
@@ -569,24 +645,64 @@ try {
                     $supabaseUserId = getSupabaseUserId($user);
                 } catch (Exception $e) {
                     error_log("Wallet transactions API: User not found in Supabase: " . $e->getMessage());
-                    // Возвращаем пустой список транзакций
-                    if (ob_get_level() > 0) {
-                        ob_end_clean();
+                    error_log("Wallet transactions API: Exception type: " . get_class($e));
+                    error_log("Wallet transactions API: Exception code: " . $e->getCode());
+                    error_log("Wallet transactions API: Exception file: " . $e->getFile() . ":" . $e->getLine());
+                    error_log("Wallet transactions API: Exception trace: " . $e->getTraceAsString());
+                    
+                    // Пытаемся синхронизировать пользователя
+                    if (function_exists('syncUserToSupabase') && isset($user['id'])) {
+                        try {
+                            error_log("Wallet transactions API: Attempting to sync user ID {$user['id']} to Supabase");
+                            syncUserToSupabase($user['id']);
+                            $supabaseUserId = getSupabaseUserId($user);
+                            error_log("Wallet transactions API: User synced successfully, Supabase user_id={$supabaseUserId}");
+                        } catch (Exception $syncError) {
+                            error_log("Wallet transactions API: Sync failed: " . $syncError->getMessage());
+                            error_log("Wallet transactions API: Sync exception trace: " . $syncError->getTraceAsString());
+                            
+                            // Возвращаем пустой список транзакций, если синхронизация не удалась
+                            if (ob_get_level() > 0) {
+                                ob_end_clean();
+                            }
+                            echo json_encode([
+                                'success' => true,
+                                'transactions' => [],
+                                'total' => 0,
+                                'warning' => 'User not synchronized with Supabase. Please contact support.'
+                            ], JSON_UNESCAPED_UNICODE);
+                            exit;
+                        }
+                    } else {
+                        // Если синхронизация недоступна, возвращаем пустой список
+                        error_log("Wallet transactions API: syncUserToSupabase function not available or user ID missing");
+                        if (ob_get_level() > 0) {
+                            ob_end_clean();
+                        }
+                        echo json_encode([
+                            'success' => true,
+                            'transactions' => [],
+                            'total' => 0,
+                            'warning' => 'User not synchronized with Supabase. Please contact support.'
+                        ], JSON_UNESCAPED_UNICODE);
+                        exit;
                     }
-                    echo json_encode([
-                        'success' => true,
-                        'transactions' => [],
-                        'total' => 0
-                    ], JSON_UNESCAPED_UNICODE);
-                    exit;
                 }
                 
                 // Получаем транзакции через RPC
                 try {
                     $result = $supabase->getTransactions($supabaseUserId, $currency, $limit, $offset);
                     
+                    error_log("Wallet transactions API: RPC result type: " . gettype($result));
+                    error_log("Wallet transactions API: RPC result: " . json_encode($result));
+                    
+                    // Supabase может вернуть JSONB как массив с одним элементом
+                    if (is_array($result) && isset($result[0]) && is_array($result[0])) {
+                        $result = $result[0];
+                    }
+                    
                     if (!isset($result['success']) || !$result['success']) {
-                        error_log("Wallet transactions API: RPC function returned unsuccessful result");
+                        error_log("Wallet transactions API: RPC function returned unsuccessful result: " . json_encode($result));
                         // Возвращаем пустой список
                         if (ob_get_level() > 0) {
                             ob_end_clean();
@@ -603,7 +719,19 @@ try {
                     
                     // Если transactions - это строка JSON, парсим её
                     if (is_string($transactions)) {
-                        $transactions = json_decode($transactions, true) ?? [];
+                        $decoded = json_decode($transactions, true);
+                        if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                            $transactions = $decoded;
+                        } else {
+                            error_log("Wallet transactions API: Failed to decode transactions JSON string: " . json_last_error_msg());
+                            $transactions = [];
+                        }
+                    }
+                    
+                    // Убеждаемся, что transactions - это массив
+                    if (!is_array($transactions)) {
+                        error_log("Wallet transactions API: transactions is not an array, type: " . gettype($transactions) . ", value: " . json_encode($transactions));
+                        $transactions = [];
                     }
                     
                     // Фильтруем по типу, если указан
@@ -634,6 +762,9 @@ try {
                         ob_end_clean();
                     }
                     
+                    // Устанавливаем заголовки против кеширования
+                    setNoCacheHeaders();
+                    
                     echo json_encode([
                         'success' => true,
                         'transactions' => $formattedTransactions,
@@ -641,18 +772,40 @@ try {
                     ], JSON_UNESCAPED_UNICODE);
                 } catch (Exception $rpcError) {
                     error_log("Wallet transactions API: RPC error: " . $rpcError->getMessage());
+                    error_log("Wallet transactions API: RPC error type: " . get_class($rpcError));
+                    error_log("Wallet transactions API: RPC error code: " . $rpcError->getCode());
+                    error_log("Wallet transactions API: RPC error file: " . $rpcError->getFile() . ":" . $rpcError->getLine());
+                    error_log("Wallet transactions API: RPC error trace: " . $rpcError->getTraceAsString());
+                    
                     // Возвращаем пустой список при ошибке RPC
                     if (ob_get_level() > 0) {
                         ob_end_clean();
                     }
-                    echo json_encode([
-                        'success' => true,
-                        'transactions' => [],
-                        'total' => 0
-                    ], JSON_UNESCAPED_UNICODE);
+                    
+                    // Проверяем, является ли это ошибкой отсутствия функции
+                    if (strpos($rpcError->getMessage(), 'function') !== false || 
+                        strpos($rpcError->getMessage(), 'does not exist') !== false ||
+                        strpos($rpcError->getMessage(), '404') !== false) {
+                        echo json_encode([
+                            'success' => true,
+                            'transactions' => [],
+                            'total' => 0,
+                            'warning' => 'Wallet system not fully configured. Please execute SQL schema in Supabase.'
+                        ], JSON_UNESCAPED_UNICODE);
+                    } else {
+                        echo json_encode([
+                            'success' => true,
+                            'transactions' => [],
+                            'total' => 0
+                        ], JSON_UNESCAPED_UNICODE);
+                    }
                 }
             } catch (Exception $e) {
                 error_log("Wallet transactions API: Error for user_id={$user['id']}: " . $e->getMessage());
+                error_log("Wallet transactions API: Exception type: " . get_class($e));
+                error_log("Wallet transactions API: Exception code: " . $e->getCode());
+                error_log("Wallet transactions API: Exception file: " . $e->getFile() . ":" . $e->getLine());
+                error_log("Wallet transactions API: Exception trace: " . $e->getTraceAsString());
                 throw $e;
             }
             break;

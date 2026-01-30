@@ -11,17 +11,31 @@ const API = {
     async request(endpoint, options = {}) {
         const token = Auth.getToken();
         
+        // Добавляем cache-busting параметр к URL
+        const separator = endpoint.includes('?') ? '&' : '?';
+        const cacheBuster = `_t=${Date.now()}&_r=${Math.random().toString(36).substring(7)}`;
+        const urlWithCacheBuster = this.baseUrl + endpoint + separator + cacheBuster;
+        
         const config = {
+            method: options.method || 'GET',
             headers: {
                 'Content-Type': 'application/json',
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
                 ...(token && { 'Authorization': `Bearer ${token}` }),
                 ...options.headers
             },
+            cache: 'no-store', // Предотвращаем кеширование
             ...options
         };
         
+        // Если есть body, добавляем его
+        if (options.body) {
+            config.body = options.body;
+        }
+        
         try {
-            const response = await fetch(this.baseUrl + endpoint, config);
+            const response = await fetch(urlWithCacheBuster, config);
             
             // Проверяем Content-Type перед парсингом JSON
             const contentType = response.headers.get('content-type');
