@@ -62,6 +62,11 @@ try {
     require_once __DIR__ . '/../config/database.php';
     require_once __DIR__ . '/../config/supabase.php';
     require_once __DIR__ . '/auth.php';
+    
+    // Загружаем sync.php для функции syncUserToSupabase
+    if (file_exists(__DIR__ . '/sync.php')) {
+        require_once __DIR__ . '/sync.php';
+    }
 } catch (Exception $e) {
     if (ob_get_level() > 0) {
         ob_end_clean();
