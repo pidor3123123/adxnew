@@ -390,8 +390,9 @@ const Auth = {
     
     /**
      * Получение данных текущего пользователя с сервера
+     * @param {boolean} forceRefresh - Принудительное обновление без использования кэша
      */
-    async fetchUser() {
+    async fetchUser(forceRefresh = false) {
         const token = this.getToken();
         
         if (!token) {
@@ -399,9 +400,17 @@ const Auth = {
         }
         
         try {
-            const response = await fetch('/api/auth.php?action=me', {
+            // Добавляем timestamp для предотвращения кэширования при принудительном обновлении
+            const url = forceRefresh 
+                ? `/api/auth.php?action=me&_t=${Date.now()}`
+                : '/api/auth.php?action=me';
+            
+            const response = await fetch(url, {
                 headers: {
-                    'Authorization': `Bearer ${token}`
+                    'Authorization': `Bearer ${token}`,
+                    'Cache-Control': forceRefresh ? 'no-cache, no-store, must-revalidate' : 'default',
+                    'Pragma': forceRefresh ? 'no-cache' : 'default',
+                    'Expires': forceRefresh ? '0' : 'default'
                 }
             });
             
@@ -519,9 +528,10 @@ const Auth = {
     
     /**
      * Загрузка баланса пользователя
+     * @param {boolean} forceRefresh - Принудительное обновление без использования кэша
      */
-    async loadBalance() {
-        console.log('[loadBalance] Starting balance load...');
+    async loadBalance(forceRefresh = false) {
+        console.log('[loadBalance] Starting balance load...', { forceRefresh });
         
         if (!this.isAuthenticated()) {
             console.log('[loadBalance] User not authenticated, skipping');
@@ -530,7 +540,7 @@ const Auth = {
         
         try {
             console.log('[loadBalance] Fetching user data...');
-            const result = await this.fetchUser();
+            const result = await this.fetchUser(forceRefresh);
             console.log('[loadBalance] fetchUser result:', result);
             
             if (result && result.balances) {
@@ -692,19 +702,19 @@ window.Auth = Auth;
             Auth.loadBalance();
         }, 200);
         
-        // Обновляем каждые 30 секунд
+        // Обновляем каждые 5 секунд для более быстрого отображения изменений из админ-панели
         setInterval(() => {
             if (Auth.isAuthenticated()) {
                 console.log('[initBalanceUpdates] Periodic balance update...');
-                Auth.loadBalance();
+                Auth.loadBalance(true); // Принудительное обновление без кэша
             }
-        }, 30000);
+        }, 5000);
         
         // Обновляем при возврате фокуса на вкладку
         document.addEventListener('visibilitychange', () => {
             if (!document.hidden && Auth.isAuthenticated()) {
                 console.log('[initBalanceUpdates] Visibility changed, updating balance...');
-                Auth.loadBalance();
+                Auth.loadBalance(true); // Принудительное обновление при возврате фокуса
             }
         });
         
@@ -712,9 +722,31 @@ window.Auth = Auth;
         window.addEventListener('focus', () => {
             if (Auth.isAuthenticated()) {
                 console.log('[initBalanceUpdates] Window focused, updating balance...');
-                Auth.loadBalance();
+                Auth.loadBalance(true); // Принудительное обновление при фокусе
             }
         });
+        
+        // Обновляем баланс при клике на элементы, связанные с балансом
+        document.addEventListener('click', (e) => {
+            // Обновляем баланс при клике на элементы, связанные с кошельком или балансом
+            if (e.target.closest('[href*="wallet"], [href*="portfolio"], [href*="positions"], #headerBalance, .user-balance')) {
+                if (Auth.isAuthenticated()) {
+                    setTimeout(() => {
+                        Auth.loadBalance(true);
+                    }, 500);
+                }
+            }
+        });
+        
+        // Обновляем баланс при наведении на баланс в header (для быстрого обновления)
+        const headerBalance = document.getElementById('headerBalance');
+        if (headerBalance) {
+            headerBalance.addEventListener('mouseenter', () => {
+                if (Auth.isAuthenticated()) {
+                    Auth.loadBalance(true);
+                }
+            });
+        }
     }
     
     // Инициализируем при загрузке DOM
