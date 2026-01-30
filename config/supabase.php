@@ -161,11 +161,47 @@ class SupabaseClient {
             throw new Exception("CURL Error calling RPC $functionName: $error");
         }
         
+        // Логируем запрос для диагностики
+        error_log("Supabase RPC Request: $functionName, Params: " . json_encode($params));
+        error_log("Supabase RPC Response Code: $httpCode");
+        error_log("Supabase RPC Response: " . substr($response, 0, 500)); // Первые 500 символов
+        
         $decoded = json_decode($response, true);
         
         if ($httpCode >= 400) {
-            $errorMessage = $decoded['message'] ?? $decoded['error'] ?? $decoded['hint'] ?? "HTTP $httpCode";
+            // Логируем детали ошибки для диагностики
+            error_log("Supabase RPC Error ($functionName): HTTP $httpCode");
+            error_log("Supabase RPC Error Full Response: " . $response);
+            
+            $errorMessage = $decoded['message'] ?? $decoded['error'] ?? $decoded['hint'] ?? $decoded['error_description'] ?? "HTTP $httpCode";
+            
+            // Если это ошибка отсутствия функции, даем более понятное сообщение
+            if ($httpCode === 404 || strpos($errorMessage, 'function') !== false || strpos($errorMessage, 'does not exist') !== false) {
+                throw new Exception("RPC function '$functionName' not found in Supabase. Please execute SQL schema.", 404);
+            }
+            
             throw new Exception("Supabase RPC Error ($functionName): $errorMessage", $httpCode);
+        }
+        
+        // Supabase RPC функции могут возвращать JSONB напрямую (не массив)
+        // Если ответ - это JSONB объект, он будет распарсен как массив
+        // Если ответ - это массив с одним элементом (JSONB), берем первый элемент
+        if (is_array($decoded) && count($decoded) === 1 && isset($decoded[0])) {
+            // Это массив с одним JSONB объектом - возвращаем объект
+            return $decoded[0];
+        }
+        
+        // Если ответ пустой, возвращаем пустой массив
+        if ($decoded === null) {
+            if ($response === '' || $response === 'null') {
+                return [];
+            }
+            // Пытаемся распарсить как JSON еще раз
+            $decoded = json_decode($response, true);
+            if ($decoded === null) {
+                error_log("Supabase RPC Warning: Could not parse response as JSON: " . substr($response, 0, 200));
+                return [];
+            }
         }
         
         return $decoded;

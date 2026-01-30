@@ -265,68 +265,158 @@ try {
             
             try {
                 $supabase = getSupabaseClient();
-                $supabaseUserId = getSupabaseUserId($user);
                 
-                error_log("Wallet balances API: Supabase user_id={$supabaseUserId}");
+                // Пытаемся получить Supabase UUID
+                try {
+                    $supabaseUserId = getSupabaseUserId($user);
+                    error_log("Wallet balances API: Supabase user_id={$supabaseUserId}");
+                } catch (Exception $e) {
+                    error_log("Wallet balances API: User not found in Supabase, attempting sync. Error: " . $e->getMessage());
+                    
+                    // Пытаемся синхронизировать пользователя
+                    if (function_exists('syncUserToSupabase') && isset($user['id'])) {
+                        try {
+                            syncUserToSupabase($user['id']);
+                            $supabaseUserId = getSupabaseUserId($user);
+                            error_log("Wallet balances API: User synced successfully, Supabase user_id={$supabaseUserId}");
+                        } catch (Exception $syncError) {
+                            error_log("Wallet balances API: Sync failed: " . $syncError->getMessage());
+                            // Возвращаем пустой баланс, если синхронизация не удалась
+                            if (ob_get_level() > 0) {
+                                ob_end_clean();
+                            }
+                            echo json_encode([
+                                'success' => true,
+                                'balances' => [],
+                                'total_usd' => 0,
+                                'warning' => 'User not synchronized with Supabase. Please contact support.'
+                            ], JSON_UNESCAPED_UNICODE);
+                            exit;
+                        }
+                    } else {
+                        // Если синхронизация недоступна, возвращаем пустой баланс
+                        error_log("Wallet balances API: syncUserToSupabase function not available");
+                        if (ob_get_level() > 0) {
+                            ob_end_clean();
+                        }
+                        echo json_encode([
+                            'success' => true,
+                            'balances' => [],
+                            'total_usd' => 0,
+                            'warning' => 'User not synchronized with Supabase. Please contact support.'
+                        ], JSON_UNESCAPED_UNICODE);
+                        exit;
+                    }
+                }
                 
                 // Получаем все балансы через RPC
-                $result = $supabase->getAllWalletBalances($supabaseUserId);
-                
-                if (!$result['success']) {
-                    throw new Exception('Failed to fetch balances from Supabase', 500);
-                }
-                
-                $balances = $result['balances'] ?? [];
-                
-                error_log("Wallet balances API: Found " . count($balances) . " balance records");
-                
-                // Преобразуем формат для совместимости с фронтендом
-                $formattedBalances = [];
-                $totalUsd = 0;
-                
-                // Получаем цены для конвертации в USD
-                $prices = getUsdPrices();
-                
-                foreach ($balances as $balance) {
-                    $currency = $balance['currency'] ?? 'USD';
-                    $balanceAmount = (float)($balance['balance'] ?? 0);
+                try {
+                    $result = $supabase->getAllWalletBalances($supabaseUserId);
                     
-                    $price = $prices[$currency] ?? 0;
-                    $usdValue = $balanceAmount * $price;
-                    $totalUsd += $usdValue;
+                    error_log("Wallet balances API: RPC result type: " . gettype($result));
+                    error_log("Wallet balances API: RPC result: " . json_encode($result));
                     
-                    $formattedBalances[] = [
-                        'currency' => $currency,
-                        'available' => $balanceAmount,
-                        'reserved' => 0, // В новой схеме нет reserved, все в balance
-                        'usd_value' => $usdValue
-                    ];
+                    // Supabase может вернуть JSONB как массив с одним элементом
+                    if (is_array($result) && isset($result[0]) && is_array($result[0])) {
+                        $result = $result[0];
+                    }
                     
-                    error_log("Wallet balances API: Balance - currency={$currency}, balance={$balanceAmount}, usd_value={$usdValue}");
+                    if (!isset($result['success']) || !$result['success']) {
+                        error_log("Wallet balances API: RPC function returned unsuccessful result: " . json_encode($result));
+                        // Возвращаем пустой баланс, если RPC функция не работает
+                        if (ob_get_level() > 0) {
+                            ob_end_clean();
+                        }
+                        echo json_encode([
+                            'success' => true,
+                            'balances' => [],
+                            'total_usd' => 0,
+                            'warning' => 'Wallet system not fully configured. Please contact support.'
+                        ], JSON_UNESCAPED_UNICODE);
+                        exit;
+                    }
+                    
+                    $balances = $result['balances'] ?? [];
+                    
+                    // Если balances - это строка JSON, парсим её
+                    if (is_string($balances)) {
+                        $balances = json_decode($balances, true) ?? [];
+                    }
+                    
+                    error_log("Wallet balances API: Found " . count($balances) . " balance records");
+                    
+                    // Преобразуем формат для совместимости с фронтендом
+                    $formattedBalances = [];
+                    $totalUsd = 0;
+                    
+                    // Получаем цены для конвертации в USD
+                    $prices = getUsdPrices();
+                    
+                    foreach ($balances as $balance) {
+                        $currency = $balance['currency'] ?? 'USD';
+                        $balanceAmount = (float)($balance['balance'] ?? 0);
+                        
+                        $price = $prices[$currency] ?? 0;
+                        $usdValue = $balanceAmount * $price;
+                        $totalUsd += $usdValue;
+                        
+                        $formattedBalances[] = [
+                            'currency' => $currency,
+                            'available' => $balanceAmount,
+                            'reserved' => 0, // В новой схеме нет reserved, все в balance
+                            'usd_value' => $usdValue
+                        ];
+                        
+                        error_log("Wallet balances API: Balance - currency={$currency}, balance={$balanceAmount}, usd_value={$usdValue}");
+                    }
+                    
+                    // Сортируем балансы
+                    usort($formattedBalances, function($a, $b) {
+                        $order = ['USD' => 0, 'BTC' => 1, 'ETH' => 2];
+                        $orderA = $order[$a['currency']] ?? 3;
+                        $orderB = $order[$b['currency']] ?? 3;
+                        return $orderA <=> $orderB ?: strcmp($a['currency'], $b['currency']);
+                    });
+                    
+                    error_log("Wallet balances API: user_id={$user['id']}, balances_count=" . count($formattedBalances) . ", total_usd={$totalUsd}");
+                    
+                    // Очищаем буфер перед выводом JSON
+                    if (ob_get_level() > 0) {
+                        ob_end_clean();
+                    }
+                    
+                    echo json_encode([
+                        'success' => true,
+                        'balances' => $formattedBalances,
+                        'total_usd' => $totalUsd
+                    ], JSON_UNESCAPED_UNICODE);
+                } catch (Exception $rpcError) {
+                    error_log("Wallet balances API: RPC error: " . $rpcError->getMessage());
+                    error_log("Wallet balances API: RPC error trace: " . $rpcError->getTraceAsString());
+                    
+                    // Если RPC функция не существует или не работает, возвращаем пустой баланс
+                    if (ob_get_level() > 0) {
+                        ob_end_clean();
+                    }
+                    
+                    // Проверяем, является ли это ошибкой отсутствия функции
+                    if (strpos($rpcError->getMessage(), 'function') !== false || 
+                        strpos($rpcError->getMessage(), 'does not exist') !== false ||
+                        strpos($rpcError->getMessage(), '404') !== false) {
+                        echo json_encode([
+                            'success' => true,
+                            'balances' => [],
+                            'total_usd' => 0,
+                            'warning' => 'Wallet system not fully configured. Please execute SQL schema in Supabase.'
+                        ], JSON_UNESCAPED_UNICODE);
+                    } else {
+                        // Другая ошибка - пробрасываем дальше
+                        throw $rpcError;
+                    }
                 }
-                
-                // Сортируем балансы
-                usort($formattedBalances, function($a, $b) {
-                    $order = ['USD' => 0, 'BTC' => 1, 'ETH' => 2];
-                    $orderA = $order[$a['currency']] ?? 3;
-                    $orderB = $order[$b['currency']] ?? 3;
-                    return $orderA <=> $orderB ?: strcmp($a['currency'], $b['currency']);
-                });
-                
-                error_log("Wallet balances API: user_id={$user['id']}, balances_count=" . count($formattedBalances) . ", total_usd={$totalUsd}");
-                
-                // Очищаем буфер перед выводом JSON
-                if (ob_get_level() > 0) {
-                    ob_end_clean();
-                }
-                
-                echo json_encode([
-                    'success' => true,
-                    'balances' => $formattedBalances,
-                    'total_usd' => $totalUsd
-                ], JSON_UNESCAPED_UNICODE);
             } catch (Exception $e) {
                 error_log("Wallet balances API: Error for user_id={$user['id']}: " . $e->getMessage());
+                error_log("Wallet balances API: Error trace: " . $e->getTraceAsString());
                 throw $e;
             }
             break;
@@ -473,50 +563,94 @@ try {
             
             try {
                 $supabase = getSupabaseClient();
-                $supabaseUserId = getSupabaseUserId($user);
+                
+                // Пытаемся получить Supabase UUID
+                try {
+                    $supabaseUserId = getSupabaseUserId($user);
+                } catch (Exception $e) {
+                    error_log("Wallet transactions API: User not found in Supabase: " . $e->getMessage());
+                    // Возвращаем пустой список транзакций
+                    if (ob_get_level() > 0) {
+                        ob_end_clean();
+                    }
+                    echo json_encode([
+                        'success' => true,
+                        'transactions' => [],
+                        'total' => 0
+                    ], JSON_UNESCAPED_UNICODE);
+                    exit;
+                }
                 
                 // Получаем транзакции через RPC
-                $result = $supabase->getTransactions($supabaseUserId, $currency, $limit, $offset);
-                
-                if (!$result['success']) {
-                    throw new Exception('Failed to fetch transactions from Supabase', 500);
+                try {
+                    $result = $supabase->getTransactions($supabaseUserId, $currency, $limit, $offset);
+                    
+                    if (!isset($result['success']) || !$result['success']) {
+                        error_log("Wallet transactions API: RPC function returned unsuccessful result");
+                        // Возвращаем пустой список
+                        if (ob_get_level() > 0) {
+                            ob_end_clean();
+                        }
+                        echo json_encode([
+                            'success' => true,
+                            'transactions' => [],
+                            'total' => 0
+                        ], JSON_UNESCAPED_UNICODE);
+                        exit;
+                    }
+                    
+                    $transactions = $result['transactions'] ?? [];
+                    
+                    // Если transactions - это строка JSON, парсим её
+                    if (is_string($transactions)) {
+                        $transactions = json_decode($transactions, true) ?? [];
+                    }
+                    
+                    // Фильтруем по типу, если указан
+                    if ($type) {
+                        $transactions = array_filter($transactions, function($t) use ($type) {
+                            return ($t['type'] ?? '') === $type;
+                        });
+                        $transactions = array_values($transactions); // Переиндексируем
+                    }
+                    
+                    // Преобразуем формат для совместимости
+                    $formattedTransactions = [];
+                    foreach ($transactions as $tx) {
+                        $formattedTransactions[] = [
+                            'id' => $tx['id'],
+                            'type' => $tx['type'],
+                            'currency' => $tx['currency'],
+                            'amount' => (float)($tx['amount'] ?? 0),
+                            'description' => $tx['metadata']['description'] ?? '',
+                            'status' => 'completed', // В новой схеме все транзакции completed
+                            'created_at' => $tx['created_at'],
+                            'completed_at' => $tx['created_at']
+                        ];
+                    }
+                    
+                    // Очищаем буфер перед выводом JSON
+                    if (ob_get_level() > 0) {
+                        ob_end_clean();
+                    }
+                    
+                    echo json_encode([
+                        'success' => true,
+                        'transactions' => $formattedTransactions,
+                        'total' => $result['total'] ?? count($formattedTransactions)
+                    ], JSON_UNESCAPED_UNICODE);
+                } catch (Exception $rpcError) {
+                    error_log("Wallet transactions API: RPC error: " . $rpcError->getMessage());
+                    // Возвращаем пустой список при ошибке RPC
+                    if (ob_get_level() > 0) {
+                        ob_end_clean();
+                    }
+                    echo json_encode([
+                        'success' => true,
+                        'transactions' => [],
+                        'total' => 0
+                    ], JSON_UNESCAPED_UNICODE);
                 }
-                
-                $transactions = $result['transactions'] ?? [];
-                
-                // Фильтруем по типу, если указан
-                if ($type) {
-                    $transactions = array_filter($transactions, function($t) use ($type) {
-                        return ($t['type'] ?? '') === $type;
-                    });
-                    $transactions = array_values($transactions); // Переиндексируем
-                }
-                
-                // Преобразуем формат для совместимости
-                $formattedTransactions = [];
-                foreach ($transactions as $tx) {
-                    $formattedTransactions[] = [
-                        'id' => $tx['id'],
-                        'type' => $tx['type'],
-                        'currency' => $tx['currency'],
-                        'amount' => (float)($tx['amount'] ?? 0),
-                        'description' => $tx['metadata']['description'] ?? '',
-                        'status' => 'completed', // В новой схеме все транзакции completed
-                        'created_at' => $tx['created_at'],
-                        'completed_at' => $tx['created_at']
-                    ];
-                }
-                
-                // Очищаем буфер перед выводом JSON
-                if (ob_get_level() > 0) {
-                    ob_end_clean();
-                }
-                
-                echo json_encode([
-                    'success' => true,
-                    'transactions' => $formattedTransactions,
-                    'total' => $result['total'] ?? count($formattedTransactions)
-                ], JSON_UNESCAPED_UNICODE);
             } catch (Exception $e) {
                 error_log("Wallet transactions API: Error for user_id={$user['id']}: " . $e->getMessage());
                 throw $e;
