@@ -144,6 +144,109 @@
         .currency-icon.bnb { background: #f3ba2f20; color: #f3ba2f; }
         .currency-icon.default { background: var(--accent-primary-soft); color: var(--accent-primary); }
         
+        /* Balance Notification Styles */
+        .balance-notification {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px 20px;
+            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+            border-radius: var(--radius-md);
+            color: white;
+            margin-bottom: 12px;
+            box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+            animation: slideInRight 0.3s ease-out;
+            position: relative;
+        }
+        
+        @keyframes slideInRight {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        .balance-notification-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            flex-shrink: 0;
+        }
+        
+        .balance-notification-content {
+            flex: 1;
+        }
+        
+        .balance-notification-title {
+            font-weight: 600;
+            font-size: 1rem;
+            margin-bottom: 4px;
+        }
+        
+        .balance-notification-amount {
+            font-size: 1.5rem;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        
+        .balance-notification-close {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+        }
+        
+        .balance-notification-close:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .balance-notifications-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        
+        .balance-notifications-header h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 0;
+        }
+        
+        .balance-notifications-clear {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .balance-notifications-clear:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+        
         .transaction-item {
             display: flex;
             align-items: center;
@@ -482,6 +585,11 @@
                     </div>
                 </div>
                 
+                <!-- Notifications Section -->
+                <div id="balanceNotifications" style="margin-bottom: 24px; display: none;">
+                    <!-- Notifications will be added here -->
+                </div>
+                
                 <!-- Total Balance -->
                 <div class="wallet-total">
                     <div class="wallet-total-label">Общий баланс</div>
@@ -660,16 +768,87 @@
             
             Auth.updateUI();
             
+            // Инициализация отслеживания баланса
+            initBalanceTracking();
+            
+            // Загружаем сохраненные уведомления
+            loadSavedNotifications();
+            
             await loadBalances();
             await loadTransactions();
+            
+            // Автоматическое обновление каждые 5 секунд
+            setInterval(async () => {
+                if (Auth.isAuthenticated()) {
+                    await loadBalances(true);
+                    await loadTransactions();
+                }
+            }, 5000);
+            
+            // Обновление при возврате фокуса
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden && Auth.isAuthenticated()) {
+                    loadBalances(true);
+                    loadTransactions();
+                }
+            });
+            
+            window.addEventListener('focus', () => {
+                if (Auth.isAuthenticated()) {
+                    loadBalances(true);
+                    loadTransactions();
+                }
+            });
         });
         
-        async function loadBalances() {
+        // Хранилище предыдущих балансов для отслеживания изменений
+        let previousBalances = {};
+        let balanceUpdateInterval = null;
+        
+        function initBalanceTracking() {
+            // Загружаем сохраненные балансы из localStorage
+            const saved = localStorage.getItem('wallet_previous_balances');
+            if (saved) {
+                try {
+                    previousBalances = JSON.parse(saved);
+                } catch (e) {
+                    previousBalances = {};
+                }
+            }
+        }
+        
+        function savePreviousBalances(newBalances) {
+            previousBalances = {};
+            newBalances.forEach(b => {
+                previousBalances[b.currency] = parseFloat(b.available);
+            });
+            localStorage.setItem('wallet_previous_balances', JSON.stringify(previousBalances));
+        }
+        
+        async function loadBalances(forceRefresh = false) {
             try {
-                const result = await API.get('/wallet.php?action=balances');
+                const url = forceRefresh 
+                    ? `/wallet.php?action=balances&_t=${Date.now()}`
+                    : '/wallet.php?action=balances';
+                
+                const result = await API.get(url);
                 
                 if (result.success) {
-                    // Сохраняем балансы
+                    // Отслеживаем изменения баланса
+                    const newBalances = {};
+                    result.balances.forEach(b => {
+                        newBalances[b.currency] = parseFloat(b.available);
+                    });
+                    
+                    // Проверяем изменения
+                    if (Object.keys(previousBalances).length > 0) {
+                        checkBalanceChanges(previousBalances, newBalances, result.balances);
+                    }
+                    
+                    // Сохраняем текущие балансы как предыдущие
+                    savePreviousBalances(result.balances);
+                    
+                    // Обновляем отображение
                     result.balances.forEach(b => {
                         balances[b.currency] = parseFloat(b.available);
                     });
@@ -682,6 +861,219 @@
                 }
             } catch (error) {
                 console.error('Error loading balances:', error);
+            }
+        }
+        
+        function checkBalanceChanges(oldBalances, newBalances, balanceList) {
+            // Проверяем каждую валюту на изменения
+            Object.keys(newBalances).forEach(currency => {
+                const oldBalance = oldBalances[currency] || 0;
+                const newBalance = newBalances[currency] || 0;
+                const difference = newBalance - oldBalance;
+                
+                // Если баланс увеличился (пополнение)
+                if (difference > 0.0001) { // Учитываем погрешность округления
+                    const balanceData = balanceList.find(b => b.currency === currency);
+                    showBalanceNotification(currency, difference, balanceData);
+                }
+            });
+        }
+        
+        // Хранилище активных уведомлений
+        let activeNotifications = [];
+        
+        function showBalanceNotification(currency, amount, balanceData) {
+            // Проверяем, не показывали ли мы уже это уведомление
+            const notificationId = `balance_${currency}_${Date.now()}`;
+            const existing = activeNotifications.find(n => n.currency === currency && Math.abs(n.amount - amount) < 0.01);
+            if (existing) {
+                return; // Уже показывали это уведомление
+            }
+            
+            const notification = {
+                id: notificationId,
+                currency: currency,
+                amount: amount,
+                timestamp: Date.now()
+            };
+            
+            activeNotifications.push(notification);
+            
+            // Создаем элемент уведомления
+            const notificationEl = document.createElement('div');
+            notificationEl.className = 'balance-notification';
+            notificationEl.id = notificationId;
+            
+            const currencyName = getCurrencyName(currency);
+            const formattedAmount = formatBalance(amount, currency);
+            const usdValue = balanceData?.usd_value || (currency === 'USD' ? amount : 0);
+            
+            notificationEl.innerHTML = `
+                <div class="balance-notification-icon">
+                    <i class="bi bi-check-circle-fill"></i>
+                </div>
+                <div class="balance-notification-content">
+                    <div class="balance-notification-title">Зачислено на баланс</div>
+                    <div class="balance-notification-amount">${formattedAmount}</div>
+                    ${currency !== 'USD' && usdValue > 0 ? `<div style="font-size: 0.875rem; opacity: 0.9; margin-top: 2px;">≈ ${NovaTrade.formatCurrency(usdValue)}</div>` : ''}
+                </div>
+                <button class="balance-notification-close" onclick="closeNotification('${notificationId}')">
+                    <i class="bi bi-x"></i>
+                </button>
+            `;
+            
+            // Показываем контейнер уведомлений
+            const container = document.getElementById('balanceNotifications');
+            if (container) {
+                container.style.display = 'block';
+                
+                // Добавляем заголовок, если его еще нет
+                if (!container.querySelector('.balance-notifications-header')) {
+                    const header = document.createElement('div');
+                    header.className = 'balance-notifications-header';
+                    header.innerHTML = `
+                        <h3>Уведомления</h3>
+                        <button class="balance-notifications-clear" onclick="clearAllNotifications()">Закрыть все</button>
+                    `;
+                    container.insertBefore(header, container.firstChild);
+                }
+                
+                // Добавляем уведомление после заголовка
+                const header = container.querySelector('.balance-notifications-header');
+                if (header && header.nextSibling) {
+                    container.insertBefore(notificationEl, header.nextSibling);
+                } else {
+                    container.appendChild(notificationEl);
+                }
+                
+                // Автоматически скрываем через 10 секунд
+                setTimeout(() => {
+                    closeNotification(notificationId);
+                }, 10000);
+            }
+            
+            // Сохраняем уведомление в localStorage для отображения при следующем заходе
+            saveNotificationToStorage(notification);
+        }
+        
+        function closeNotification(notificationId) {
+            const notificationEl = document.getElementById(notificationId);
+            if (notificationEl) {
+                notificationEl.style.animation = 'slideInRight 0.3s ease-out reverse';
+                setTimeout(() => {
+                    notificationEl.remove();
+                    activeNotifications = activeNotifications.filter(n => n.id !== notificationId);
+                    
+                    // Скрываем контейнер, если нет уведомлений
+                    const container = document.getElementById('balanceNotifications');
+                    if (container && container.querySelectorAll('.balance-notification').length === 0) {
+                        container.style.display = 'none';
+                        const header = container.querySelector('.balance-notifications-header');
+                        if (header) header.remove();
+                    }
+                }, 300);
+            }
+        }
+        
+        function clearAllNotifications() {
+            const container = document.getElementById('balanceNotifications');
+            if (container) {
+                const notifications = container.querySelectorAll('.balance-notification');
+                notifications.forEach(notif => {
+                    notif.style.animation = 'slideInRight 0.3s ease-out reverse';
+                    setTimeout(() => notif.remove(), 300);
+                });
+                activeNotifications = [];
+                container.style.display = 'none';
+                const header = container.querySelector('.balance-notifications-header');
+                if (header) header.remove();
+            }
+        }
+        
+        // Экспортируем функции для использования в onclick
+        window.closeNotification = closeNotification;
+        window.clearAllNotifications = clearAllNotifications;
+        
+        function saveNotificationToStorage(notification) {
+            try {
+                const saved = localStorage.getItem('wallet_notifications');
+                const notifications = saved ? JSON.parse(saved) : [];
+                notifications.push(notification);
+                // Храним только последние 10 уведомлений
+                if (notifications.length > 10) {
+                    notifications.shift();
+                }
+                localStorage.setItem('wallet_notifications', JSON.stringify(notifications));
+            } catch (e) {
+                console.error('Error saving notification:', e);
+            }
+        }
+        
+        function loadSavedNotifications() {
+            try {
+                const saved = localStorage.getItem('wallet_notifications');
+                if (saved) {
+                    const notifications = JSON.parse(saved);
+                    // Показываем только уведомления за последний час
+                    const oneHourAgo = Date.now() - 3600000;
+                    const recent = notifications.filter(n => n.timestamp > oneHourAgo);
+                    
+                    if (recent.length > 0) {
+                        recent.forEach(notif => {
+                            // Восстанавливаем уведомление (без повторной проверки)
+                            const notificationEl = document.createElement('div');
+                            notificationEl.className = 'balance-notification';
+                            notificationEl.id = notif.id;
+                            
+                            const currencyName = getCurrencyName(notif.currency);
+                            const formattedAmount = formatBalance(notif.amount, notif.currency);
+                            
+                            notificationEl.innerHTML = `
+                                <div class="balance-notification-icon">
+                                    <i class="bi bi-check-circle-fill"></i>
+                                </div>
+                                <div class="balance-notification-content">
+                                    <div class="balance-notification-title">Зачислено на баланс</div>
+                                    <div class="balance-notification-amount">${formattedAmount}</div>
+                                </div>
+                                <button class="balance-notification-close" onclick="closeNotification('${notif.id}')">
+                                    <i class="bi bi-x"></i>
+                                </button>
+                            `;
+                            
+                            const container = document.getElementById('balanceNotifications');
+                            if (container) {
+                                container.style.display = 'block';
+                                
+                                if (!container.querySelector('.balance-notifications-header')) {
+                                    const header = document.createElement('div');
+                                    header.className = 'balance-notifications-header';
+                                    header.innerHTML = `
+                                        <h3>Уведомления</h3>
+                                        <button class="balance-notifications-clear" onclick="clearAllNotifications()">Закрыть все</button>
+                                    `;
+                                    container.insertBefore(header, container.firstChild);
+                                }
+                                
+                                const header = container.querySelector('.balance-notifications-header');
+                                if (header && header.nextSibling) {
+                                    container.insertBefore(notificationEl, header.nextSibling);
+                                } else {
+                                    container.appendChild(notificationEl);
+                                }
+                                
+                                activeNotifications.push(notif);
+                                
+                                // Автоматически скрываем через 10 секунд
+                                setTimeout(() => {
+                                    closeNotification(notif.id);
+                                }, 10000);
+                            }
+                        });
+                    }
+                }
+            } catch (e) {
+                console.error('Error loading saved notifications:', e);
             }
         }
         
