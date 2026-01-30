@@ -10,14 +10,30 @@ const API = {
      */
     async request(endpoint, options = {}) {
         const token = Auth.getToken();
+        const startTime = performance.now();
         
         // Добавляем cache-busting параметр к URL
         const separator = endpoint.includes('?') ? '&' : '?';
         const cacheBuster = `_t=${Date.now()}&_r=${Math.random().toString(36).substring(7)}`;
         const urlWithCacheBuster = this.baseUrl + endpoint + separator + cacheBuster;
+        const method = options.method || 'GET';
+        
+        // Параметры для логирования
+        let requestParams = null;
+        if (options.body) {
+            try {
+                if (typeof options.body === 'string') {
+                    requestParams = JSON.parse(options.body);
+                } else {
+                    requestParams = options.body;
+                }
+            } catch (e) {
+                requestParams = { body: '[Unable to parse]' };
+            }
+        }
         
         const config = {
-            method: options.method || 'GET',
+            method: method,
             headers: {
                 'Content-Type': 'application/json',
                 'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -35,7 +51,13 @@ const API = {
         }
         
         try {
+            // Логируем запрос
+            if (window.Logger) {
+                window.Logger.apiRequest(urlWithCacheBuster, method, requestParams, null, null);
+            }
+            
             const response = await fetch(urlWithCacheBuster, config);
+            const responseTime = Math.round(performance.now() - startTime);
             
             // Проверяем Content-Type перед парсингом JSON
             const contentType = response.headers.get('content-type');
@@ -46,20 +68,44 @@ const API = {
                 try {
                     data = JSON.parse(text);
                 } catch (parseError) {
-                    throw new Error(`Invalid JSON response: ${text.substring(0, 100)}`);
+                    const error = new Error(`Invalid JSON response: ${text.substring(0, 100)}`);
+                    if (window.Logger) {
+                        window.Logger.apiError(urlWithCacheBuster, error, { responseText: text.substring(0, 200) });
+                    }
+                    throw error;
                 }
             } else {
                 // Если ответ не JSON, читаем как текст для отладки
                 const text = await response.text();
-                throw new Error(`Server returned non-JSON response (${contentType || 'unknown'}): ${text.substring(0, 200)}`);
+                const error = new Error(`Server returned non-JSON response (${contentType || 'unknown'}): ${text.substring(0, 200)}`);
+                if (window.Logger) {
+                    window.Logger.apiError(urlWithCacheBuster, error, { contentType, responseText: text.substring(0, 200) });
+                }
+                throw error;
             }
             
             if (!response.ok) {
-                throw new Error(data.error || `Request failed: ${response.status} ${response.statusText}`);
+                const error = new Error(data.error || `Request failed: ${response.status} ${response.statusText}`);
+                if (window.Logger) {
+                    window.Logger.apiError(urlWithCacheBuster, error, { status: response.status, data });
+                }
+                throw error;
+            }
+            
+            // Логируем успешный ответ
+            if (window.Logger) {
+                window.Logger.apiRequest(urlWithCacheBuster, method, requestParams, responseTime, response.status);
             }
             
             return data;
         } catch (error) {
+            const responseTime = Math.round(performance.now() - startTime);
+            
+            // Логируем ошибку
+            if (window.Logger) {
+                window.Logger.apiError(urlWithCacheBuster, error, { responseTime, method });
+            }
+            
             console.error('API Error:', error);
             
             // Если это сетевая ошибка, логируем детали

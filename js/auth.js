@@ -96,7 +96,16 @@ const Auth = {
      * Сохранение данных пользователя
      */
     setUser(user) {
+        const oldUser = this.getUser();
+        const oldBalance = oldUser?.balance;
+        const newBalance = user?.balance;
+        
         localStorage.setItem(this.USER_KEY, JSON.stringify(user));
+        
+        // Логируем изменение баланса
+        if (window.Logger && oldBalance !== undefined && newBalance !== undefined && oldBalance !== newBalance) {
+            window.Logger.stateChange('balance', oldBalance, newBalance);
+        }
         
         // Если баланс сохранен в user, обновляем его в шапке сразу
         if (user && user.balance !== undefined) {
@@ -112,6 +121,10 @@ const Auth = {
      * Регистрация
      */
     async register(data) {
+        if (window.Logger) {
+            window.Logger.userAction('Registration attempt', { email: data.email });
+        }
+        
         try {
             const response = await fetch('/api/auth.php?action=register', {
                 method: 'POST',
@@ -214,6 +227,10 @@ const Auth = {
      * Вход
      */
     async login(email, password, remember = false) {
+        if (window.Logger) {
+            window.Logger.userAction('Login attempt', { email });
+        }
+        
         try {
             const response = await fetch('/api/auth.php?action=login', {
                 method: 'POST',
@@ -425,6 +442,11 @@ const Auth = {
      * Выход
      */
     async logout() {
+        const user = this.getUser();
+        if (window.Logger) {
+            window.Logger.userAction('Logout', { email: user?.email, userId: user?.id });
+        }
+        
         try {
             const token = this.getToken();
             

@@ -124,6 +124,8 @@ function filterAssetList(query) {
  * Select asset
  */
 async function selectAsset(symbol) {
+    const oldSymbol = currentAsset?.symbol;
+    
     let asset = assetList.find(a => a.symbol === symbol || a.symbol === symbol.toUpperCase());
     
     // Если актив не найден в списке, создаём его с базовыми данными
@@ -170,6 +172,15 @@ async function selectAsset(symbol) {
     
     // Обновляем цену из API для всех активов (криптовалюты, акции, форекс)
     await updateAssetPrice();
+    
+    // Логируем выбор актива
+    if (window.Logger) {
+        window.Logger.userAction('Asset selected', { 
+            symbol: currentAsset.symbol, 
+            name: currentAsset.name,
+            oldSymbol: oldSymbol 
+        });
+    }
     
     // Запускаем обновление цен в реальном времени через API
     startPriceUpdates();
@@ -515,11 +526,36 @@ async function submitOrder(isQuick = false) {
             trade_duration: tradeDuration // Длительность в секундах для быстрой торговли
         };
         
+        // Логируем попытку создания ордера
+        if (window.Logger) {
+            window.Logger.trade('Order submission', {
+                symbol: currentAsset.symbol,
+                side,
+                type,
+                quantity,
+                isQuick,
+                takeProfit,
+                stopLoss,
+                tradeDuration
+            });
+        }
+        
         const result = await TradingAPI.createOrder(orderData);
         
         if (result.success) {
             const tpSlInfo = (takeProfit || stopLoss) ? 
                 ` (TP: ${takeProfit || '—'}, SL: ${stopLoss || '—'})` : '';
+            
+            // Логируем успешное создание ордера
+            if (window.Logger) {
+                window.Logger.trade('Order created successfully', {
+                    orderId: result.order?.id,
+                    symbol: currentAsset.symbol,
+                    side,
+                    quantity,
+                    isQuick
+                });
+            }
             
             NovaTrade.showToast(
                 'Ордер создан', 
@@ -543,6 +579,14 @@ async function submitOrder(isQuick = false) {
                 await Auth.loadBalance();
             }
         } else {
+            // Логируем ошибку создания ордера
+            if (window.Logger) {
+                window.Logger.trade('Order creation failed', {
+                    symbol: currentAsset.symbol,
+                    side,
+                    error: result.error
+                });
+            }
             NovaTrade.showToast('Ошибка', result.error || 'Не удалось создать ордер', 'error');
         }
     } catch (error) {
