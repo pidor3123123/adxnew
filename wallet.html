@@ -774,6 +774,22 @@
             // Загружаем сохраненные уведомления
             loadSavedNotifications();
             
+            // Пытаемся загрузить баланс из Auth как fallback перед основным запросом
+            if (typeof Auth !== 'undefined' && Auth.isAuthenticated()) {
+                const user = Auth.getUser();
+                if (user && user.balance !== undefined) {
+                    console.log('[init] Fallback: Loading balance from Auth.getUser():', user.balance);
+                    const totalBalance = document.getElementById('totalBalance');
+                    if (totalBalance) {
+                        totalBalance.textContent = NovaTrade.formatCurrency(user.balance || 0);
+                    }
+                    const headerBalance = document.getElementById('headerBalance');
+                    if (headerBalance) {
+                        headerBalance.textContent = parseFloat(user.balance || 0).toLocaleString('en-US', { minimumFractionDigits: 2 });
+                    }
+                }
+            }
+            
             await loadBalances();
             await loadTransactions();
             
@@ -826,12 +842,24 @@
         }
         
         async function loadBalances(forceRefresh = false) {
+            const url = forceRefresh 
+                ? `/wallet.php?action=balances&_t=${Date.now()}`
+                : '/wallet.php?action=balances';
+            
+            console.log('[loadBalances] Starting balance load, forceRefresh:', forceRefresh);
+            console.log('[loadBalances] Request URL:', url);
+            console.log('[loadBalances] Auth token:', Auth.getToken() ? 'Present' : 'Missing');
+            console.log('[loadBalances] User authenticated:', Auth.isAuthenticated());
+            
             try {
-                const url = forceRefresh 
-                    ? `/wallet.php?action=balances&_t=${Date.now()}`
-                    : '/wallet.php?action=balances';
-                
                 const result = await API.get(url);
+                
+                console.log('[loadBalances] API response received:', {
+                    success: result.success,
+                    balancesCount: result.balances?.length || 0,
+                    totalUsd: result.total_usd,
+                    balances: result.balances
+                });
                 
                 if (result.success) {
                     // Отслеживаем изменения баланса
@@ -839,6 +867,8 @@
                     result.balances.forEach(b => {
                         newBalances[b.currency] = parseFloat(b.available);
                     });
+                    
+                    console.log('[loadBalances] Processed balances:', newBalances);
                     
                     // Проверяем изменения
                     if (Object.keys(previousBalances).length > 0) {
@@ -856,11 +886,64 @@
                     renderBalances(result.balances, result.total_usd);
                     
                     // Обновляем баланс в шапке
-                    document.getElementById('headerBalance').textContent = 
-                        (balances.USD || 0).toLocaleString('en-US', { minimumFractionDigits: 2 });
+                    const headerBalanceEl = document.getElementById('headerBalance');
+                    if (headerBalanceEl) {
+                        headerBalanceEl.textContent = 
+                            (balances.USD || 0).toLocaleString('en-US', { minimumFractionDigits: 2 });
+                    }
+                    
+                    console.log('[loadBalances] Balance display updated successfully');
+                } else {
+                    console.error('[loadBalances] API returned success=false:', result);
+                    throw new Error(result.error || 'Unknown error from API');
                 }
             } catch (error) {
-                console.error('Error loading balances:', error);
+                console.error('[loadBalances] Error loading balances:', error);
+                console.error('[loadBalances] Error details:', {
+                    name: error.name,
+                    message: error.message,
+                    stack: error.stack
+                });
+                
+                // Показываем сообщение об ошибке пользователю
+                const container = document.getElementById('balanceList');
+                if (container) {
+                    const errorMessage = error.message || 'Не удалось загрузить данные';
+                    container.innerHTML = `
+                        <div style="padding: 40px; text-align: center; color: var(--text-error, #ef4444);">
+                            <i class="bi bi-exclamation-triangle" style="font-size: 2rem; margin-bottom: 16px; display: block;"></i>
+                            <div style="margin-bottom: 8px; font-weight: 600;">Ошибка загрузки балансов</div>
+                            <div style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 16px;">${errorMessage}</div>
+                            <button class="btn btn-primary" onclick="loadBalances(true)" style="margin-top: 16px;">
+                                <i class="bi bi-arrow-clockwise"></i>
+                                Попробовать снова
+                            </button>
+                        </div>
+                    `;
+                }
+                
+                // Пытаемся загрузить баланс из Auth (fallback)
+                console.log('[loadBalances] Attempting fallback to Auth.getUser()');
+                if (typeof Auth !== 'undefined' && Auth.isAuthenticated()) {
+                    const user = Auth.getUser();
+                    console.log('[loadBalances] Fallback user data:', user);
+                    if (user && user.balance !== undefined) {
+                        const headerBalance = document.getElementById('headerBalance');
+                        if (headerBalance) {
+                            headerBalance.textContent = parseFloat(user.balance || 0).toLocaleString('en-US', { minimumFractionDigits: 2 });
+                            console.log('[loadBalances] Fallback: Updated header balance to', user.balance);
+                        }
+                        const totalBalance = document.getElementById('totalBalance');
+                        if (totalBalance) {
+                            totalBalance.textContent = NovaTrade.formatCurrency(user.balance || 0);
+                            console.log('[loadBalances] Fallback: Updated total balance to', user.balance);
+                        }
+                    } else {
+                        console.warn('[loadBalances] Fallback: User data does not contain balance');
+                    }
+                } else {
+                    console.warn('[loadBalances] Fallback: User not authenticated or Auth not available');
+                }
             }
         }
         
@@ -1078,15 +1161,23 @@
         }
         
         function renderBalances(balanceList, totalUsd) {
-            document.getElementById('totalBalance').textContent = NovaTrade.formatCurrency(totalUsd);
+            const totalBalanceEl = document.getElementById('totalBalance');
+            if (totalBalanceEl) {
+                totalBalanceEl.textContent = NovaTrade.formatCurrency(totalUsd);
+            }
             
             const container = document.getElementById('balanceList');
+            if (!container) {
+                console.error('[renderBalances] Container #balanceList not found');
+                return;
+            }
             
-            if (balanceList.length === 0) {
+            if (!balanceList || balanceList.length === 0) {
                 container.innerHTML = `
                     <div style="padding: 40px; text-align: center; color: var(--text-secondary);">
                         <i class="bi bi-wallet" style="font-size: 2rem; margin-bottom: 16px; display: block;"></i>
-                        Нет балансов
+                        <div style="margin-bottom: 8px; font-weight: 600;">Нет балансов</div>
+                        <div style="font-size: 0.875rem;">Ваши балансы будут отображаться здесь после пополнения</div>
                     </div>
                 `;
                 return;

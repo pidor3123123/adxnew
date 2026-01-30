@@ -92,48 +92,84 @@ $action = $_GET['action'] ?? '';
 try {
     $user = getAuthUser();
     
+    // Логируем информацию о пользователе
+    if ($user) {
+        error_log("Wallet API: Request from user_id={$user['id']}, email={$user['email'] ?? 'N/A'}, action={$action}");
+    } else {
+        error_log("Wallet API: Request from unauthenticated user, action={$action}");
+    }
+    
     switch ($action) {
         case 'balances':
             if (!$user) {
+                error_log("Wallet balances API: Unauthorized request - no user found");
                 throw new Exception('Unauthorized', 401);
             }
             
-            $db = getDB();
-            $stmt = $db->prepare('
-                SELECT 
-                    currency, 
-                    SUM(available) as available, 
-                    SUM(reserved) as reserved 
-                FROM balances 
-                WHERE user_id = ?
-                GROUP BY currency
-                ORDER BY 
-                    CASE currency 
-                        WHEN "USD" THEN 0 
-                        WHEN "BTC" THEN 1 
-                        WHEN "ETH" THEN 2 
-                        ELSE 3 
-                    END,
-                    currency
-            ');
-            $stmt->execute([$user['id']]);
-            $balances = $stmt->fetchAll();
+            error_log("Wallet balances API: Starting balance fetch for user_id={$user['id']}");
             
-            // Добавляем USD эквивалент
-            $prices = getUsdPrices();
-            $totalUsd = 0;
-            
-            foreach ($balances as &$balance) {
-                $price = $prices[$balance['currency']] ?? 0;
-                $balance['usd_value'] = (float)$balance['available'] * $price;
-                $totalUsd += $balance['usd_value'];
+            try {
+                $db = getDB();
+                $stmt = $db->prepare('
+                    SELECT 
+                        currency, 
+                        SUM(available) as available, 
+                        SUM(reserved) as reserved 
+                    FROM balances 
+                    WHERE user_id = ?
+                    GROUP BY currency
+                    ORDER BY 
+                        CASE currency 
+                            WHEN "USD" THEN 0 
+                            WHEN "BTC" THEN 1 
+                            WHEN "ETH" THEN 2 
+                            ELSE 3 
+                        END,
+                        currency
+                ');
+                $stmt->execute([$user['id']]);
+                $balances = $stmt->fetchAll();
+                
+                error_log("Wallet balances API: Query executed successfully, found " . count($balances) . " balance records");
+                
+                // Если балансов нет, создаем пустой массив
+                if (!$balances) {
+                    $balances = [];
+                    error_log("Wallet balances API: No balances found for user_id={$user['id']}");
+                } else {
+                    // Логируем детали каждого баланса
+                    foreach ($balances as $balance) {
+                        error_log("Wallet balances API: Balance - currency={$balance['currency']}, available={$balance['available']}, reserved={$balance['reserved']}");
+                    }
+                }
+                
+                // Добавляем USD эквивалент
+                $prices = getUsdPrices();
+                $totalUsd = 0;
+                
+                foreach ($balances as &$balance) {
+                    $price = $prices[$balance['currency']] ?? 0;
+                    $balance['usd_value'] = (float)$balance['available'] * $price;
+                    $totalUsd += $balance['usd_value'];
+                    error_log("Wallet balances API: Calculated USD value for {$balance['currency']}: {$balance['usd_value']} (price={$price}, amount={$balance['available']})");
+                }
+                
+                // Логируем итоговую информацию
+                error_log("Wallet balances API: user_id={$user['id']}, balances_count=" . count($balances) . ", total_usd={$totalUsd}");
+                
+                echo json_encode([
+                    'success' => true,
+                    'balances' => $balances,
+                    'total_usd' => $totalUsd
+                ], JSON_UNESCAPED_UNICODE);
+            } catch (PDOException $e) {
+                error_log("Wallet balances API: Database error for user_id={$user['id']}: " . $e->getMessage());
+                error_log("Wallet balances API: SQL State: " . $e->getCode());
+                throw new Exception('Database error: ' . $e->getMessage(), 500, $e);
+            } catch (Exception $e) {
+                error_log("Wallet balances API: General error for user_id={$user['id']}: " . $e->getMessage());
+                throw $e;
             }
-            
-            echo json_encode([
-                'success' => true,
-                'balances' => $balances,
-                'total_usd' => $totalUsd
-            ]);
             break;
             
         case 'deposit':
