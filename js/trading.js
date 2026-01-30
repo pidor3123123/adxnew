@@ -377,25 +377,26 @@ function updateTradeSummary() {
  */
 function updateQuickTradeSummary() {
     const quantity = parseFloat(document.getElementById('quickQuantity')?.value) || 0;
-    const limitPrice = parseFloat(document.getElementById('quickLimitPrice')?.value) || currentAsset.price;
-    const activeOrderType = document.querySelector('#quickTradeForm .tab.active');
-    const type = activeOrderType?.dataset.type || 'market';
-    const price = type === 'limit' ? limitPrice : currentAsset.price;
     
-    // Получаем активную сторону
+    // Получаем цену из элемента quickTradePrice (быстрая торговля всегда рыночная)
+    const priceEl = document.getElementById('quickTradePrice');
+    if (!priceEl) return;
+    
+    const price = parseFloat(priceEl.textContent.replace(/[^0-9.]/g, '')) || (currentAsset?.price || 0);
+    
+    // Получаем активную сторону из быстрой торговли
     const activeTab = document.querySelector('#quickTradeMode .trade-tab.active');
-    const side = activeTab?.dataset.side || 'buy';
+    const side = activeTab?.dataset.side || (window.TradingState?.tradeSide || 'buy');
     
     const total = quantity * price;
     const fee = total * 0.001; // 0.1% fee
     const finalTotal = side === 'buy' ? total + fee : total - fee;
     
     // Update display
-    const priceEl = document.getElementById('quickTradePrice');
     const feeEl = document.getElementById('quickTradeFee');
     const totalEl = document.getElementById('quickTradeTotal');
     
-    if (priceEl) priceEl.textContent = NovaTrade.formatCurrency(price);
+    // Цена уже должна быть установлена, не перезаписываем её
     if (feeEl) feeEl.textContent = NovaTrade.formatCurrency(fee);
     if (totalEl) totalEl.textContent = NovaTrade.formatCurrency(finalTotal);
 }
