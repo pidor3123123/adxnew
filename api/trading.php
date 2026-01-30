@@ -211,6 +211,7 @@ try {
             $currentPrice = isset($data['current_price']) && $data['current_price'] ? (float)$data['current_price'] : null;
             $takeProfit = isset($data['take_profit']) && $data['take_profit'] ? (float)$data['take_profit'] : null;
             $stopLoss = isset($data['stop_loss']) && $data['stop_loss'] ? (float)$data['stop_loss'] : null;
+            $tradeDuration = isset($data['trade_duration']) && $data['trade_duration'] ? (int)$data['trade_duration'] : null; // Длительность в секундах для быстрой торговли
             
             // Валидация
             if (!$symbol) {
@@ -304,10 +305,17 @@ try {
                     updateBalance($user['id'], 'USD', $total - $fee, true);
                 }
                 
+                // Для быстрой торговли сохраняем duration в stop_price (временное решение)
+                // В будущем нужно добавить отдельное поле trade_duration
+                $stopPrice = null;
+                if ($tradeDuration !== null && $tradeDuration > 0) {
+                    $stopPrice = $tradeDuration; // Сохраняем duration в секундах в stop_price
+                }
+                
                 // Создаём запись ордера
                 $stmt = $db->prepare('
-                    INSERT INTO orders (user_id, asset_id, type, side, status, quantity, filled_quantity, price, average_price, total, fee, take_profit, stop_loss, filled_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                    INSERT INTO orders (user_id, asset_id, type, side, status, quantity, filled_quantity, price, stop_price, average_price, total, fee, take_profit, stop_loss, filled_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
                 ');
                 
                 $stmt->execute([
@@ -319,6 +327,7 @@ try {
                     $quantity,
                     $quantity,
                     $price,
+                    $stopPrice, // Используем для хранения duration для быстрой торговли
                     $price,
                     $total,
                     $fee,
@@ -543,6 +552,18 @@ try {
                 // Получаем текущую цену актива
                 $currentPrice = getMarketPrice($order['symbol']);
                 
+                // Логирование для отладки
+                error_log(sprintf(
+                    "[TP/SL Check] Order ID: %d, Symbol: %s, Side: %s, Entry Price: %.2f, Current Price: %.2f, TP: %s, SL: %s",
+                    $order['id'],
+                    $order['symbol'],
+                    $order['side'],
+                    $order['price'],
+                    $currentPrice,
+                    $order['take_profit'] ? number_format($order['take_profit'], 2) : 'NULL',
+                    $order['stop_loss'] ? number_format($order['stop_loss'], 2) : 'NULL'
+                ));
+                
                 // Проверяем TP/SL
                 $shouldClose = false;
                 $closeReason = '';
@@ -552,18 +573,22 @@ try {
                     if ($order['take_profit'] && $currentPrice >= $order['take_profit']) {
                         $shouldClose = true;
                         $closeReason = 'Take Profit';
+                        error_log(sprintf("[TP/SL Check] Order %d: TP triggered (Current: %.2f >= TP: %.2f)", $order['id'], $currentPrice, $order['take_profit']));
                     } elseif ($order['stop_loss'] && $currentPrice <= $order['stop_loss']) {
                         $shouldClose = true;
                         $closeReason = 'Stop Loss';
+                        error_log(sprintf("[TP/SL Check] Order %d: SL triggered (Current: %.2f <= SL: %.2f)", $order['id'], $currentPrice, $order['stop_loss']));
                     }
                 } else {
                     // Для sell: TP срабатывает если цена <= TP, SL если цена >= SL
                     if ($order['take_profit'] && $currentPrice <= $order['take_profit']) {
                         $shouldClose = true;
                         $closeReason = 'Take Profit';
+                        error_log(sprintf("[TP/SL Check] Order %d: TP triggered (Current: %.2f <= TP: %.2f)", $order['id'], $currentPrice, $order['take_profit']));
                     } elseif ($order['stop_loss'] && $currentPrice >= $order['stop_loss']) {
                         $shouldClose = true;
                         $closeReason = 'Stop Loss';
+                        error_log(sprintf("[TP/SL Check] Order %d: SL triggered (Current: %.2f >= SL: %.2f)", $order['id'], $currentPrice, $order['stop_loss']));
                     }
                 }
                 

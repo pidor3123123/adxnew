@@ -47,6 +47,17 @@ const API = {
             return data;
         } catch (error) {
             console.error('API Error:', error);
+            
+            // Если это сетевая ошибка, логируем детали
+            if (error.name === 'TypeError' && error.message.includes('fetch')) {
+                console.error('[API] Network error - possible causes: server down, CORS issue, or network connectivity');
+            }
+            
+            // Если это ошибка парсинга JSON, логируем детали
+            if (error.message && error.message.includes('JSON')) {
+                console.error('[API] JSON parsing error - invalid response format');
+            }
+            
             throw error;
         }
     },
@@ -142,23 +153,73 @@ const MarketAPI = {
      */
     async getCryptoPrices(coins = ['bitcoin', 'ethereum', 'binancecoin', 'ripple', 'solana', 'cardano', 'dogecoin', 'polkadot', 'polygon', 'litecoin']) {
         return this.getCached('crypto_prices', async () => {
-            try {
-                // Используем наш PHP API вместо прямого запроса к CoinGecko (избегаем CORS)
-                const response = await fetch('/api/market.php?action=crypto');
-                
-                if (!response.ok) throw new Error('Market API error');
-                
-                const result = await response.json();
-                
-                if (result.success && result.data) {
-                    return result.data;
-                } else {
-                    throw new Error('Invalid API response');
+            const maxRetries = 3;
+            const retryDelay = 1000; // 1 секунда
+            
+            for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                try {
+                    // Создаем AbortController для таймаута
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 секунд таймаут
+                    
+                    // Используем наш PHP API вместо прямого запроса к CoinGecko (избегаем CORS)
+                    const response = await fetch('/api/market.php?action=crypto', {
+                        signal: controller.signal,
+                        headers: {
+                            'Accept': 'application/json',
+                            'Cache-Control': 'no-cache'
+                        }
+                    });
+                    
+                    clearTimeout(timeoutId);
+                    
+                    if (!response.ok) {
+                        const errorText = await response.text().catch(() => 'Unknown error');
+                        throw new Error(`Market API error: ${response.status} ${response.statusText} - ${errorText.substring(0, 100)}`);
+                    }
+                    
+                    const contentType = response.headers.get('content-type');
+                    if (!contentType || !contentType.includes('application/json')) {
+                        const text = await response.text();
+                        throw new Error(`Invalid content type: ${contentType}. Response: ${text.substring(0, 200)}`);
+                    }
+                    
+                    const result = await response.json();
+                    
+                    if (result.success && result.data && Array.isArray(result.data)) {
+                        console.log(`[MarketAPI] Successfully fetched ${result.data.length} crypto prices`);
+                        return result.data;
+                    } else {
+                        throw new Error('Invalid API response format');
+                    }
+                } catch (error) {
+                    console.error(`[MarketAPI] Attempt ${attempt}/${maxRetries} failed:`, error);
+                    
+                    // Если это последняя попытка или ошибка не связана с сетью, возвращаем моковые данные
+                    if (attempt === maxRetries || (error.name === 'AbortError' && attempt < maxRetries)) {
+                        // Для AbortError (таймаут) делаем еще одну попытку
+                        if (error.name === 'AbortError' && attempt < maxRetries) {
+                            console.warn(`[MarketAPI] Request timeout, retrying in ${retryDelay}ms...`);
+                            await new Promise(resolve => setTimeout(resolve, retryDelay));
+                            continue;
+                        }
+                        
+                        // Если это сетевая ошибка или последняя попытка, используем моковые данные
+                        if (error.name === 'TypeError' || error.message.includes('Failed to fetch') || error.message.includes('ERR_CONNECTION_REFUSED')) {
+                            console.warn('[MarketAPI] Network error, using mock data as fallback');
+                        } else {
+                            console.warn('[MarketAPI] API error, using mock data as fallback');
+                        }
+                        return this.getMockCryptoPrices();
+                    }
+                    
+                    // Ждем перед следующей попыткой
+                    await new Promise(resolve => setTimeout(resolve, retryDelay * attempt));
                 }
-            } catch (error) {
-                console.error('Error fetching crypto prices:', error);
-                return this.getMockCryptoPrices();
             }
+            
+            // Если все попытки провалились, возвращаем моковые данные
+            return this.getMockCryptoPrices();
         });
     },
     

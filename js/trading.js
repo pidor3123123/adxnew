@@ -19,8 +19,14 @@ let userBalances = {
     ETH: 0
 };
 
-let tradeSide = 'buy';
-let orderType = 'market';
+// Используем глобальный объект TradingState вместо локальных переменных
+// Если объект не существует, создаем его
+if (!window.TradingState) {
+    window.TradingState = {
+        tradeSide: 'buy',
+        orderType: 'market'
+    };
+}
 let assetList = [];
 
 // WebSocket больше не используется - используем только API опрос
@@ -155,7 +161,6 @@ async function selectAsset(symbol) {
         decimals: asset.price < 1 ? 6 : (asset.price < 10 ? 4 : 2)
     };
     
-    // Update global reference for charts.js
     window.currentAsset = currentAsset;
     
     // Update UI
@@ -186,9 +191,6 @@ async function selectAsset(symbol) {
     // Update button
     updateTradeButton();
     
-    // Load chart with current selected interval
-    const activeInterval = document.querySelector('.chart-timeframe.active');
-    const interval = activeInterval ? activeInterval.dataset.interval : '4h';
     // Update summary
     updateTradeSummary();
     
@@ -202,7 +204,9 @@ async function selectAsset(symbol) {
  * Update trade UI
  */
 function updateTradeUI(side, parentSection = null) {
-    tradeSide = side;
+    if (window.TradingState) {
+        window.TradingState.tradeSide = side;
+    }
     
     // Определяем, какая форма активна
     const isQuick = parentSection?.id === 'quickTradeMode';
@@ -249,9 +253,10 @@ function updateTradeUI(side, parentSection = null) {
 function updateTradeButton() {
     const submitBtn = document.getElementById('submitTradeBtn');
     if (submitBtn) {
+        const side = window.TradingState?.tradeSide || 'buy';
         submitBtn.innerHTML = `
-            <i class="bi bi-${tradeSide === 'buy' ? 'cart-plus' : 'cart-dash'}"></i>
-            ${tradeSide === 'buy' ? 'Купить' : 'Продать'} ${currentAsset.symbol}
+            <i class="bi bi-${side === 'buy' ? 'cart-plus' : 'cart-dash'}"></i>
+            ${side === 'buy' ? 'Купить' : 'Продать'} ${currentAsset.symbol}
         `;
     }
 }
@@ -309,7 +314,7 @@ function calculateQuantityByPercent(percent, mode = 'normal') {
     // Получаем активную сторону из соответствующей формы
     const modeSelector = mode === 'quick' ? '#quickTradeMode' : '#normalTradeMode';
     const activeTab = document.querySelector(`${modeSelector} .trade-tab.active`);
-    const side = activeTab?.dataset.side || tradeSide;
+    const side = activeTab?.dataset.side || (window.TradingState?.tradeSide || 'buy');
     
     // Получаем step из input поля
     const step = parseFloat(quantityInput.getAttribute('step')) || 0.0001;
@@ -353,10 +358,12 @@ function calculateQuantityByPercent(percent, mode = 'normal') {
 function updateTradeSummary() {
     const quantity = parseFloat(document.getElementById('quantity')?.value) || 0;
     const limitPrice = parseFloat(document.getElementById('limitPrice')?.value) || currentAsset.price;
+    const orderType = window.TradingState?.orderType || 'market';
     const price = orderType === 'limit' ? limitPrice : currentAsset.price;
     
     const total = quantity * price;
     const fee = total * 0.001; // 0.1% fee
+    const tradeSide = window.TradingState?.tradeSide || 'buy';
     const finalTotal = tradeSide === 'buy' ? total + fee : total - fee;
     
     // Update display
@@ -431,11 +438,63 @@ async function submitOrder(isQuick = false) {
         
         // Получаем активную вкладку Купить/Продать
         const activeMode = isQuick ? document.querySelector('#quickTradeMode .trade-tab.active') : document.querySelector('#normalTradeMode .trade-tab.active');
-        const side = activeMode?.dataset.side || tradeSide;
+        const side = activeMode?.dataset.side || (window.TradingState?.tradeSide || 'buy');
         
         // Получаем тип ордера
         const activeOrderType = isQuick ? document.querySelector('#quickTradeForm .tab.active') : document.querySelector('#tradeForm .tab.active');
-        const type = activeOrderType?.dataset.type || orderType;
+        const type = activeOrderType?.dataset.type || (window.TradingState?.orderType || 'market');
+        
+        // Определяем цену входа для валидации TP/SL
+        const entryPrice = type === 'limit' && limitPrice ? limitPrice : (currentAsset.price || null);
+        
+        // Валидация TP/SL для быстрой торговли
+        if (isQuick && entryPrice) {
+            if (takeProfit !== null && takeProfit !== undefined && !isNaN(takeProfit)) {
+                if (side === 'buy' && takeProfit <= entryPrice) {
+                    NovaTrade.showToast('Ошибка', 'Take Profit должен быть выше цены входа', 'error');
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalText;
+                    return;
+                }
+                if (side === 'sell' && takeProfit >= entryPrice) {
+                    NovaTrade.showToast('Ошибка', 'Take Profit должен быть ниже цены входа', 'error');
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalText;
+                    return;
+                }
+            }
+            
+            if (stopLoss !== null && stopLoss !== undefined && !isNaN(stopLoss)) {
+                if (side === 'buy' && stopLoss >= entryPrice) {
+                    NovaTrade.showToast('Ошибка', 'Stop Loss должен быть ниже цены входа', 'error');
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalText;
+                    return;
+                }
+                if (side === 'sell' && stopLoss <= entryPrice) {
+                    NovaTrade.showToast('Ошибка', 'Stop Loss должен быть выше цены входа', 'error');
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalText;
+                    return;
+                }
+            }
+        }
+        
+        // Получаем время сделки для быстрой торговли
+        let tradeDuration = null;
+        if (isQuick) {
+            const activeTimeBtn = document.querySelector('.trade-time-btn.active');
+            if (activeTimeBtn) {
+                const timeStr = activeTimeBtn.dataset.time;
+                // Преобразуем время в секунды
+                if (timeStr === '1m') tradeDuration = 60;
+                else if (timeStr === '5m') tradeDuration = 300;
+                else if (timeStr === '15m') tradeDuration = 900;
+                else if (timeStr === '30m') tradeDuration = 1800;
+                else if (timeStr === '1h') tradeDuration = 3600;
+                else if (timeStr === '4h') tradeDuration = 14400;
+            }
+        }
         
         const orderData = {
             symbol: currentAsset.symbol,
@@ -443,9 +502,10 @@ async function submitOrder(isQuick = false) {
             type: type,
             quantity: quantity,
             price: type === 'limit' ? limitPrice : null,
-            current_price: currentAsset.price || null, // Отправляем текущую цену для валидации
+            current_price: entryPrice, // Отправляем цену входа для валидации
             take_profit: takeProfit || null,
-            stop_loss: stopLoss || null
+            stop_loss: stopLoss || null,
+            trade_duration: tradeDuration // Длительность в секундах для быстрой торговли
         };
         
         const result = await TradingAPI.createOrder(orderData);
@@ -501,7 +561,8 @@ async function loadUserBalances() {
             });
             
             // Update UI
-            updateTradeUI(tradeSide);
+            const side = window.TradingState?.tradeSide || 'buy';
+            updateTradeUI(side);
             
             // Update header balance
             const headerBalance = document.getElementById('headerBalance');
@@ -520,7 +581,10 @@ async function loadUserBalances() {
  * Обновление цены актива из API (fallback для акций и форекса)
  */
 async function updateAssetPrice() {
-    if (!currentAsset || !currentAsset.symbol) return;
+    if (!currentAsset || !currentAsset.symbol) {
+        console.warn('[updateAssetPrice] No current asset or symbol');
+        return;
+    }
     
     try {
         const symbol = currentAsset.symbol.toUpperCase();

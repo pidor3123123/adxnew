@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trading Terminal — ADX Finance</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0a0a;
+            --bg-secondary: #111111;
+            --bg-tertiary: #1a1a1a;
+            --bg-hover: #1f1f1f;
+            --bg-active: #252525;
+            
+            --text-primary: #ffffff;
+            --text-secondary: #a1a1aa;
+            --text-tertiary: #71717a;
+            
+            --accent-primary: #6366f1;
+            --accent-hover: #818cf8;
+            
+            --buy-color: #22c55e;
+            --buy-hover: #16a34a;
+            --sell-color: #ef4444;
+            --sell-hover: #dc2626;
+            
+            --border-color: #2a2a2a;
+            --border-light: #333333;
+            
+            --badge-crypto: #22c55e;
+            --badge-stock: #3b82f6;
+            --badge-forex: #f59e0b;
+            --badge-index: #8b5cf6;
+            --badge-commodity: #ec4899;
+            
+            --transition: 150ms ease;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            overflow: hidden;
+            height: 100vh;
+        }
+        
+        .terminal-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            width: 100%;
+        }
+        
+        /* Header */
+        .terminal-header {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+            flex-shrink: 0;
+            height: 60px;
+        }
+        
+        .symbol-section {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .symbol-name {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            font-variant-numeric: tabular-nums;
+        }
+        
+        .market-badge {
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .market-badge.crypto { background: var(--badge-crypto); color: #000; }
+        .market-badge.stock { background: var(--badge-stock); color: #fff; }
+        .market-badge.forex { background: var(--badge-forex); color: #000; }
+        .market-badge.index { background: var(--badge-index); color: #fff; }
+        .market-badge.commodity { background: var(--badge-commodity); color: #fff; }
+        
+        .asset-dropdown-wrapper {
+            position: relative;
+        }
+        
+        .asset-dropdown-btn {
+            padding: 6px 12px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: all var(--transition);
+        }
+        
+        .asset-dropdown-btn:hover {
+            background: var(--bg-hover);
+            border-color: var(--border-light);
+        }
+        
+        .asset-dropdown {
+            position: absolute;
+            top: calc(100% + 8px);
+            right: 0;
+            width: 300px;
+            max-height: 400px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            z-index: 1000;
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .asset-dropdown.show {
+            display: flex;
+        }
+        
+        .asset-dropdown-search {
+            padding: 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .asset-dropdown-search input {
+            width: 100%;
+            padding: 8px 12px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            color: var(--text-primary);
+            font-size: 0.875rem;
+        }
+        
+        .asset-dropdown-list {
+            overflow-y: auto;
+            max-height: 300px;
+        }
+        
+        .asset-dropdown-item {
+            padding: 10px 12px;
+            cursor: pointer;
+            transition: all var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .asset-dropdown-item:hover {
+            background: var(--bg-hover);
+        }
+        
+        .asset-dropdown-item-name {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+        
+        .asset-dropdown-item-symbol {
+            font-size: 0.75rem;
+            color: var(--text-tertiary);
+        }
+        
+        /* Main Grid */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 70% 30%;
+            height: calc(100vh - 60px - 120px);
+            overflow: hidden;
+        }
+        
+        /* Chart Section */
+        .chart-section {
+            background: var(--bg-primary);
+            border-right: 1px solid var(--border-color);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        #tradingview-chart {
+            width: 100%;
+            height: 100%;
+        }
+        
+        /* Trading Terminal */
+        .trading-terminal {
+            background: var(--bg-secondary);
+            padding: 16px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .trade-tabs {
+            display: flex;
+            gap: 4px;
+            background: var(--bg-tertiary);
+            padding: 4px;
+            border-radius: 6px;
+        }
+        
+        .trade-tab {
+            flex: 1;
+            padding: 8px 12px;
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all var(--transition);
+        }
+        
+        .trade-tab:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+        
+        .trade-tab.active {
+            background: var(--bg-active);
+            color: var(--text-primary);
+        }
+        
+        .trade-tab.buy.active {
+            background: var(--buy-color);
+            color: #000;
+        }
+        
+        .trade-tab.sell.active {
+            background: var(--sell-color);
+            color: #fff;
+        }
+        
+        .order-type-tabs {
+            display: flex;
+            gap: 4px;
+            background: var(--bg-tertiary);
+            padding: 4px;
+            border-radius: 6px;
+        }
+        
+        .order-type-tab {
+            flex: 1;
+            padding: 6px 10px;
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 0.8125rem;
+            font-weight: 500;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all var(--transition);
+        }
+        
+        .order-type-tab:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+        
+        .order-type-tab.active {
+            background: var(--bg-active);
+            color: var(--text-primary);
+        }
+        
+        .trade-input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        
+        .trade-input-group label {
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .trade-input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+        
+        .trade-input {
+            width: 100%;
+            padding: 10px 12px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 0.9375rem;
+            font-family: 'JetBrains Mono', monospace;
+            transition: all var(--transition);
+        }
+        
+        .trade-input:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+        }
+        
+        .trade-input-suffix {
+            position: absolute;
+            right: 12px;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            pointer-events: none;
+        }
+        
+        .trade-percent-buttons {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 6px;
+        }
+        
+        .trade-percent-btn {
+            padding: 6px 8px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all var(--transition);
+        }
+        
+        .trade-percent-btn:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+            border-color: var(--border-light);
+        }
+        
+        .trade-summary {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding: 12px;
+            background: var(--bg-tertiary);
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+        }
+        
+        .trade-summary-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.8125rem;
+        }
+        
+        .trade-summary-label {
+            color: var(--text-tertiary);
+        }
+        
+        .trade-summary-value {
+            color: var(--text-primary);
+            font-weight: 500;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        
+        .trade-action-btn {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.9375rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all var(--transition);
+        }
+        
+        .trade-action-btn.buy {
+            background: var(--buy-color);
+            color: #000;
+        }
+        
+        .trade-action-btn.buy:hover {
+            background: var(--buy-hover);
+        }
+        
+        .trade-action-btn.sell {
+            background: var(--sell-color);
+            color: #fff;
+        }
+        
+        .trade-action-btn.sell:hover {
+            background: var(--sell-hover);
+        }
+        
+        /* Market Overview */
+        .market-overview {
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border-color);
+            height: 120px;
+            padding: 12px 20px;
+            overflow-x: auto;
+            overflow-y: hidden;
+            flex-shrink: 0;
+        }
+        
+        .market-overview-content {
+            display: flex;
+            gap: 16px;
+            height: 100%;
+        }
+        
+        .market-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .market-group-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .market-items {
+            display: flex;
+            gap: 12px;
+        }
+        
+        .market-item {
+            min-width: 120px;
+            padding: 8px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all var(--transition);
+        }
+        
+        .market-item:hover {
+            background: var(--bg-hover);
+            border-color: var(--border-light);
+        }
+        
+        .market-item.active {
+            border-color: var(--accent-primary);
+            background: var(--bg-active);
+        }
+        
+        .market-item-name {
+            font-size: 0.8125rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+        
+        .market-item-price {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+        
+        .market-item-chart {
+            width: 100%;
+            height: 40px;
+            margin-top: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="terminal-container">
+        <!-- Header -->
+        <header class="terminal-header">
+            <div class="symbol-section">
+                <span class="symbol-name" id="symbolName">BTCUSDT</span>
+                <span class="market-badge crypto" id="marketBadge">Crypto</span>
+            </div>
+            
+            <div class="asset-dropdown-wrapper">
+                <button class="asset-dropdown-btn" id="assetDropdownBtn">
+                    Выбрать актив
+                </button>
+                <div class="asset-dropdown" id="assetDropdown">
+                    <div class="asset-dropdown-search">
+                        <input type="text" id="assetSearch" placeholder="Поиск актива...">
+                    </div>
+                    <div class="asset-dropdown-list" id="assetDropdownList">
+                        <!-- Assets will be populated here -->
+                    </div>
+                </div>
+            </div>
+        </header>
+        
+        <!-- Main Grid -->
+        <div class="main-grid">
+            <!-- Chart Section -->
+            <div class="chart-section">
+                <div id="tradingview-chart"></div>
+            </div>
+            
+            <!-- Trading Terminal -->
+            <div class="trading-terminal">
+                <!-- Buy/Sell Tabs -->
+                <div class="trade-tabs">
+                    <button class="trade-tab buy active" data-side="buy">Купить</button>
+                    <button class="trade-tab sell" data-side="sell">Продать</button>
+                </div>
+                
+                <!-- Order Type Tabs -->
+                <div class="order-type-tabs">
+                    <button class="order-type-tab active" data-type="market">Рыночный</button>
+                    <button class="order-type-tab" data-type="limit">Лимитный</button>
+                </div>
+                
+                <!-- Limit Price Input (hidden by default) -->
+                <div class="trade-input-group" id="limitPriceGroup" style="display: none;">
+                    <label>Цена</label>
+                    <div class="trade-input-wrapper">
+                        <input type="number" class="trade-input" id="limitPrice" placeholder="0.00" step="0.01">
+                        <span class="trade-input-suffix">USD</span>
+                    </div>
+                </div>
+                
+                <!-- Quantity Input -->
+                <div class="trade-input-group">
+                    <label>Количество</label>
+                    <div class="trade-input-wrapper">
+                        <input type="number" class="trade-input" id="quantity" placeholder="0.00" step="0.0001">
+                        <span class="trade-input-suffix" id="quantitySuffix">BTC</span>
+                    </div>
+                </div>
+                
+                <!-- Percentage Buttons -->
+                <div class="trade-percent-buttons">
+                    <button type="button" class="trade-percent-btn" data-percent="25">25%</button>
+                    <button type="button" class="trade-percent-btn" data-percent="50">50%</button>
+                    <button type="button" class="trade-percent-btn" data-percent="75">75%</button>
+                    <button type="button" class="trade-percent-btn" data-percent="100">100%</button>
+                </div>
+                
+                <!-- Trade Summary -->
+                <div class="trade-summary">
+                    <div class="trade-summary-row">
+                        <span class="trade-summary-label">Доступно</span>
+                        <span class="trade-summary-value" id="availableBalance">$10,000.00</span>
+                    </div>
+                    <div class="trade-summary-row">
+                        <span class="trade-summary-label">Цена</span>
+                        <span class="trade-summary-value" id="tradePrice">$0.00</span>
+                    </div>
+                    <div class="trade-summary-row">
+                        <span class="trade-summary-label">Комиссия (0.1%)</span>
+                        <span class="trade-summary-value" id="tradeFee">$0.00</span>
+                    </div>
+                    <div class="trade-summary-row" style="font-weight: 600;">
+                        <span class="trade-summary-label">Итого</span>
+                        <span class="trade-summary-value" id="tradeTotal">$0.00</span>
+                    </div>
+                </div>
+                
+                <!-- Action Button -->
+                <button type="button" class="trade-action-btn buy" id="submitTradeBtn">
+                    Купить BTC
+                </button>
+            </div>
+        </div>
+        
+        <!-- Market Overview -->
+        <div class="market-overview">
+            <div class="market-overview-content" id="marketOverview">
+                <!-- Market items will be added here -->
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Market symbols mapping
+        const marketSymbols = {
+            crypto: [
+                { name: 'Bitcoin', symbol: 'BTCUSDT', tv: 'BINANCE:BTCUSDT' },
+                { name: 'Ethereum', symbol: 'ETHUSDT', tv: 'BINANCE:ETHUSDT' },
+                { name: 'BNB', symbol: 'BNBUSDT', tv: 'BINANCE:BNBUSDT' },
+                { name: 'Solana', symbol: 'SOLUSDT', tv: 'BINANCE:SOLUSDT' },
+                { name: 'XRP', symbol: 'XRPUSDT', tv: 'BINANCE:XRPUSDT' },
+                { name: 'Cardano', symbol: 'ADAUSDT', tv: 'BINANCE:ADAUSDT' },
+                { name: 'Dogecoin', symbol: 'DOGEUSDT', tv: 'BINANCE:DOGEUSDT' },
+                { name: 'Polkadot', symbol: 'DOTUSDT', tv: 'BINANCE:DOTUSDT' }
+            ],
+            stocks: [
+                { name: 'Apple', symbol: 'AAPL', tv: 'NASDAQ:AAPL' },
+                { name: 'Tesla', symbol: 'TSLA', tv: 'NASDAQ:TSLA' },
+                { name: 'Microsoft', symbol: 'MSFT', tv: 'NASDAQ:MSFT' },
+                { name: 'Google', symbol: 'GOOGL', tv: 'NASDAQ:GOOGL' },
+                { name: 'Amazon', symbol: 'AMZN', tv: 'NASDAQ:AMZN' },
+                { name: 'Meta', symbol: 'META', tv: 'NASDAQ:META' },
+                { name: 'NVIDIA', symbol: 'NVDA', tv: 'NASDAQ:NVDA' }
+            ],
+            forex: [
+                { name: 'EUR/USD', symbol: 'EURUSD', tv: 'FX:EURUSD' },
+                { name: 'GBP/USD', symbol: 'GBPUSD', tv: 'FX:GBPUSD' },
+                { name: 'USD/JPY', symbol: 'USDJPY', tv: 'FX:USDJPY' },
+                { name: 'AUD/USD', symbol: 'AUDUSD', tv: 'FX:AUDUSD' },
+                { name: 'USD/CAD', symbol: 'USDCAD', tv: 'FX:USDCAD' }
+            ],
+            indices: [
+                { name: 'S&P 500', symbol: 'SPX', tv: 'SP:SPX' },
+                { name: 'NASDAQ', symbol: 'NDX', tv: 'NASDAQ:NDX' },
+                { name: 'Dow Jones', symbol: 'DJI', tv: 'DJ:DJI' },
+                { name: 'FTSE 100', symbol: 'FTSE', tv: 'LSE:FTSE' }
+            ],
+            commodities: [
+                { name: 'Gold', symbol: 'GOLD', tv: 'TVC:GOLD' },
+                { name: 'Silver', symbol: 'SILVER', tv: 'TVC:SILVER' },
+                { name: 'Oil', symbol: 'OIL', tv: 'TVC:USOIL' },
+                { name: 'Brent', symbol: 'BRENT', tv: 'TVC:UKOIL' }
+            ]
+        };
+        
+        const marketBadges = {
+            crypto: { text: 'Crypto', class: 'crypto' },
+            stocks: { text: 'Stock', class: 'stock' },
+            forex: { text: 'Forex', class: 'forex' },
+            indices: { text: 'Index', class: 'index' },
+            commodities: { text: 'Commodity', class: 'commodity' }
+        };
+        
+        // State
+        let currentSymbol = 'BINANCE:BTCUSDT';
+        let currentSymbolName = 'BTCUSDT';
+        let currentMarket = 'crypto';
+        let chartWidget = null;
+        let tvScriptLoaded = false;
+        let tradeSide = 'buy';
+        let orderType = 'market';
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadState();
+            initChart();
+            initTradingTerminal();
+            initAssetDropdown();
+            initMarketOverview();
+        });
+        
+        function loadState() {
+            const savedSymbol = localStorage.getItem('terminal_symbol');
+            if (savedSymbol) {
+                currentSymbol = savedSymbol;
+                const symbolData = findSymbolData(savedSymbol);
+                if (symbolData) {
+                    currentSymbolName = symbolData.symbol;
+                    currentMarket = findMarketForSymbol(savedSymbol);
+                }
+            }
+            updateUI();
+        }
+        
+        function saveState() {
+            localStorage.setItem('terminal_symbol', currentSymbol);
+        }
+        
+        function findSymbolData(tvSymbol) {
+            for (const market of Object.values(marketSymbols)) {
+                const found = market.find(s => s.tv === tvSymbol);
+                if (found) return found;
+            }
+            return null;
+        }
+        
+        function findMarketForSymbol(tvSymbol) {
+            for (const [market, symbols] of Object.entries(marketSymbols)) {
+                if (symbols.find(s => s.tv === tvSymbol)) {
+                    return market;
+                }
+            }
+            return 'crypto';
+        }
+        
+        function updateUI() {
+            const symbolData = findSymbolData(currentSymbol);
+            if (symbolData) {
+                currentSymbolName = symbolData.symbol;
+                document.getElementById('symbolName').textContent = symbolData.symbol;
+                document.getElementById('quantitySuffix').textContent = symbolData.symbol.replace('USDT', '').replace('USD', '');
+            }
+            
+            const badge = marketBadges[currentMarket];
+            const badgeEl = document.getElementById('marketBadge');
+            badgeEl.textContent = badge.text;
+            badgeEl.className = `market-badge ${badge.class}`;
+        }
+        
+        function initChart() {
+            const container = document.getElementById('tradingview-chart');
+            if (!container) return;
+            
+            function createWidget() {
+                if (typeof TradingView !== 'undefined') {
+                    const widgetConfig = {
+                        autosize: true,
+                        symbol: currentSymbol,
+                        interval: '15',
+                        timezone: 'Etc/UTC',
+                        theme: 'dark',
+                        style: '1',
+                        locale: 'ru',
+                        toolbar_bg: '#111111',
+                        enable_publishing: false,
+                        allow_symbol_change: true,
+                        hide_top_toolbar: false,
+                        hide_legend: false,
+                        save_image: false,
+                        container_id: 'tradingview-chart',
+                        studies: [],
+                        disabled_features: ['use_localstorage_for_settings'],
+                        enabled_features: ['study_templates']
+                    };
+                    
+                    chartWidget = new TradingView.widget(widgetConfig);
+                }
+            }
+            
+            if (typeof TradingView !== 'undefined') {
+                createWidget();
+            } else if (!tvScriptLoaded) {
+                tvScriptLoaded = true;
+                const script = document.createElement('script');
+                script.type = 'text/javascript';
+                script.src = 'https://s3.tradingview.com/tv.js';
+                script.async = true;
+                script.onload = createWidget;
+                document.head.appendChild(script);
+            }
+        }
+        
+        function updateChart(symbol) {
+            currentSymbol = symbol;
+            saveState();
+            updateUI();
+            updateTradingTerminal();
+            updateMarketOverview();
+            
+            // Reinitialize chart with new symbol
+            const container = document.getElementById('tradingview-chart');
+            if (container) {
+                container.innerHTML = '';
+                initChart();
+            }
+        }
+        
+        function updateMarketOverview() {
+            document.querySelectorAll('.market-item').forEach(item => {
+                item.classList.remove('active');
+                const chartId = item.querySelector('[id^="chart-"]')?.id;
+                if (chartId) {
+                    const symbol = chartId.replace('chart-', '');
+                    if (symbol === currentSymbol) {
+                        item.classList.add('active');
+                    }
+                }
+            });
+        }
+        
+        function initTradingTerminal() {
+            // Buy/Sell tabs
+            document.querySelectorAll('.trade-tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    document.querySelectorAll('.trade-tab').forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    tradeSide = tab.dataset.side;
+                    updateTradeButton();
+                });
+            });
+            
+            // Order type tabs
+            document.querySelectorAll('.order-type-tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    document.querySelectorAll('.order-type-tab').forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    orderType = tab.dataset.type;
+                    const limitGroup = document.getElementById('limitPriceGroup');
+                    if (orderType === 'limit') {
+                        limitGroup.style.display = 'flex';
+                    } else {
+                        limitGroup.style.display = 'none';
+                    }
+                });
+            });
+            
+            // Quantity input
+            const quantityInput = document.getElementById('quantity');
+            quantityInput.addEventListener('input', () => {
+                updateTradeSummary();
+            });
+            
+            // Limit price input
+            const limitPriceInput = document.getElementById('limitPrice');
+            limitPriceInput.addEventListener('input', () => {
+                updateTradeSummary();
+            });
+            
+            // Percentage buttons
+            document.querySelectorAll('.trade-percent-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const percent = parseFloat(btn.dataset.percent);
+                    const available = parseFloat(document.getElementById('availableBalance').textContent.replace(/[^0-9.]/g, ''));
+                    const price = parseFloat(document.getElementById('tradePrice').textContent.replace(/[^0-9.]/g, ''));
+                    if (price > 0) {
+                        const quantity = (available * percent / 100) / price;
+                        quantityInput.value = quantity.toFixed(8);
+                        updateTradeSummary();
+                    }
+                });
+            });
+            
+            // Action button
+            document.getElementById('submitTradeBtn').addEventListener('click', (e) => {
+                e.preventDefault();
+                // UI only - no actual trading
+                alert(`${tradeSide === 'buy' ? 'Покупка' : 'Продажа'} ${currentSymbolName} - UI только`);
+            });
+        }
+        
+        function updateTradeButton() {
+            const btn = document.getElementById('submitTradeBtn');
+            btn.className = `trade-action-btn ${tradeSide}`;
+            btn.textContent = `${tradeSide === 'buy' ? 'Купить' : 'Продать'} ${currentSymbolName}`;
+        }
+        
+        function updateTradeSummary() {
+            const quantity = parseFloat(document.getElementById('quantity').value) || 0;
+            const priceText = document.getElementById('tradePrice').textContent;
+            const marketPrice = parseFloat(priceText.replace(/[^0-9.]/g, '')) || 0;
+            
+            let price = marketPrice;
+            if (orderType === 'limit') {
+                const limitPrice = parseFloat(document.getElementById('limitPrice').value);
+                if (limitPrice && limitPrice > 0) {
+                    price = limitPrice;
+                }
+            }
+            
+            const total = quantity * price;
+            const fee = total * 0.001;
+            const finalTotal = total + fee;
+            
+            document.getElementById('tradeFee').textContent = `$${fee.toFixed(2)}`;
+            document.getElementById('tradeTotal').textContent = `$${finalTotal.toFixed(2)}`;
+        }
+        
+        function updateTradingTerminal() {
+            updateTradeButton();
+            const symbolData = findSymbolData(currentSymbol);
+            if (symbolData) {
+                document.getElementById('quantitySuffix').textContent = symbolData.symbol.replace('USDT', '').replace('USD', '');
+            }
+            // Price will be updated from TradingView widget
+            // For now, set a placeholder
+            document.getElementById('tradePrice').textContent = '$0.00';
+        }
+        
+        function initAssetDropdown() {
+            const btn = document.getElementById('assetDropdownBtn');
+            const dropdown = document.getElementById('assetDropdown');
+            const search = document.getElementById('assetSearch');
+            const list = document.getElementById('assetDropdownList');
+            
+            // Populate dropdown
+            function populateDropdown(filter = '') {
+                list.innerHTML = '';
+                Object.entries(marketSymbols).forEach(([market, symbols]) => {
+                    const filtered = symbols.filter(s => 
+                        s.name.toLowerCase().includes(filter.toLowerCase()) ||
+                        s.symbol.toLowerCase().includes(filter.toLowerCase())
+                    );
+                    
+                    if (filtered.length > 0) {
+                        const group = document.createElement('div');
+                        group.style.padding = '8px 12px';
+                        group.style.fontSize = '0.75rem';
+                        group.style.fontWeight = '600';
+                        group.style.color = 'var(--text-tertiary)';
+                        group.style.textTransform = 'uppercase';
+                        group.textContent = market;
+                        list.appendChild(group);
+                        
+                        filtered.forEach(symbol => {
+                            const item = document.createElement('div');
+                            item.className = 'asset-dropdown-item';
+                            item.innerHTML = `
+                                <div>
+                                    <div class="asset-dropdown-item-name">${symbol.name}</div>
+                                    <div class="asset-dropdown-item-symbol">${symbol.symbol}</div>
+                                </div>
+                            `;
+                            item.addEventListener('click', () => {
+                                updateChart(symbol.tv);
+                                dropdown.classList.remove('show');
+                            });
+                            list.appendChild(item);
+                        });
+                    }
+                });
+            }
+            
+            populateDropdown();
+            
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                dropdown.classList.toggle('show');
+            });
+            
+            search.addEventListener('input', (e) => {
+                populateDropdown(e.target.value);
+            });
+            
+            document.addEventListener('click', (e) => {
+                if (!dropdown.contains(e.target) && e.target !== btn) {
+                    dropdown.classList.remove('show');
+                }
+            });
+        }
+        
+        function initMarketOverview() {
+            const container = document.getElementById('marketOverview');
+            
+            Object.entries(marketSymbols).forEach(([market, symbols]) => {
+                const group = document.createElement('div');
+                group.className = 'market-group';
+                
+                const label = document.createElement('div');
+                label.className = 'market-group-label';
+                label.textContent = market;
+                group.appendChild(label);
+                
+                const items = document.createElement('div');
+                items.className = 'market-items';
+                
+                symbols.forEach(symbol => {
+                    const item = document.createElement('div');
+                    item.className = 'market-item';
+                    if (symbol.tv === currentSymbol) {
+                        item.classList.add('active');
+                    }
+                    
+                    item.innerHTML = `
+                        <div class="market-item-name">${symbol.symbol}</div>
+                        <div class="market-item-price" id="price-${symbol.tv}">—</div>
+                        <div class="market-item-chart" id="chart-${symbol.tv}"></div>
+                    `;
+                    
+                    item.addEventListener('click', () => {
+                        updateChart(symbol.tv);
+                        document.querySelectorAll('.market-item').forEach(i => i.classList.remove('active'));
+                        item.classList.add('active');
+                    });
+                    
+                    items.appendChild(item);
+                    
+                    // Create mini chart
+                    setTimeout(() => {
+                        const chartContainer = document.getElementById(`chart-${symbol.tv}`);
+                        if (chartContainer) {
+                            const script = document.createElement('script');
+                            script.type = 'text/javascript';
+                            script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js';
+                            script.async = true;
+                            script.textContent = JSON.stringify({
+                                symbol: symbol.tv,
+                                width: '100%',
+                                height: '100%',
+                                locale: 'ru',
+                                dateRange: '1D',
+                                colorTheme: 'dark',
+                                isTransparent: false,
+                                autosize: true,
+                                largeChartUrl: ''
+                            });
+                            chartContainer.appendChild(script);
+                        }
+                    }, 100);
+                });
+                
+                group.appendChild(items);
+                container.appendChild(group);
+            });
+        }
+    </script>
+</body>
+</html>

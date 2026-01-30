@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ADX Finance — Биржевая платформа</title>
+    <link rel="icon" type="image/x-icon" href="app/favicon.ico">
+    <link rel="shortcut icon" type="image/x-icon" href="app/favicon.ico">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -340,42 +342,40 @@
             height: 100% !important;
             max-height: 48px !important;
             overflow: visible !important;
-<<<<<<< HEAD
-            width: auto !important;
-            min-width: 100% !important;
-=======
             width: 100vw !important;
             min-width: 100vw !important;
             max-width: none !important;
->>>>>>> 7a0b94442799c3b56d0e82221ac14dbd79c923dc
         }
         
         .tradingview-widget-container {
             height: 100% !important;
             max-height: 48px !important;
             overflow: visible !important;
-<<<<<<< HEAD
-            width: auto !important;
-            min-width: 100% !important;
-=======
             width: 100% !important;
             min-width: 100% !important;
             max-width: none !important;
->>>>>>> 7a0b94442799c3b56d0e82221ac14dbd79c923dc
         }
         
         .tradingview-widget-container__widget {
             height: 100% !important;
             max-height: 48px !important;
             overflow: visible !important;
-<<<<<<< HEAD
-            width: auto !important;
-            min-width: 100% !important;
-=======
             width: 100% !important;
             min-width: 100% !important;
             max-width: none !important;
->>>>>>> 7a0b94442799c3b56d0e82221ac14dbd79c923dc
+        }
+        
+        /* Скрываем логотип TradingView в ticker tape */
+        .tradingview-ticker-container img[src*="tradingview"],
+        .tradingview-ticker-container svg[viewBox*="0 0 195 17"],
+        .tradingview-widget-container img[src*="tradingview"],
+        .tradingview-widget-container svg[viewBox*="0 0 195 17"],
+        .tradingview-ticker-container a[href*="tradingview.com"] {
+            display: none !important;
+            visibility: hidden !important;
+            opacity: 0 !important;
+            width: 0 !important;
+            height: 0 !important;
         }
         
         .ticker-item {
@@ -1313,7 +1313,7 @@
                 script.async = true;
                 script.text = JSON.stringify({
                     "symbols": symbolsArray,
-                    "showSymbolLogo": true,
+                    "showSymbolLogo": false,
                     "colorTheme": "dark",
                     "isTransparent": true,
                     "displayMode": "adaptive",

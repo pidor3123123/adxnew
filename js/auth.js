@@ -572,6 +572,27 @@ const Auth = {
     },
     
     /**
+     * Единая инициализация авторизации
+     * Проверяет localStorage и обновляет UI
+     */
+    initAuth() {
+        const token = this.getToken();
+        const user = this.getUser();
+        const isAuth = !!token;
+        
+        console.log('[initAuth] Initializing auth state:', { isAuth, hasUser: !!user });
+        
+        // Обновляем UI
+        this.updateUI();
+        
+        // Возвращаем объект состояния
+        return {
+            isAuthenticated: isAuth,
+            user: user
+        };
+    },
+    
+    /**
      * Обновление UI для авторизованного пользователя
      */
     updateUI() {

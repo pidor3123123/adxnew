@@ -4,12 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Портфель — ADX Finance</title>
+    <link rel="icon" type="image/x-icon" href="app/favicon.ico">
+    <link rel="shortcut icon" type="image/x-icon" href="app/favicon.ico">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="css/style.css">
-    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
     <style>
         .portfolio-header {
             display: flex;
@@ -40,10 +41,6 @@
             
             .portfolio-header {
                 gap: 12px;
-            }
-            
-            #portfolioChart {
-                height: 200px;
             }
             
             .allocation-chart {
@@ -77,10 +74,6 @@
                 align-items: flex-start;
             }
             
-            #portfolioChart {
-                height: 250px;
-            }
-            
             .allocation-chart {
                 height: 200px;
             }
@@ -95,10 +88,6 @@
                 gap: 12px;
             }
             
-            #portfolioChart {
-                height: 200px;
-            }
-            
             .allocation-chart {
                 height: 180px;
             }
@@ -106,18 +95,8 @@
         
         .portfolio-grid {
             display: grid;
-            grid-template-columns: 2fr 1fr;
+            grid-template-columns: 1fr;
             gap: 24px;
-        }
-        
-        @media (max-width: 1024px) {
-            .portfolio-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-        
-        #portfolioChart {
-            height: 300px;
         }
         
         .allocation-chart {
@@ -326,13 +305,6 @@
                         <h1 style="margin-bottom: 8px;">Портфель</h1>
                         <p style="color: var(--text-secondary);">Обзор ваших активов и производительности</p>
                     </div>
-                    <div class="chart-timeframes">
-                        <button class="chart-timeframe" data-period="7d">7Д</button>
-                        <button class="chart-timeframe active" data-period="30d">30Д</button>
-                        <button class="chart-timeframe" data-period="90d">90Д</button>
-                        <button class="chart-timeframe" data-period="1y">1Г</button>
-                        <button class="chart-timeframe" data-period="all">Всё</button>
-                    </div>
                 </div>
                 
                 <!-- Summary Cards -->
@@ -371,19 +343,6 @@
                 </div>
                 
                 <div class="portfolio-grid">
-                    <!-- Portfolio Chart -->
-                    <div class="card">
-                        <div class="card-header">
-                            <h3 class="card-title">
-                                <i class="bi bi-graph-up"></i>
-                                История портфеля
-                            </h3>
-                        </div>
-                        <div class="card-body">
-                            <div id="portfolioChart"></div>
-                        </div>
-                    </div>
-                    
                     <!-- Allocation -->
                     <div class="card">
                         <div class="card-header">
@@ -433,7 +392,6 @@
     <script src="js/auth.js"></script>
     <script src="js/api.js"></script>
     <script>
-        let portfolioChart = null;
         let portfolioData = null;
         
         const allocationColors = [
@@ -448,17 +406,6 @@
             Auth.updateUI();
             
             await loadPortfolio();
-            initPortfolioChart();
-            await loadChartHistory('30d');
-            
-            // Обработчики периодов
-            document.querySelectorAll('.chart-timeframe').forEach(btn => {
-                btn.addEventListener('click', async () => {
-                    document.querySelectorAll('.chart-timeframe').forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
-                    await loadChartHistory(btn.dataset.period);
-                });
-            });
         });
         
         async function loadPortfolio() {
@@ -592,68 +539,6 @@
                     </div>
                 `;
             }).join('');
-        }
-        
-        function initPortfolioChart() {
-            const container = document.getElementById('portfolioChart');
-            if (!container) return;
-            
-            const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-            
-            portfolioChart = LightweightCharts.createChart(container, {
-                layout: {
-                    background: { type: 'solid', color: 'transparent' },
-                    textColor: isDark ? '#a1a1aa' : '#495057',
-                },
-                grid: {
-                    vertLines: { visible: false },
-                    horzLines: { color: isDark ? '#1f1f25' : '#e9ecef' },
-                },
-                rightPriceScale: {
-                    borderVisible: false,
-                },
-                timeScale: {
-                    borderVisible: false,
-                    timeVisible: true,
-                },
-                handleScroll: false,
-                handleScale: false,
-            });
-            
-            const resizeChart = () => {
-                portfolioChart.applyOptions({
-                    width: container.clientWidth,
-                    height: container.clientHeight || 300,
-                });
-            };
-            
-            resizeChart();
-            window.addEventListener('resize', resizeChart);
-        }
-        
-        async function loadChartHistory(period) {
-            try {
-                const result = await API.get('/portfolio.php?action=history', { period });
-                
-                if (result.success && portfolioChart) {
-                    const series = portfolioChart.addAreaSeries({
-                        lineColor: '#6366f1',
-                        topColor: 'rgba(99, 102, 241, 0.3)',
-                        bottomColor: 'rgba(99, 102, 241, 0)',
-                        lineWidth: 2,
-                    });
-                    
-                    const data = result.history.map(item => ({
-                        time: item.date,
-                        value: item.value
-                    }));
-                    
-                    series.setData(data);
-                    portfolioChart.timeScale().fitContent();
-                }
-            } catch (error) {
-                console.error('Error loading chart history:', error);
-            }
         }
         
         function formatAmount(amount, currency) {

@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Торговля — ADX Finance</title>
+    <link rel="icon" type="image/x-icon" href="app/favicon.ico">
+    <link rel="shortcut icon" type="image/x-icon" href="app/favicon.ico">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -12,24 +14,10 @@
     <style>
         .trade-layout {
             display: grid;
-            grid-template-columns: 1fr 320px;
-            grid-template-rows: auto 1fr;
+            grid-template-columns: 1fr;
             gap: 20px;
-            height: calc(100vh - var(--header-height) - 48px);
             padding: 16px 0;
         }
-        
-        @media (max-width: 1200px) {
-            .trade-layout {
-                grid-template-columns: 1fr;
-                height: auto;
-            }
-        }
-        
-        .chart-section {
-            grid-row: span 2;
-            display: flex;
-            flex-direction: column;
             max-height: 400px;
             overflow: hidden;
         }
@@ -243,44 +231,6 @@
         .asset-dropdown-item-change.up { color: var(--success-text); }
         .asset-dropdown-item-change.down { color: var(--danger-text); }
         
-        .chart-price-display {
-            margin-left: auto;
-            text-align: right;
-        }
-        
-        .chart-price-display .price {
-            font-size: 1.5rem;
-            font-weight: 700;
-            font-family: var(--font-primary);
-        }
-        
-        .chart-price-display .change {
-            font-size: 0.9375rem;
-            font-weight: 500;
-        }
-        
-        .chart-price-display .change.up { color: var(--success-text); }
-        .chart-price-display .change.down { color: var(--danger-text); }
-        
-        #tradingViewChart {
-            min-height: 450px;
-            max-height: 450px;
-            height: 450px;
-            width: 100%;
-            position: relative;
-            flex-shrink: 0;
-        }
-        
-        #tradingViewChart .tradingview-widget-container {
-            width: 100% !important;
-            height: 100% !important;
-            position: relative;
-        }
-        
-        #tradingViewChart .tradingview-widget-container__widget {
-            width: 100% !important;
-            height: 100% !important;
-        }
         
         .trade-sidebar {
             display: flex;
@@ -703,9 +653,6 @@
                 order: 2;
             }
             
-            .chart-section {
-                order: 1;
-            }
         }
         
         @media (max-width: 360px) {
@@ -746,9 +693,6 @@
             color: var(--accent-primary);
         }
         
-        .chart-style-toggle {
-            display: flex;
-            gap: 4px;
             padding: 4px;
             background: var(--bg-tertiary);
             border-radius: var(--radius-sm);
@@ -867,260 +811,107 @@
         </header>
         
         <!-- Main Content -->
-        <main class="main-content" style="padding: 0;">
-            <div class="container">
-                <div class="trade-layout">
-                    <!-- Chart Section -->
-                    <div class="chart-section">
-                        <div class="card" style="display: flex; flex-direction: column; height: fit-content;">
-                            <div class="card-header">
-                                <div class="chart-toolbar">
-                                    <div class="asset-selector-wrapper">
-                                        <div class="asset-selector" id="assetSelector" onclick="toggleAssetDropdown()">
-                                            <div class="asset-selector-icon" id="assetIcon">
-                                                <i class="bi bi-currency-bitcoin"></i>
-                                            </div>
-                                            <div class="asset-selector-info">
-                                                <h3 id="currentAsset">BTC/USD</h3>
-                                                <span id="currentAssetName">Bitcoin</span>
-                                            </div>
-                                            <i class="bi bi-chevron-down" id="assetChevron"></i>
-                                        </div>
-                                        <div class="asset-dropdown" id="assetDropdown">
-                                            <div class="asset-dropdown-search">
-                                                <i class="bi bi-search"></i>
-                                                <input type="text" placeholder="Поиск актива..." id="dropdownSearch" oninput="filterDropdownAssets(this.value)">
-                                            </div>
-                                            <div class="asset-dropdown-tabs">
-                                                <button class="asset-dropdown-tab active" data-filter="all" onclick="filterByMarket('all')">Все</button>
-                                                <button class="asset-dropdown-tab" data-filter="crypto" onclick="filterByMarket('crypto')">Крипто</button>
-                                                <button class="asset-dropdown-tab" data-filter="stocks" onclick="filterByMarket('stocks')">Акции</button>
-                                                <button class="asset-dropdown-tab" data-filter="forex" onclick="filterByMarket('forex')">Форекс</button>
-                                            </div>
-                                            <div class="asset-dropdown-list" id="assetDropdownList">
-                                                <!-- Заполняется через JS -->
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="chart-timeframes">
-                                        <button class="chart-timeframe" data-interval="1m">1м</button>
-                                        <button class="chart-timeframe active" data-interval="5m">5м</button>
-                                        <button class="chart-timeframe" data-interval="15m">15м</button>
-                                        <button class="chart-timeframe" data-interval="30m">30м</button>
-                                        <button class="chart-timeframe" data-interval="1h">1ч</button>
-                                        <button class="chart-timeframe" data-interval="24h">24ч</button>
-                                        <button class="chart-timeframe" data-interval="1w">Неделя</button>
-                                        <button class="chart-timeframe" data-interval="1M">Месяц</button>
-                                        <button class="chart-timeframe" data-interval="1y">Год</button>
-                                        <button class="chart-timeframe" data-interval="all">Всё</button>
-                                    </div>
-                                    
-                                    <div class="chart-style-toggle" style="display: flex; gap: 4px; margin-left: 12px;">
-                                        <button class="chart-style-btn active" data-chart-style="candles" onclick="switchChartStyle('candles')" title="Свечи" id="chartStyleCandles">
-                                            <i class="bi bi-bar-chart-line"></i>
-                                        </button>
-                                        <button class="chart-style-btn" data-chart-style="line" onclick="switchChartStyle('line')" title="Линия" id="chartStyleLine">
-                                            <i class="bi bi-graph-up"></i>
-                                        </button>
-                                    </div>
-                                    
-                                    <div class="chart-price-display">
-                                        <div class="price" id="currentPrice">$43,250.00</div>
-                                        <div class="change up" id="currentChange">
-                                            <i class="bi bi-caret-up-fill"></i>
-                                            +2.45% ($1,042.18)
-                                        </div>
-                                    </div>
-                                </div>
+        <main class="main-content" style="padding: 0; height: calc(100vh - 70px); overflow: hidden;">
+            <div class="terminal-container" style="height: 100%; display: flex; flex-direction: column;">
+                <!-- Terminal Header -->
+                <header class="terminal-header" style="background: var(--bg-secondary); border-bottom: 1px solid var(--border-color); padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-shrink: 0; height: 60px;">
+                    <div class="symbol-section" style="display: flex; align-items: center; gap: 12px;">
+                        <span class="symbol-name" id="symbolName" style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); font-variant-numeric: tabular-nums;">BTCUSDT</span>
+                        <span class="market-badge crypto" id="marketBadge" style="padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; background: #22c55e; color: #000;">Crypto</span>
+                    </div>
+                    <div class="asset-dropdown-wrapper" style="position: relative;">
+                        <button class="asset-dropdown-btn" id="assetDropdownBtn" style="padding: 6px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-secondary); font-size: 0.875rem; cursor: pointer;">
+                            Выбрать актив
+                        </button>
+                        <div class="asset-dropdown" id="assetDropdown" style="position: absolute; top: calc(100% + 8px); right: 0; width: 300px; max-height: 400px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 6px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); z-index: 1000; display: none; flex-direction: column; overflow: hidden;">
+                            <div class="asset-dropdown-search" style="padding: 12px; border-bottom: 1px solid var(--border-color);">
+                                <input type="text" id="assetSearch" placeholder="Поиск актива..." style="width: 100%; padding: 8px 12px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-primary); font-size: 0.875rem;">
                             </div>
-                            <div class="card-body" style="padding: 0; position: relative; height: 450px; max-height: 450px; overflow: hidden;">
-                                <!-- TradingView Widget -->
-                                <div id="tradingViewChart" style="width: 100%; height: 450px; max-height: 450px; display: block;">
-                                    <div class="tradingview-widget-container" style="width: 100%; height: 100%;">
-                                        <div class="tradingview-widget-container__widget" style="width: 100%; height: 100%;"></div>
-                                    </div>
-                                </div>
+                            <div class="asset-dropdown-list" id="assetDropdownList" style="overflow-y: auto; max-height: 300px;">
+                                <!-- Assets will be populated here -->
                             </div>
                         </div>
                     </div>
+                </header>
+                
+                <!-- Main Grid -->
+                <div class="main-grid" style="display: grid; grid-template-columns: 70% 30%; height: calc(100% - 60px - 120px); overflow: hidden;">
+                    <!-- Chart Section -->
+                    <div class="chart-section" style="background: var(--bg-primary); border-right: 1px solid var(--border-color); position: relative; overflow: hidden;">
+                        <div id="tradingview-chart" style="width: 100%; height: 100%;"></div>
+                    </div>
                     
-                    <!-- Trade Sidebar -->
-                    <div class="trade-sidebar">
-                        <!-- Trade Panel -->
-                        <div class="trade-panel">
-                            <!-- Вкладки режима торговли -->
-                            <div class="trade-mode-tabs">
-                                <button class="trade-mode-tab active" data-mode="normal">
-                                    <i class="bi bi-graph-up"></i>
-                                    Обычная торговля
-                                </button>
-                                <button class="trade-mode-tab" data-mode="quick">
-                                    <i class="bi bi-lightning-charge"></i>
-                                    Быстрая торговля
-                                </button>
-                            </div>
-                            
-                            <!-- Обычная торговля -->
-                            <div id="normalTradeMode" class="trade-mode-content">
-                                <div class="trade-tabs">
-                                    <button class="trade-tab buy active" data-side="buy">Купить</button>
-                                    <button class="trade-tab sell" data-side="sell">Продать</button>
-                                </div>
-                                
-                                <form class="trade-form" id="tradeForm">
-                                <div class="tabs" style="margin-bottom: 16px;">
-                                    <button type="button" class="tab active" data-type="market">Рыночный</button>
-                                    <button type="button" class="tab" data-type="limit">Лимитный</button>
-                                </div>
-                                
-                                <div class="trade-input-group" id="limitPriceGroup" style="display: none;">
-                                    <label>Цена</label>
-                                    <input type="number" class="trade-input" id="limitPrice" placeholder="0.00" step="0.01">
-                                    <span class="trade-input-suffix">USD</span>
-                                </div>
-                                
-                                <div class="trade-input-group">
-                                    <label>Количество</label>
-                                    <input type="number" class="trade-input" id="quantity" placeholder="0.00" step="0.0001" required>
-                                    <span class="trade-input-suffix" id="quantitySuffix">BTC</span>
-                                </div>
-                                
-                                <div class="trade-percent-buttons">
-                                    <button type="button" class="trade-percent-btn" data-percent="25">25%</button>
-                                    <button type="button" class="trade-percent-btn" data-percent="50">50%</button>
-                                    <button type="button" class="trade-percent-btn" data-percent="75">75%</button>
-                                    <button type="button" class="trade-percent-btn" data-percent="100">100%</button>
-                                </div>
-                                
-                                <div class="trade-summary">
-                                    <div class="trade-summary-row">
-                                        <span class="trade-summary-label">Доступно</span>
-                                        <span class="trade-summary-value" id="availableBalance">$10,000.00</span>
-                                    </div>
-                                    <div class="trade-summary-row">
-                                        <span class="trade-summary-label">Цена</span>
-                                        <span class="trade-summary-value" id="tradePrice">$43,250.00</span>
-                                    </div>
-                                    <div class="trade-summary-row">
-                                        <span class="trade-summary-label">Комиссия (0.1%)</span>
-                                        <span class="trade-summary-value" id="tradeFee">$0.00</span>
-                                    </div>
-                                    <div class="trade-summary-row" style="font-weight: 600;">
-                                        <span class="trade-summary-label">Итого</span>
-                                        <span class="trade-summary-value" id="tradeTotal">$0.00</span>
-                                    </div>
-                                </div>
-                                
-                                <button type="submit" class="btn btn-buy btn-block btn-lg" id="submitTradeBtn">
-                                    <i class="bi bi-cart-plus"></i>
-                                    Купить BTC
-                                </button>
-                            </form>
-                            </div>
-                            
-                            <!-- Быстрая торговля -->
-                            <div id="quickTradeMode" class="trade-mode-content" style="display: none;">
-                                <div class="trade-tabs">
-                                    <button class="trade-tab buy active" data-side="buy">Купить</button>
-                                    <button class="trade-tab sell" data-side="sell">Продать</button>
-                                </div>
-                                
-                                <form class="trade-form" id="quickTradeForm">
-                                    <div class="tabs" style="margin-bottom: 16px;">
-                                        <button type="button" class="tab active" data-type="market">Рыночный</button>
-                                        <button type="button" class="tab" data-type="limit">Лимитный</button>
-                                    </div>
-                                    
-                                    <div class="trade-input-group" id="quickLimitPriceGroup" style="display: none;">
-                                        <label>Цена</label>
-                                        <input type="number" class="trade-input" id="quickLimitPrice" placeholder="0.00" step="0.01">
-                                        <span class="trade-input-suffix">USD</span>
-                                    </div>
-                                    
-                                    <div class="trade-input-group">
-                                        <label>Количество</label>
-                                        <input type="number" class="trade-input" id="quickQuantity" placeholder="0.00" step="0.0001" required>
-                                        <span class="trade-input-suffix" id="quickQuantitySuffix">BTC</span>
-                                    </div>
-                                    
-                                    <div class="trade-percent-buttons">
-                                        <button type="button" class="trade-percent-btn" data-percent="25">25%</button>
-                                        <button type="button" class="trade-percent-btn" data-percent="50">50%</button>
-                                        <button type="button" class="trade-percent-btn" data-percent="75">75%</button>
-                                        <button type="button" class="trade-percent-btn" data-percent="100">100%</button>
-                                        <button type="button" class="trade-percent-btn trade-percent-btn-max" data-percent="max">Макс</button>
-                                    </div>
-                                    
-                                    <div id="quickTradeFields" style="margin-top: 16px; padding: 16px; background: var(--bg-secondary); border-radius: var(--radius-md); border: 1px solid var(--border-color);">
-                                        <div class="trade-input-group">
-                                            <label>Время сделки</label>
-                                            <div class="trade-time-buttons">
-                                                <button type="button" class="trade-time-btn" data-time="1m" data-profit="2">1 мин (+2%)</button>
-                                                <button type="button" class="trade-time-btn" data-time="5m" data-profit="6">5 мин (+6%)</button>
-                                                <button type="button" class="trade-time-btn" data-time="15m" data-profit="10">15 мин (+10%)</button>
-                                                <button type="button" class="trade-time-btn" data-time="30m" data-profit="12">30 мин (+12%)</button>
-                                                <button type="button" class="trade-time-btn" data-time="1h" data-profit="15">1 час (+15%)</button>
-                                                <button type="button" class="trade-time-btn" data-time="4h" data-profit="18">4 часа (+18%)</button>
-                                            </div>
-                                            <small style="color: var(--text-tertiary); font-size: 0.75rem; margin-top: 8px; display: block;" id="quickTimeInfo">Выберите время сделки для автоматического расчета прибыли</small>
-                                        </div>
-                                        
-                                        <div class="trade-input-group" style="margin-top: 16px;">
-                                            <label>Take Profit (Тейк Профит)</label>
-                                            <input type="number" class="trade-input" id="quickTakeProfit" placeholder="0.00" step="0.01">
-                                            <span class="trade-input-suffix">USD</span>
-                                            <small style="color: var(--text-tertiary); font-size: 0.75rem; margin-top: 4px; display: block;" id="quickTpInfo"></small>
-                                            <small style="color: var(--success-text); font-size: 0.8125rem; margin-top: 4px; display: block; font-weight: 500;" id="quickProfitDisplay"></small>
-                                        </div>
-                                        
-                                        <div class="trade-input-group" style="margin-top: 12px;">
-                                            <label>Stop Loss (Стоп Лосс)</label>
-                                            <input type="number" class="trade-input" id="quickStopLoss" placeholder="0.00" step="0.01">
-                                            <span class="trade-input-suffix">USD</span>
-                                            <small style="color: var(--text-tertiary); font-size: 0.75rem; margin-top: 4px; display: block;" id="quickSlInfo"></small>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="trade-summary">
-                                        <div class="trade-summary-row">
-                                            <span class="trade-summary-label">Доступно</span>
-                                            <span class="trade-summary-value" id="quickAvailableBalance">$10,000.00</span>
-                                        </div>
-                                        <div class="trade-summary-row">
-                                            <span class="trade-summary-label">Цена</span>
-                                            <span class="trade-summary-value" id="quickTradePrice">$43,250.00</span>
-                                        </div>
-                                        <div class="trade-summary-row">
-                                            <span class="trade-summary-label">Комиссия (0.1%)</span>
-                                            <span class="trade-summary-value" id="quickTradeFee">$0.00</span>
-                                        </div>
-                                        <div class="trade-summary-row" style="font-weight: 600;">
-                                            <span class="trade-summary-label">Итого</span>
-                                            <span class="trade-summary-value" id="quickTradeTotal">$0.00</span>
-                                        </div>
-                                    </div>
-                                    
-                                    <button type="submit" class="btn btn-buy btn-block btn-lg" id="submitQuickTradeBtn">
-                                        <i class="bi bi-lightning-charge"></i>
-                                        Купить BTC
-                                    </button>
-                                </form>
+                    <!-- Trading Terminal -->
+                    <div class="trading-terminal" style="background: var(--bg-secondary); padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px;">
+                        <!-- Buy/Sell Tabs -->
+                        <div class="trade-tabs" style="display: flex; gap: 4px; background: var(--bg-tertiary); padding: 4px; border-radius: 6px;">
+                            <button class="trade-tab buy active" data-side="buy" style="flex: 1; padding: 8px 12px; background: transparent; border: none; color: var(--text-secondary); font-size: 0.875rem; font-weight: 500; cursor: pointer; border-radius: 4px; transition: all 150ms ease;">Купить</button>
+                            <button class="trade-tab sell" data-side="sell" style="flex: 1; padding: 8px 12px; background: transparent; border: none; color: var(--text-secondary); font-size: 0.875rem; font-weight: 500; cursor: pointer; border-radius: 4px; transition: all 150ms ease;">Продать</button>
+                        </div>
+                        
+                        <!-- Order Type Tabs -->
+                        <div class="order-type-tabs" style="display: flex; gap: 4px; background: var(--bg-tertiary); padding: 4px; border-radius: 6px;">
+                            <button class="order-type-tab active" data-type="market" style="flex: 1; padding: 6px 10px; background: var(--bg-active); border: none; color: var(--text-primary); font-size: 0.8125rem; font-weight: 500; cursor: pointer; border-radius: 4px; transition: all 150ms ease;">Рыночный</button>
+                            <button class="order-type-tab" data-type="limit" style="flex: 1; padding: 6px 10px; background: transparent; border: none; color: var(--text-secondary); font-size: 0.8125rem; font-weight: 500; cursor: pointer; border-radius: 4px; transition: all 150ms ease;">Лимитный</button>
+                        </div>
+                        
+                        <!-- Limit Price Input (hidden by default) -->
+                        <div class="trade-input-group" id="limitPriceGroup" style="display: none; flex-direction: column; gap: 6px;">
+                            <label style="font-size: 0.75rem; font-weight: 500; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.5px;">Цена</label>
+                            <div class="trade-input-wrapper" style="position: relative; display: flex; align-items: center;">
+                                <input type="number" class="trade-input" id="limitPrice" placeholder="0.00" step="0.01" style="width: 100%; padding: 10px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 0.9375rem; font-family: 'JetBrains Mono', monospace;">
+                                <span class="trade-input-suffix" style="position: absolute; right: 12px; font-size: 0.875rem; color: var(--text-secondary); pointer-events: none;">USD</span>
                             </div>
                         </div>
                         
-                        <!-- Asset List -->
-                        <div class="card">
-                            <div class="card-header" style="padding: 12px 16px;">
-                                <div class="search-wrapper" style="width: 100%;">
-                                    <i class="bi bi-search"></i>
-                                    <input type="text" class="search-input" placeholder="Поиск актива..." id="assetSearch">
-                                </div>
-                            </div>
-                            <div class="asset-list-panel" id="assetList">
-                                <!-- Заполняется через JS -->
+                        <!-- Quantity Input -->
+                        <div class="trade-input-group" style="flex-direction: column; gap: 6px;">
+                            <label style="font-size: 0.75rem; font-weight: 500; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.5px;">Количество</label>
+                            <div class="trade-input-wrapper" style="position: relative; display: flex; align-items: center;">
+                                <input type="number" class="trade-input" id="quantity" placeholder="0.00" step="0.0001" style="width: 100%; padding: 10px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 0.9375rem; font-family: 'JetBrains Mono', monospace;">
+                                <span class="trade-input-suffix" id="quantitySuffix" style="position: absolute; right: 12px; font-size: 0.875rem; color: var(--text-secondary); pointer-events: none;">BTC</span>
                             </div>
                         </div>
+                        
+                        <!-- Percentage Buttons -->
+                        <div class="trade-percent-buttons" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;">
+                            <button type="button" class="trade-percent-btn" data-percent="25" style="padding: 6px 8px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-secondary); font-size: 0.75rem; font-weight: 500; cursor: pointer; transition: all 150ms ease;">25%</button>
+                            <button type="button" class="trade-percent-btn" data-percent="50" style="padding: 6px 8px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-secondary); font-size: 0.75rem; font-weight: 500; cursor: pointer; transition: all 150ms ease;">50%</button>
+                            <button type="button" class="trade-percent-btn" data-percent="75" style="padding: 6px 8px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-secondary); font-size: 0.75rem; font-weight: 500; cursor: pointer; transition: all 150ms ease;">75%</button>
+                            <button type="button" class="trade-percent-btn" data-percent="100" style="padding: 6px 8px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-secondary); font-size: 0.75rem; font-weight: 500; cursor: pointer; transition: all 150ms ease;">100%</button>
+                        </div>
+                        
+                        <!-- Trade Summary -->
+                        <div class="trade-summary" style="display: flex; flex-direction: column; gap: 8px; padding: 12px; background: var(--bg-tertiary); border-radius: 6px; border: 1px solid var(--border-color);">
+                            <div class="trade-summary-row" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8125rem;">
+                                <span class="trade-summary-label" style="color: var(--text-tertiary);">Доступно</span>
+                                <span class="trade-summary-value" id="availableBalance" style="color: var(--text-primary); font-weight: 500; font-family: 'JetBrains Mono', monospace;">$10,000.00</span>
+                            </div>
+                            <div class="trade-summary-row" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8125rem;">
+                                <span class="trade-summary-label" style="color: var(--text-tertiary);">Цена</span>
+                                <span class="trade-summary-value" id="tradePrice" style="color: var(--text-primary); font-weight: 500; font-family: 'JetBrains Mono', monospace;">$0.00</span>
+                            </div>
+                            <div class="trade-summary-row" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8125rem;">
+                                <span class="trade-summary-label" style="color: var(--text-tertiary);">Комиссия (0.1%)</span>
+                                <span class="trade-summary-value" id="tradeFee" style="color: var(--text-primary); font-weight: 500; font-family: 'JetBrains Mono', monospace;">$0.00</span>
+                            </div>
+                            <div class="trade-summary-row" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8125rem; font-weight: 600;">
+                                <span class="trade-summary-label" style="color: var(--text-tertiary);">Итого</span>
+                                <span class="trade-summary-value" id="tradeTotal" style="color: var(--text-primary); font-weight: 500; font-family: 'JetBrains Mono', monospace;">$0.00</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Action Button -->
+                        <button type="button" class="trade-action-btn buy" id="submitTradeBtn" style="width: 100%; padding: 12px; border: none; border-radius: 6px; font-size: 0.9375rem; font-weight: 600; cursor: pointer; transition: all 150ms ease; background: #22c55e; color: #000;">
+                            Купить BTC
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Market Overview -->
+                <div class="market-overview" style="background: var(--bg-secondary); border-top: 1px solid var(--border-color); height: 120px; padding: 12px 20px; overflow-x: auto; overflow-y: hidden; flex-shrink: 0;">
+                    <div class="market-overview-content" id="marketOverview" style="display: flex; gap: 16px; height: 100%;">
+                        <!-- Market items will be added here -->
                     </div>
                 </div>
             </div>
@@ -1132,9 +923,558 @@
     <script src="js/api.js"></script>
     <script src="js/trading.js"></script>
     <script>
+        // Глобальный обработчик ошибок для перехвата необработанных исключений
+        window.addEventListener('error', function(event) {
+            console.error('Global error handler:', {
+                message: event.message,
+                filename: event.filename,
+                lineno: event.lineno,
+                colno: event.colno,
+                error: event.error
+            });
+            
+            // Не показываем пользователю технические ошибки, только логируем
+            if (event.error && event.error.message) {
+                const errorMsg = event.error.message.toLowerCase();
+                if (errorMsg.includes('syntax') || errorMsg.includes('unexpected')) {
+                    console.error('Syntax error detected, please check console for details');
+                }
+            }
+            
+            // Предотвращаем показ ошибки в консоли браузера по умолчанию
+            // event.preventDefault(); // Раскомментировать, если нужно полностью скрыть ошибки
+        });
+        
+        // Обработчик необработанных промисов
+        window.addEventListener('unhandledrejection', function(event) {
+            console.error('Unhandled promise rejection:', event.reason);
+            event.preventDefault(); // Предотвращаем вывод в консоль
+        });
+        
+        // Проверка синтаксиса перед выполнением критических функций
+        function validateSyntax(code, functionName) {
+            try {
+                // Пытаемся создать функцию из строки для проверки синтаксиса
+                new Function(code);
+                return true;
+            } catch (error) {
+                console.error(`Syntax error in ${functionName}:`, error);
+                return false;
+            }
+        }
+        // Trading Terminal JavaScript
+        const marketSymbols = {
+            crypto: [
+                { name: 'Bitcoin', symbol: 'BTCUSDT', tv: 'BINANCE:BTCUSDT' },
+                { name: 'Ethereum', symbol: 'ETHUSDT', tv: 'BINANCE:ETHUSDT' },
+                { name: 'BNB', symbol: 'BNBUSDT', tv: 'BINANCE:BNBUSDT' },
+                { name: 'Solana', symbol: 'SOLUSDT', tv: 'BINANCE:SOLUSDT' },
+                { name: 'XRP', symbol: 'XRPUSDT', tv: 'BINANCE:XRPUSDT' },
+                { name: 'Cardano', symbol: 'ADAUSDT', tv: 'BINANCE:ADAUSDT' },
+                { name: 'Dogecoin', symbol: 'DOGEUSDT', tv: 'BINANCE:DOGEUSDT' },
+                { name: 'Polkadot', symbol: 'DOTUSDT', tv: 'BINANCE:DOTUSDT' }
+            ],
+            stocks: [
+                { name: 'Apple', symbol: 'AAPL', tv: 'NASDAQ:AAPL' },
+                { name: 'Tesla', symbol: 'TSLA', tv: 'NASDAQ:TSLA' },
+                { name: 'Microsoft', symbol: 'MSFT', tv: 'NASDAQ:MSFT' },
+                { name: 'Google', symbol: 'GOOGL', tv: 'NASDAQ:GOOGL' },
+                { name: 'Amazon', symbol: 'AMZN', tv: 'NASDAQ:AMZN' },
+                { name: 'Meta', symbol: 'META', tv: 'NASDAQ:META' },
+                { name: 'NVIDIA', symbol: 'NVDA', tv: 'NASDAQ:NVDA' }
+            ],
+            forex: [
+                { name: 'EUR/USD', symbol: 'EURUSD', tv: 'FX:EURUSD' },
+                { name: 'GBP/USD', symbol: 'GBPUSD', tv: 'FX:GBPUSD' },
+                { name: 'USD/JPY', symbol: 'USDJPY', tv: 'FX:USDJPY' },
+                { name: 'AUD/USD', symbol: 'AUDUSD', tv: 'FX:AUDUSD' },
+                { name: 'USD/CAD', symbol: 'USDCAD', tv: 'FX:USDCAD' }
+            ],
+            indices: [
+                { name: 'S&P 500', symbol: 'SPX', tv: 'SP:SPX' },
+                { name: 'NASDAQ', symbol: 'NDX', tv: 'NASDAQ:NDX' },
+                { name: 'Dow Jones', symbol: 'DJI', tv: 'DJ:DJI' },
+                { name: 'FTSE 100', symbol: 'FTSE', tv: 'LSE:FTSE' }
+            ],
+            commodities: [
+                { name: 'Gold', symbol: 'GOLD', tv: 'TVC:GOLD' },
+                { name: 'Silver', symbol: 'SILVER', tv: 'TVC:SILVER' },
+                { name: 'Oil', symbol: 'OIL', tv: 'TVC:USOIL' },
+                { name: 'Brent', symbol: 'BRENT', tv: 'TVC:UKOIL' }
+            ]
+        };
+        
+        const marketBadges = {
+            crypto: { text: 'Crypto', class: 'crypto' },
+            stocks: { text: 'Stock', class: 'stock' },
+            forex: { text: 'Forex', class: 'forex' },
+            indices: { text: 'Index', class: 'index' },
+            commodities: { text: 'Commodity', class: 'commodity' }
+        };
+        
+        // Единый объект состояния торговли
+        const TradingState = {
+            currentSymbol: 'BINANCE:BTCUSDT',
+            currentSymbolName: 'BTCUSDT',
+            currentMarket: 'crypto',
+            tradeSide: 'buy',
+            orderType: 'market',
+            chartWidget: null,
+            tvScriptLoaded: false
+        };
+        
+        // Делаем объект доступным глобально
+        window.TradingState = TradingState;
+        
+        // Локальные переменные для внутреннего использования
+        let currentSymbol = TradingState.currentSymbol;
+        let currentSymbolName = TradingState.currentSymbolName;
+        let currentMarket = TradingState.currentMarket;
+        let chartWidget = TradingState.chartWidget;
+        let tvScriptLoaded = TradingState.tvScriptLoaded;
+        
+        function findSymbolData(tvSymbol) {
+            for (const market of Object.values(marketSymbols)) {
+                const found = market.find(s => s.tv === tvSymbol);
+                if (found) return found;
+            }
+            return null;
+        }
+        
+        function findMarketForSymbol(tvSymbol) {
+            for (const [market, symbols] of Object.entries(marketSymbols)) {
+                if (symbols.find(s => s.tv === tvSymbol)) {
+                    return market;
+                }
+            }
+            return 'crypto';
+        }
+        
+        function updateUI() {
+            const symbolData = findSymbolData(currentSymbol);
+            if (symbolData) {
+                currentSymbolName = symbolData.symbol;
+                const symbolNameEl = document.getElementById('symbolName');
+                const quantitySuffixEl = document.getElementById('quantitySuffix');
+                if (symbolNameEl) symbolNameEl.textContent = symbolData.symbol;
+                if (quantitySuffixEl) quantitySuffixEl.textContent = symbolData.symbol.replace('USDT', '').replace('USD', '');
+            }
+            
+            const badge = marketBadges[currentMarket];
+            const badgeEl = document.getElementById('marketBadge');
+            if (badgeEl) {
+                badgeEl.textContent = badge.text;
+                badgeEl.className = `market-badge ${badge.class}`;
+                badgeEl.style.background = badge.class === 'crypto' ? '#22c55e' : badge.class === 'stock' ? '#3b82f6' : badge.class === 'forex' ? '#f59e0b' : badge.class === 'index' ? '#8b5cf6' : '#ec4899';
+                badgeEl.style.color = badge.class === 'crypto' || badge.class === 'forex' ? '#000' : '#fff';
+            }
+        }
+        
+        function initChart() {
+            const container = document.getElementById('tradingview-chart');
+            if (!container) return;
+            
+            function createWidget() {
+                if (typeof TradingView !== 'undefined') {
+                    const widgetConfig = {
+                        autosize: true,
+                        symbol: TradingState.currentSymbol,
+                        interval: '15',
+                        timezone: 'Etc/UTC',
+                        theme: 'dark',
+                        style: '1',
+                        locale: 'ru',
+                        toolbar_bg: '#111111',
+                        enable_publishing: false,
+                        allow_symbol_change: true,
+                        hide_top_toolbar: false,
+                        hide_legend: false,
+                        save_image: false,
+                        container_id: 'tradingview-chart',
+                        studies: [],
+                        disabled_features: ['use_localstorage_for_settings'],
+                        enabled_features: ['study_templates']
+                    };
+                    
+                    TradingState.chartWidget = new TradingView.widget(widgetConfig);
+                    chartWidget = TradingState.chartWidget;
+                }
+            }
+            
+            if (typeof TradingView !== 'undefined') {
+                createWidget();
+            } else if (!TradingState.tvScriptLoaded) {
+                TradingState.tvScriptLoaded = true;
+                tvScriptLoaded = true;
+                const script = document.createElement('script');
+                script.type = 'text/javascript';
+                script.src = 'https://s3.tradingview.com/tv.js';
+                script.async = true;
+                script.onload = createWidget;
+                document.head.appendChild(script);
+            }
+        }
+        
+        function updateChart(symbol) {
+            TradingState.currentSymbol = symbol;
+            currentSymbol = symbol;
+            localStorage.setItem('terminal_symbol', symbol);
+            const symbolData = findSymbolData(symbol);
+            if (symbolData) {
+                TradingState.currentSymbolName = symbolData.symbol;
+                TradingState.currentMarket = findMarketForSymbol(symbol);
+                currentSymbolName = symbolData.symbol;
+                currentMarket = findMarketForSymbol(symbol);
+            }
+            updateUI();
+            updateTradingTerminal();
+            updateMarketOverview();
+            
+            // Инициализируем авторизацию после смены символа
+            if (typeof Auth !== 'undefined' && typeof Auth.initAuth === 'function') {
+                Auth.initAuth();
+            }
+            
+            const container = document.getElementById('tradingview-chart');
+            if (container) {
+                container.innerHTML = '';
+                initChart();
+            }
+        }
+        
+        function updateMarketOverview() {
+            document.querySelectorAll('.market-item').forEach(item => {
+                item.classList.remove('active');
+                const chartId = item.querySelector('[id^="chart-"]')?.id;
+                if (chartId) {
+                    const symbol = chartId.replace('chart-', '');
+                    if (symbol === currentSymbol) {
+                        item.classList.add('active');
+                    }
+                }
+            });
+        }
+        
+        function initTradingTerminal() {
+            document.querySelectorAll('.trade-tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    document.querySelectorAll('.trade-tab').forEach(t => {
+                        t.classList.remove('active');
+                        t.style.background = 'transparent';
+                        t.style.color = 'var(--text-secondary)';
+                    });
+                    tab.classList.add('active');
+                    TradingState.tradeSide = tab.dataset.side;
+                    if (TradingState.tradeSide === 'buy') {
+                        tab.style.background = '#22c55e';
+                        tab.style.color = '#000';
+                    } else {
+                        tab.style.background = '#ef4444';
+                        tab.style.color = '#fff';
+                    }
+                    updateTradeButton();
+                });
+            });
+            
+            document.querySelectorAll('.order-type-tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    document.querySelectorAll('.order-type-tab').forEach(t => {
+                        t.classList.remove('active');
+                        t.style.background = 'transparent';
+                        t.style.color = 'var(--text-secondary)';
+                    });
+                    tab.classList.add('active');
+                    TradingState.orderType = tab.dataset.type;
+                    tab.style.background = 'var(--bg-active)';
+                    tab.style.color = 'var(--text-primary)';
+                    const limitGroup = document.getElementById('limitPriceGroup');
+                    if (limitGroup) {
+                        limitGroup.style.display = TradingState.orderType === 'limit' ? 'flex' : 'none';
+                    }
+                });
+            });
+            
+            const quantityInput = document.getElementById('quantity');
+            if (quantityInput) {
+                quantityInput.addEventListener('input', updateTradeSummary);
+            }
+            
+            const limitPriceInput = document.getElementById('limitPrice');
+            if (limitPriceInput) {
+                limitPriceInput.addEventListener('input', updateTradeSummary);
+            }
+            
+            document.querySelectorAll('.trade-percent-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const percent = parseFloat(btn.dataset.percent);
+                    const availableEl = document.getElementById('availableBalance');
+                    const priceEl = document.getElementById('tradePrice');
+                    if (availableEl && priceEl && quantityInput) {
+                        const available = parseFloat(availableEl.textContent.replace(/[^0-9.]/g, ''));
+                        const price = parseFloat(priceEl.textContent.replace(/[^0-9.]/g, ''));
+                        if (price > 0) {
+                            const quantity = (available * percent / 100) / price;
+                            quantityInput.value = quantity.toFixed(8);
+                            updateTradeSummary();
+                        }
+                    }
+                });
+            });
+            
+            const submitBtn = document.getElementById('submitTradeBtn');
+            if (submitBtn) {
+                submitBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    alert(`${TradingState.tradeSide === 'buy' ? 'Покупка' : 'Продажа'} ${currentSymbolName} - UI только`);
+                });
+            }
+        }
+        
+        function updateTradeButton() {
+            const btn = document.getElementById('submitTradeBtn');
+            if (btn) {
+                btn.className = `trade-action-btn ${TradingState.tradeSide}`;
+                btn.textContent = `${TradingState.tradeSide === 'buy' ? 'Купить' : 'Продать'} ${currentSymbolName}`;
+                btn.style.background = TradingState.tradeSide === 'buy' ? '#22c55e' : '#ef4444';
+                btn.style.color = TradingState.tradeSide === 'buy' ? '#000' : '#fff';
+            }
+        }
+        
+        function updateTradeSummary() {
+            const quantityInput = document.getElementById('quantity');
+            const priceEl = document.getElementById('tradePrice');
+            const feeEl = document.getElementById('tradeFee');
+            const totalEl = document.getElementById('tradeTotal');
+            
+            if (!quantityInput || !priceEl || !feeEl || !totalEl) return;
+            
+            const quantity = parseFloat(quantityInput.value) || 0;
+            const marketPrice = parseFloat(priceEl.textContent.replace(/[^0-9.]/g, '')) || 0;
+            
+            let price = marketPrice;
+            if (TradingState.orderType === 'limit') {
+                const limitPriceInput = document.getElementById('limitPrice');
+                if (limitPriceInput) {
+                    const limitPrice = parseFloat(limitPriceInput.value);
+                    if (limitPrice && limitPrice > 0) {
+                        price = limitPrice;
+                    }
+                }
+            }
+            
+            const total = quantity * price;
+            const fee = total * 0.001;
+            const finalTotal = total + fee;
+            
+            feeEl.textContent = `$${fee.toFixed(2)}`;
+            totalEl.textContent = `$${finalTotal.toFixed(2)}`;
+        }
+        
+        function updateTradingTerminal() {
+            updateTradeButton();
+            const symbolData = findSymbolData(currentSymbol);
+            if (symbolData) {
+                const quantitySuffixEl = document.getElementById('quantitySuffix');
+                if (quantitySuffixEl) {
+                    quantitySuffixEl.textContent = symbolData.symbol.replace('USDT', '').replace('USD', '');
+                }
+            }
+        }
+        
+        function initAssetDropdown() {
+            const btn = document.getElementById('assetDropdownBtn');
+            const dropdown = document.getElementById('assetDropdown');
+            const search = document.getElementById('assetSearch');
+            const list = document.getElementById('assetDropdownList');
+            
+            if (!btn || !dropdown || !search || !list) return;
+            
+            function populateDropdown(filter = '') {
+                list.innerHTML = '';
+                Object.entries(marketSymbols).forEach(([market, symbols]) => {
+                    const filtered = symbols.filter(s => 
+                        s.name.toLowerCase().includes(filter.toLowerCase()) ||
+                        s.symbol.toLowerCase().includes(filter.toLowerCase())
+                    );
+                    
+                    if (filtered.length > 0) {
+                        const group = document.createElement('div');
+                        group.style.padding = '8px 12px';
+                        group.style.fontSize = '0.75rem';
+                        group.style.fontWeight = '600';
+                        group.style.color = 'var(--text-tertiary)';
+                        group.style.textTransform = 'uppercase';
+                        group.textContent = market;
+                        list.appendChild(group);
+                        
+                        filtered.forEach(symbol => {
+                            const item = document.createElement('div');
+                            item.className = 'asset-dropdown-item';
+                            item.style.padding = '10px 12px';
+                            item.style.cursor = 'pointer';
+                            item.style.transition = 'all 150ms ease';
+                            item.style.display = 'flex';
+                            item.style.alignItems = 'center';
+                            item.style.justifyContent = 'space-between';
+                            item.innerHTML = `
+                                <div>
+                                    <div style="font-size: 0.875rem; font-weight: 500; color: var(--text-primary);">${symbol.name}</div>
+                                    <div style="font-size: 0.75rem; color: var(--text-tertiary);">${symbol.symbol}</div>
+                                </div>
+                            `;
+                            item.addEventListener('mouseenter', () => {
+                                item.style.background = 'var(--bg-hover)';
+                            });
+                            item.addEventListener('mouseleave', () => {
+                                item.style.background = 'transparent';
+                            });
+                            item.addEventListener('click', () => {
+                                updateChart(symbol.tv);
+                                dropdown.classList.remove('show');
+                                dropdown.style.display = 'none';
+                            });
+                            list.appendChild(item);
+                        });
+                    }
+                });
+            }
+            
+            populateDropdown();
+            
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const isShowing = dropdown.classList.contains('show');
+                if (isShowing) {
+                    dropdown.classList.remove('show');
+                    dropdown.style.display = 'none';
+                } else {
+                    dropdown.classList.add('show');
+                    dropdown.style.display = 'flex';
+                }
+            });
+            
+            search.addEventListener('input', (e) => {
+                populateDropdown(e.target.value);
+            });
+            
+            document.addEventListener('click', (e) => {
+                if (!dropdown.contains(e.target) && e.target !== btn) {
+                    dropdown.classList.remove('show');
+                    dropdown.style.display = 'none';
+                }
+            });
+        }
+        
+        function initMarketOverview() {
+            const container = document.getElementById('marketOverview');
+            if (!container) return;
+            
+            Object.entries(marketSymbols).forEach(([market, symbols]) => {
+                const group = document.createElement('div');
+                group.style.display = 'flex';
+                group.style.flexDirection = 'column';
+                group.style.gap = '8px';
+                
+                const label = document.createElement('div');
+                label.style.fontSize = '0.75rem';
+                label.style.fontWeight = '600';
+                label.style.color = 'var(--text-tertiary)';
+                label.style.textTransform = 'uppercase';
+                label.style.letterSpacing = '0.5px';
+                label.textContent = market;
+                group.appendChild(label);
+                
+                const items = document.createElement('div');
+                items.style.display = 'flex';
+                items.style.gap = '12px';
+                
+                symbols.forEach(symbol => {
+                    const item = document.createElement('div');
+                    item.style.minWidth = '120px';
+                    item.style.padding = '8px';
+                    item.style.background = 'var(--bg-tertiary)';
+                    item.style.border = '1px solid var(--border-color)';
+                    item.style.borderRadius = '6px';
+                    item.style.cursor = 'pointer';
+                    item.style.transition = 'all 150ms ease';
+                    if (symbol.tv === currentSymbol) {
+                        item.style.borderColor = '#6366f1';
+                        item.style.background = 'var(--bg-active)';
+                    }
+                    
+                    item.innerHTML = `
+                        <div style="font-size: 0.8125rem; font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">${symbol.symbol}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary);" id="price-${symbol.tv}">—</div>
+                        <div style="width: 100%; height: 40px; margin-top: 4px;" id="chart-${symbol.tv}"></div>
+                    `;
+                    
+                    item.addEventListener('click', () => {
+                        updateChart(symbol.tv);
+                        document.querySelectorAll('.market-item').forEach(i => {
+                            i.style.borderColor = 'var(--border-color)';
+                            i.style.background = 'var(--bg-tertiary)';
+                        });
+                        item.style.borderColor = '#6366f1';
+                        item.style.background = 'var(--bg-active)';
+                    });
+                    
+                    items.appendChild(item);
+                    
+                    setTimeout(() => {
+                        const chartContainer = document.getElementById(`chart-${symbol.tv}`);
+                        if (chartContainer) {
+                            const script = document.createElement('script');
+                            script.type = 'text/javascript';
+                            script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js';
+                            script.async = true;
+                            script.textContent = JSON.stringify({
+                                symbol: symbol.tv,
+                                width: '100%',
+                                height: '100%',
+                                locale: 'ru',
+                                dateRange: '1D',
+                                colorTheme: 'dark',
+                                isTransparent: false,
+                                autosize: true,
+                                largeChartUrl: ''
+                            });
+                            chartContainer.appendChild(script);
+                        }
+                    }, 100);
+                });
+                
+                group.appendChild(items);
+                container.appendChild(group);
+            });
+        }
+        
         // Инициализация торговой страницы
         document.addEventListener('DOMContentLoaded', async () => {
-            Auth.updateUI();
+            // Инициализация авторизации (должна быть первой)
+            if (typeof Auth !== 'undefined' && typeof Auth.initAuth === 'function') {
+                Auth.initAuth();
+            } else if (typeof Auth !== 'undefined' && typeof Auth.updateUI === 'function') {
+                Auth.updateUI();
+            }
+            
+            // Load saved state
+            const savedSymbol = localStorage.getItem('terminal_symbol');
+            if (savedSymbol) {
+                TradingState.currentSymbol = savedSymbol;
+                currentSymbol = savedSymbol;
+                const symbolData = findSymbolData(savedSymbol);
+                if (symbolData) {
+                    TradingState.currentSymbolName = symbolData.symbol;
+                    TradingState.currentMarket = findMarketForSymbol(savedSymbol);
+                    currentSymbolName = symbolData.symbol;
+                    currentMarket = findMarketForSymbol(savedSymbol);
+                }
+            }
+            updateUI();
+            initChart();
+            initTradingTerminal();
+            initAssetDropdown();
+            initMarketOverview();
             
             // Инициализация user menu (после обновления UI)
             setTimeout(() => {
@@ -1142,693 +1482,9 @@
                     initUserMenu();
                 }
             }, 100);
-            
-            // Получение параметров из URL
-            const urlParams = new URLSearchParams(window.location.search);
-            const symbol = urlParams.get('symbol') || 'BTC';
-            const mode = urlParams.get('mode') || 'normal'; // По умолчанию обычная торговля
-            
-            // Переключаем режим торговли на основе URL параметра
-            switchTradeMode(mode);
-            
-            // Обновляем активную ссылку в навигации
-            updateNavActiveState(mode);
-            
-            // Загрузка списка активов
-            try {
-                await loadAssetList();
-            } catch (error) {
-                console.error('Error loading asset list:', error);
-            }
-            
-            // Выбор актива (обновит UI и цену)
-            try {
-                await selectAsset(symbol);
-            } catch (error) {
-                console.error('Error selecting asset:', error);
-            }
-            
-            // Инициализация TradingView графика после выбора актива (чтобы цена уже была загружена)
-            setTimeout(() => {
-                try {
-                    if (typeof initTradingViewChart === 'function') {
-                        initTradingViewChart(symbol, currentTradingViewInterval || '5m', currentChartStyle || 'candles');
-                    }
-                    
-                    // Запускаем обновление цены в реальном времени
-                    setTimeout(() => {
-                        try {
-                            if (typeof startTradingViewPriceUpdates === 'function') {
-                                startTradingViewPriceUpdates();
-                            }
-                        } catch (error) {
-                            console.error('Error starting TradingView price updates:', error);
-                        }
-                    }, 500);
-                } catch (error) {
-                    console.error('Error initializing TradingView chart:', error);
-                }
-            }, 300);
-            
-            // Обработчики вкладок режима торговли
-            document.querySelectorAll('.trade-mode-tab').forEach(tab => {
-                tab.addEventListener('click', () => {
-                    const newMode = tab.dataset.mode;
-                    switchTradeMode(newMode);
-                    // Обновляем URL без перезагрузки страницы
-                    const newUrl = new URL(window.location);
-                    newUrl.searchParams.set('mode', newMode);
-                    window.history.pushState({}, '', newUrl);
-                    updateNavActiveState(newMode);
-                });
-            });
-            
-            // Функция переключения режима торговли
-            function switchTradeMode(mode) {
-                // Обновляем активную вкладку
-                document.querySelectorAll('.trade-mode-tab').forEach(t => {
-                    t.classList.toggle('active', t.dataset.mode === mode);
-                });
-                
-                // Показываем/скрываем соответствующие формы
-                const normalMode = document.getElementById('normalTradeMode');
-                const quickMode = document.getElementById('quickTradeMode');
-                if (normalMode && quickMode) {
-                    normalMode.style.display = mode === 'normal' ? 'block' : 'none';
-                    quickMode.style.display = mode === 'quick' ? 'block' : 'none';
-                }
-            }
-            
-            // Функция обновления активной ссылки в навигации
-            function updateNavActiveState(mode) {
-                const navNormal = document.getElementById('navNormalTrade');
-                const navQuick = document.getElementById('navQuickTrade');
-                
-                // Убираем active со всех ссылок торговли
-                if (navNormal) navNormal.classList.remove('active');
-                if (navQuick) navQuick.classList.remove('active');
-                
-                // Добавляем active к нужной ссылке
-                if (mode === 'normal' && navNormal) {
-                    navNormal.classList.add('active');
-                } else if (mode === 'quick' && navQuick) {
-                    navQuick.classList.add('active');
-                }
-            }
-            
-            // Обработчики табов торговли (Купить/Продать) для обеих форм
-            document.querySelectorAll('.trade-tab').forEach(tab => {
-                tab.addEventListener('click', () => {
-                    // Находим родительскую секцию
-                    const parentSection = tab.closest('.trade-mode-content');
-                    // Обновляем только табы в этой секции
-                    parentSection.querySelectorAll('.trade-tab').forEach(t => t.classList.remove('active'));
-                    tab.classList.add('active');
-                    updateTradeUI(tab.dataset.side, parentSection);
-                    
-                    // Если это быстрая торговля и выбрано время, пересчитываем TP
-                    if (parentSection?.id === 'quickTradeMode') {
-                        const activeTimeBtn = document.querySelector('.trade-time-btn.active');
-                        if (activeTimeBtn && profitTable) {
-                            const profitPercent = profitTable[activeTimeBtn.dataset.time];
-                            if (profitPercent) {
-                                calculateTakeProfitFromTime(profitPercent);
-                            }
-                        }
-                    }
-                });
-            });
-            
-            // Обработчики типа ордера для обычной торговли
-            document.querySelectorAll('#tradeForm .tab').forEach(tab => {
-                tab.addEventListener('click', () => {
-                    document.querySelectorAll('#tradeForm .tab').forEach(t => t.classList.remove('active'));
-                    tab.classList.add('active');
-                    document.getElementById('limitPriceGroup').style.display = 
-                        tab.dataset.type === 'limit' ? 'block' : 'none';
-                });
-            });
-            
-            // Обработчики типа ордера для быстрой торговли
-            document.querySelectorAll('#quickTradeForm .tab').forEach(tab => {
-                tab.addEventListener('click', () => {
-                    document.querySelectorAll('#quickTradeForm .tab').forEach(t => t.classList.remove('active'));
-                    tab.classList.add('active');
-                    document.getElementById('quickLimitPriceGroup').style.display = 
-                        tab.dataset.type === 'limit' ? 'block' : 'none';
-                });
-            });
-            
-            // Обработчики процентных кнопок
-            document.querySelectorAll('.trade-percent-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const percentValue = btn.dataset.percent;
-                    if (percentValue === 'max') {
-                        calculateQuantityByPercent('max');
-                    } else {
-                        const percent = parseInt(percentValue) / 100;
-                        calculateQuantityByPercent(percent);
-                    }
-                });
-            });
-            
-            // Обработчик изменения количества для обычной торговли
-            document.getElementById('quantity').addEventListener('input', updateTradeSummary);
-            document.getElementById('limitPrice')?.addEventListener('input', updateTradeSummary);
-            
-            // Обработчик изменения количества для быстрой торговли
-            document.getElementById('quickQuantity')?.addEventListener('input', () => {
-                if (typeof updateQuickTradeSummary === 'function') updateQuickTradeSummary();
-                if (typeof updateQuickTPSLInfo === 'function') updateQuickTPSLInfo();
-            });
-            document.getElementById('quickLimitPrice')?.addEventListener('input', () => {
-                if (typeof updateQuickTradeSummary === 'function') updateQuickTradeSummary();
-                if (typeof updateQuickTPSLInfo === 'function') updateQuickTPSLInfo();
-            });
-            
-            // Обработчики таймфреймов
-            document.querySelectorAll('.chart-timeframe').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    document.querySelectorAll('.chart-timeframe').forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
-                    const interval = btn.dataset.interval;
-                    
-                    // Обновляем TradingView график
-                    updateTradingViewInterval(interval);
-                });
-            });
-            
-            // Поиск активов
-            document.getElementById('assetSearch').addEventListener('input', (e) => {
-                filterAssetList(e.target.value);
-            });
-            
-            // Таблица процентов прибыли по времени сделки
-            const profitTable = {
-                '1m': 2,   // 1 минута → 2%
-                '5m': 6,   // 5 минут → 6%
-                '15m': 10, // 15 минут → 10%
-                '30m': 12, // 30 минут → 12%
-                '1h': 15,  // 1 час → 15%
-                '4h': 18   // 4 часа → 18%
-            };
-            
-            // Обработчики кнопок выбора времени сделки
-            document.querySelectorAll('.trade-time-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    // Убираем active со всех кнопок времени
-                    document.querySelectorAll('.trade-time-btn').forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
-                    
-                    // Получаем процент прибыли
-                    const time = btn.dataset.time;
-                    const profitPercent = profitTable[time];
-                    
-                    // Автоматически рассчитываем Take Profit
-                    calculateTakeProfitFromTime(profitPercent);
-                });
-            });
-            
-            // Функция расчета Take Profit на основе времени сделки
-            function calculateTakeProfitFromTime(profitPercent) {
-                const currentPrice = window.currentAsset?.price || parseFloat(document.getElementById('quickTradePrice')?.textContent.replace(/[$,]/g, '') || document.getElementById('tradePrice')?.textContent.replace(/[$,]/g, ''));
-                const quantity = parseFloat(document.getElementById('quickQuantity')?.value) || 0;
-                const activeTab = document.querySelector('#quickTradeMode .trade-tab.active');
-                const side = activeTab?.dataset.side || 'buy';
-                
-                if (!currentPrice) return;
-                
-                // Рассчитываем Take Profit цену
-                let takeProfitPrice;
-                if (side === 'buy') {
-                    // Для покупки: TP = текущая_цена * (1 + процент_прибыли / 100)
-                    takeProfitPrice = currentPrice * (1 + profitPercent / 100);
-                } else {
-                    // Для продажи: TP = текущая_цена * (1 - процент_прибыли / 100)
-                    takeProfitPrice = currentPrice * (1 - profitPercent / 100);
-                }
-                
-                // Устанавливаем Take Profit
-                const tpInput = document.getElementById('quickTakeProfit');
-                if (tpInput) {
-                    tpInput.value = takeProfitPrice.toFixed(2);
-                }
-                
-                // Автоматически рассчитываем Stop Loss (-3% для buy, +3% для sell)
-                const stopLossPercent = 3; // Фиксированный процент для SL
-                let stopLossPrice;
-                if (side === 'buy') {
-                    // Для покупки: SL = текущая_цена * (1 - 3 / 100) = текущая_цена * 0.97
-                    stopLossPrice = currentPrice * (1 - stopLossPercent / 100);
-                } else {
-                    // Для продажи: SL = текущая_цена * (1 + 3 / 100) = текущая_цена * 1.03
-                    stopLossPrice = currentPrice * (1 + stopLossPercent / 100);
-                }
-                
-                // Устанавливаем Stop Loss
-                const slInput = document.getElementById('quickStopLoss');
-                if (slInput) {
-                    slInput.value = stopLossPrice.toFixed(2);
-                }
-                
-                // Рассчитываем прибыль в валюте
-                const dealAmount = quantity * currentPrice;
-                const profitAmount = dealAmount * (profitPercent / 100);
-                
-                // Отображаем информацию о прибыли
-                updateProfitDisplay(profitPercent, profitAmount, quantity);
-                
-                // Обновляем информацию о TP/SL
-                if (typeof updateQuickTPSLInfo === 'function') {
-                    updateQuickTPSLInfo();
-                }
-            }
-            
-            // Функция обновления отображения прибыли
-            function updateProfitDisplay(profitPercent, profitAmount, quantity) {
-                const profitDisplay = document.getElementById('quickProfitDisplay');
-                if (profitDisplay && quantity > 0) {
-                    profitDisplay.textContent = `Ожидаемая прибыль: ${profitAmount.toFixed(2)} USD (${profitPercent}% от суммы сделки)`;
-                    profitDisplay.classList.add('show');
-                } else if (profitDisplay) {
-                    profitDisplay.classList.remove('show');
-                }
-            }
-            
-            // Обновление информации о TP/SL для быстрой торговли
-            document.getElementById('quickTakeProfit')?.addEventListener('input', () => {
-                if (typeof updateQuickTPSLInfo === 'function') updateQuickTPSLInfo();
-                // Если TP изменен вручную, проверяем, не нужно ли обновить расчет
-                const tpValue = parseFloat(document.getElementById('quickTakeProfit')?.value);
-                if (tpValue && tpValue > 0) {
-                    // Показываем, что TP установлен вручную
-                    const profitDisplay = document.getElementById('quickProfitDisplay');
-                    if (profitDisplay) {
-                        profitDisplay.classList.remove('show');
-                    }
-                }
-            });
-            document.getElementById('quickStopLoss')?.addEventListener('input', () => {
-                if (typeof updateQuickTPSLInfo === 'function') updateQuickTPSLInfo();
-            });
-            document.getElementById('quickQuantity')?.addEventListener('input', () => {
-                if (typeof updateQuickTPSLInfo === 'function') updateQuickTPSLInfo();
-                // Пересчитываем прибыль при изменении количества
-                const activeTimeBtn = document.querySelector('.trade-time-btn.active');
-                if (activeTimeBtn) {
-                    const profitPercent = profitTable[activeTimeBtn.dataset.time];
-                    if (profitPercent) {
-                        calculateTakeProfitFromTime(profitPercent);
-                    }
-                }
-            });
-            
-            // Обработчики процентных кнопок для обеих форм
-            document.querySelectorAll('.trade-percent-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const percentValue = btn.dataset.percent;
-                    const parentForm = btn.closest('form');
-                    if (parentForm.id === 'quickTradeForm') {
-                        if (percentValue === 'max') {
-                            calculateQuantityByPercent('max', 'quick');
-                        } else {
-                            const percent = parseInt(percentValue) / 100;
-                            calculateQuantityByPercent(percent, 'quick');
-                        }
-                    } else {
-                        if (percentValue === 'max') {
-                            calculateQuantityByPercent('max');
-                        } else {
-                            const percent = parseInt(percentValue) / 100;
-                            calculateQuantityByPercent(percent);
-                        }
-                    }
-                });
-            });
-            
-            // Отправка ордера для обычной торговли
-            document.getElementById('tradeForm').addEventListener('submit', async (e) => {
-                e.preventDefault();
-                await submitOrder(false);
-            });
-            
-            // Отправка ордера для быстрой торговли
-            document.getElementById('quickTradeForm').addEventListener('submit', async (e) => {
-                e.preventDefault();
-                await submitOrder(true);
-            });
-            
-            // Функция обновления информации о TP/SL для быстрой торговли
-            function updateQuickTPSLInfo() {
-                const currentPrice = window.currentAsset?.price || parseFloat(document.getElementById('tradePrice')?.textContent.replace(/[$,]/g, '') || document.getElementById('quickTradePrice')?.textContent.replace(/[$,]/g, ''));
-                const tpInput = document.getElementById('quickTakeProfit');
-                const slInput = document.getElementById('quickStopLoss');
-                const tpInfo = document.getElementById('quickTpInfo');
-                const slInfo = document.getElementById('quickSlInfo');
-                
-                if (tpInput && slInput && tpInfo && slInfo && currentPrice) {
-                    const tp = parseFloat(tpInput.value);
-                    const sl = parseFloat(slInput.value);
-                    const tradeSide = document.querySelector('#quickTradeMode .trade-tab.active')?.dataset.side || 'buy';
-                    
-                    if (tp) {
-                        const diff = tp - currentPrice;
-                        const percent = (diff / currentPrice) * 100;
-                        if (tradeSide === 'buy') {
-                            tpInfo.textContent = percent > 0 ? `+${percent.toFixed(2)}% выше текущей цены` : `${percent.toFixed(2)}% ниже текущей цены`;
-                            tpInfo.style.color = percent > 0 ? 'var(--success-text)' : 'var(--danger-text)';
-                        } else {
-                            tpInfo.textContent = percent < 0 ? `${Math.abs(percent).toFixed(2)}% ниже текущей цены` : `+${percent.toFixed(2)}% выше текущей цены`;
-                            tpInfo.style.color = percent < 0 ? 'var(--success-text)' : 'var(--danger-text)';
-                        }
-                    } else {
-                        tpInfo.textContent = '';
-                    }
-                    
-                    if (sl) {
-                        const diff = sl - currentPrice;
-                        const percent = (diff / currentPrice) * 100;
-                        if (tradeSide === 'buy') {
-                            slInfo.textContent = percent < 0 ? `${Math.abs(percent).toFixed(2)}% ниже текущей цены` : `+${percent.toFixed(2)}% выше текущей цены`;
-                            slInfo.style.color = percent < 0 ? 'var(--success-text)' : 'var(--danger-text)';
-                        } else {
-                            slInfo.textContent = percent > 0 ? `+${percent.toFixed(2)}% выше текущей цены` : `${percent.toFixed(2)}% ниже текущей цены`;
-                            slInfo.style.color = percent > 0 ? 'var(--success-text)' : 'var(--danger-text)';
-                        }
-                    } else {
-                        slInfo.textContent = '';
-                    }
-                }
-            }
-            
-            // Периодическая проверка TP/SL (каждые 5 секунд)
-            if (Auth.isAuthenticated()) {
-                setInterval(async () => {
-                    try {
-                        const result = await TradingAPI.checkTPSL();
-                        if (result.success && result.closed_orders && result.closed_orders.length > 0) {
-                            result.closed_orders.forEach(order => {
-                                NovaTrade.showToast(
-                                    `Позиция закрыта (${order.reason})`,
-                                    `${order.symbol}: ${order.quantity} по ${order.price.toFixed(2)}`,
-                                    'info'
-                                );
-                            });
-                            // Обновляем балансы после закрытия позиций
-                            await loadUserBalances();
-                        }
-                    } catch (error) {
-                        console.error('Error checking TP/SL:', error);
-                    }
-                }, 5000); // Каждые 5 секунд
-            }
         });
         
         // Глобальные переменные для TradingView графика
-        let currentTradingViewInterval = '5m';
-        let currentChartStyle = 'candles'; // 'candles' или 'line'
-        
-        // Маппинг интервалов для TradingView
-        function getTradingViewInterval(interval) {
-            const intervalMap = {
-                '1m': '1',
-                '5m': '5',
-                '15m': '15',
-                '30m': '30',
-                '1h': '60',
-                '24h': 'D',
-                '1w': 'W',
-                '1M': 'M',
-                '1y': '12M',
-                'all': 'ALL'
-            };
-            return intervalMap[interval] || '5';
-        }
-        
-        // Получение символа TradingView для актива
-        function getTradingViewSymbolForAsset(symbol) {
-            const symbolUpper = symbol.toUpperCase();
-            
-            // Криптовалюты
-            const cryptoList = ['BTC', 'ETH', 'BNB', 'SOL', 'XRP', 'ADA', 'DOGE', 'DOT', 'MATIC', 'AVAX', 'LINK', 'UNI', 'ATOM', 'ETC', 'LTC', 'TRX', 'XLM', 'XMR', 'BCH', 'EOS'];
-            if (cryptoList.includes(symbolUpper)) {
-                return `BINANCE:${symbolUpper}USDT`;
-            }
-            
-            // Акции
-            const stocksList = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX', 'AMD', 'INTC', 'NKE', 'DIS', 'JPM', 'V', 'MA'];
-            if (stocksList.includes(symbolUpper)) {
-                return `NASDAQ:${symbolUpper}`;
-            }
-            
-            // Форекс
-            const forexList = ['EURUSD', 'GBPUSD', 'USDJPY', 'AUDUSD', 'USDCAD', 'USDCHF', 'NZDUSD', 'EURGBP', 'EURJPY', 'GBPJPY'];
-            if (forexList.includes(symbolUpper)) {
-                return `FX:${symbolUpper}`;
-            }
-            
-            // Индексы
-            const indexMap = {
-                'SPX': 'SP:SPX',
-                'NDX': 'NASDAQ:NDX',
-                'DJI': 'DJ:DJI',
-                'FTSE': 'LSE:FTSE',
-                'DAX': 'XETR:DAX',
-                'N225': 'TVC:NK225'
-            };
-            if (indexMap[symbolUpper]) {
-                return indexMap[symbolUpper];
-            }
-            
-            // Сырье (Commodities)
-            const commoditiesMap = {
-                'GOLD': 'TVC:GOLD',
-                'SILVER': 'TVC:SILVER',
-                'OIL': 'TVC:USOIL',
-                'BRENT': 'TVC:UKOIL',
-                'COPPER': 'TVC:COPPER',
-                'NATURALGAS': 'TVC:NATURALGAS',
-                'WHEAT': 'TVC:WHEAT',
-                'CORN': 'TVC:CORN',
-                'SUGAR': 'TVC:SUGAR',
-                'COFFEE': 'TVC:COFFEE'
-            };
-            if (commoditiesMap[symbolUpper]) {
-                return commoditiesMap[symbolUpper];
-            }
-            
-            // Расширенный список криптовалют
-            const extendedCryptoList = ['USDT', 'USDC', 'DAI', 'BUSD', 'TUSD', 'PAXG', 'WBTC', 'WETH', 'SHIB', 'PEPE', 'FLOKI', 'BONK'];
-            if (extendedCryptoList.includes(symbolUpper)) {
-                return `BINANCE:${symbolUpper}USDT`;
-            }
-            
-            // Расширенный список акций
-            const extendedStocksList = ['SPY', 'QQQ', 'IWM', 'DIA', 'GLD', 'SLV', 'TLT', 'HYG'];
-            if (extendedStocksList.includes(symbolUpper)) {
-                return `NASDAQ:${symbolUpper}`;
-            }
-            
-            // Расширенный список форекс
-            const extendedForexList = ['EURGBP', 'EURJPY', 'GBPJPY', 'AUDJPY', 'NZDUSD', 'USDCHF', 'EURCHF', 'GBPCHF'];
-            if (extendedForexList.includes(symbolUpper)) {
-                return `FX:${symbolUpper}`;
-            }
-            
-            // Расширенный список индексов
-            const extendedIndexMap = {
-                'VIX': 'TVC:VIX',
-                'RUT': 'TVC:RUT',
-                'NDX100': 'NASDAQ:NDX',
-                'SP500': 'SP:SPX'
-            };
-            if (extendedIndexMap[symbolUpper]) {
-                return extendedIndexMap[symbolUpper];
-            }
-            
-            // По умолчанию - пытаемся как криптовалюта
-            return `BINANCE:${symbolUpper}USDT`;
-        }
-        
-        // Инициализация TradingView графика
-        function initTradingViewChart(symbol, interval = null, style = null) {
-            try {
-                // Ждем, пока DOM полностью загрузится
-                const checkContainer = () => {
-                    const widgetContainer = document.querySelector('#tradingViewChart .tradingview-widget-container__widget');
-                    if (!widgetContainer) {
-                        console.warn('TradingView widget container not found, retrying...');
-                        setTimeout(checkContainer, 100);
-                        return;
-                    }
-                    
-                    initializeWidget(widgetContainer, symbol, interval, style);
-                };
-                
-                checkContainer();
-            } catch (error) {
-                console.error('Error in initTradingViewChart:', error);
-            }
-        }
-        
-        function initializeWidget(widgetContainer, symbol, interval, style) {
-            try {
-                const urlParams = new URLSearchParams(window.location.search);
-                const currentSymbol = urlParams.get('symbol') || symbol || 'BTC';
-                
-                // Проверяем наличие необходимых функций
-                if (typeof getTradingViewInterval !== 'function') {
-                    console.error('getTradingViewInterval function not found');
-                    return;
-                }
-                
-                if (typeof getTradingViewSymbolForAsset !== 'function') {
-                    console.error('getTradingViewSymbolForAsset function not found');
-                    return;
-                }
-                
-                // Используем текущие значения или переданные параметры
-                const tvInterval = interval ? getTradingViewInterval(interval) : getTradingViewInterval(currentTradingViewInterval);
-                const chartStyle = style || currentChartStyle;
-                const tvSymbol = getTradingViewSymbolForAsset(currentSymbol);
-                
-                // Определяем range на основе интервала
-                let range = '1D';
-                if (interval === '1w' || interval === '1M' || interval === '1y' || interval === 'all') {
-                    range = interval === 'all' ? 'ALL' : (interval === '1w' ? '1W' : (interval === '1M' ? '1M' : '12M'));
-                } else if (interval === '24h') {
-                    range = '1D';
-                } else if (interval === '1h' || interval === '30m') {
-                    range = '1D';
-                } else {
-                    range = '1D';
-                }
-                
-                // Очищаем контейнер перед добавлением нового скрипта
-                widgetContainer.innerHTML = '';
-                
-                // Создаем новый скрипт для виджета
-                const script = document.createElement('script');
-                script.type = 'text/javascript';
-                script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
-                script.async = true;
-                
-                // Конфигурация виджета
-                const widgetConfig = {
-                    "autosize": true,
-                    "symbol": tvSymbol,
-                    "interval": tvInterval,
-                    "timezone": "Etc/UTC",
-                    "theme": "dark",
-                    "style": chartStyle === 'candles' ? "1" : "2",
-                    "locale": "ru",
-                    "backgroundColor": "transparent",
-                    "gridColor": "rgba(45, 45, 53, 1)",
-                    "hide_top_toolbar": false,
-                    "hide_legend": false,
-                    "save_image": true,
-                    "support_host": "https://www.tradingview.com",
-                    "withdateranges": true,
-                    "range": range,
-                    "hide_volume": false,
-                    "scalePosition": "right",
-                    "scaleMode": "Normal",
-                    "fontFamily": "-apple-system, BlinkMacSystemFont, Trebuchet MS, Roboto, Ubuntu, sans-serif",
-                    "fontSize": "10",
-                    "noTimeScale": false,
-                    "valuescale_width": 50,
-                    "container_id": "tradingViewChart",
-                    "enable_publishing": false,
-                    "allow_symbol_change": false,
-                    "calendar": false,
-                    "studies": []
-                };
-                
-                // Устанавливаем содержимое скрипта
-                script.textContent = JSON.stringify(widgetConfig);
-                
-                // Добавляем обработчик ошибок
-                script.onerror = function() {
-                    console.error('Failed to load TradingView widget script');
-                };
-                
-                // Добавляем скрипт в контейнер
-                widgetContainer.appendChild(script);
-                
-                console.log('TradingView widget initialized for', tvSymbol, 'with interval', tvInterval);
-            } catch (error) {
-                console.error('Error initializing TradingView widget:', error);
-            }
-        }
-        
-        // Переключение стиля графика (свечи/линия)
-        function switchChartStyle(style) {
-            try {
-                currentChartStyle = style;
-                const buttons = document.querySelectorAll('.chart-style-btn');
-                if (buttons.length) {
-                    buttons.forEach(btn => btn.classList.remove('active'));
-                    const activeBtn = document.querySelector(`[data-chart-style="${style}"]`);
-                    if (activeBtn) {
-                        activeBtn.classList.add('active');
-                    }
-                }
-                
-                // Обновляем TradingView график
-                const urlParams = new URLSearchParams(window.location.search);
-                const symbol = urlParams.get('symbol') || 'BTC';
-                initTradingViewChart(symbol, currentTradingViewInterval, style);
-            } catch (error) {
-                console.error('Error switching chart style:', error);
-            }
-        }
-        
-        // Делаем функцию доступной глобально
-        window.switchChartStyle = switchChartStyle;
-        
-        // Обновление интервала графика
-        function updateTradingViewInterval(interval) {
-            try {
-                currentTradingViewInterval = interval;
-                
-                // Обновляем TradingView график
-                const urlParams = new URLSearchParams(window.location.search);
-                const symbol = urlParams.get('symbol') || 'BTC';
-                initTradingViewChart(symbol, interval, currentChartStyle);
-            } catch (error) {
-                console.error('Error updating TradingView interval:', error);
-            }
-        }
-        
-        // Реальное время обновление цены для TradingView
-        let tradingViewPriceUpdateInterval = null;
-        
-        function startTradingViewPriceUpdates() {
-            // Останавливаем предыдущий интервал если есть
-            if (tradingViewPriceUpdateInterval) {
-                clearInterval(tradingViewPriceUpdateInterval);
-            }
-            
-            // Используем глобальную функцию updateAssetPrice для синхронизации (каждые 2 секунды)
-            // Это избегает дублирования логики и обеспечивает единый источник истины для цены
-            tradingViewPriceUpdateInterval = setInterval(async () => {
-                try {
-                    if (typeof updateAssetPrice === 'function') {
-                        await updateAssetPrice();
-                    }
-                } catch (error) {
-                    console.error('Error in TradingView price update:', error);
-                }
-            }, 2000);
-        }
-        
-        function stopTradingViewPriceUpdates() {
-            if (tradingViewPriceUpdateInterval) {
-                clearInterval(tradingViewPriceUpdateInterval);
-                tradingViewPriceUpdateInterval = null;
-            }
-        }
-        
     </script>
 </body>
 </html>
