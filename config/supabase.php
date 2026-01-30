@@ -384,45 +384,6 @@ class SupabaseClient {
     }
     
     /**
-     * Вызов RPC функции
-     */
-    public function rpc(string $functionName, array $params = []): array {
-        $url = $this->baseUrl . '/rpc/' . $functionName;
-        
-        $headers = [
-            'apikey: ' . $this->apiKey,
-            'Authorization: Bearer ' . $this->apiKey,
-            'Content-Type: application/json',
-            'Prefer: return=representation'
-        ];
-        
-        $ch = curl_init($url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($params));
-        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
-        
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $error = curl_error($ch);
-        curl_close($ch);
-        
-        if ($error) {
-            throw new Exception("CURL Error calling RPC $functionName: $error");
-        }
-        
-        $decoded = json_decode($response, true);
-        
-        if ($httpCode >= 400) {
-            $errorMessage = $decoded['message'] ?? $decoded['error'] ?? $decoded['hint'] ?? "HTTP $httpCode";
-            throw new Exception("Supabase RPC Error ($functionName): $errorMessage", $httpCode);
-        }
-        
-        return $decoded;
-    }
-    
-    /**
      * Wallet RPC Methods
      */
     
