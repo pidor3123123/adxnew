@@ -17,7 +17,13 @@ if (!ob_get_level()) {
 
 // Функция для безопасного вывода JSON ошибки
 // Должна быть определена ДО установки обработчиков ошибок
+// Упрощена для избежания рекурсии
 function outputJsonError($message, $code = 500, $details = null) {
+    // Отключаем обработчик ошибок, чтобы избежать рекурсии
+    if (function_exists('restore_error_handler')) {
+        restore_error_handler();
+    }
+    
     // Очищаем все уровни буфера
     while (ob_get_level() > 0) {
         @ob_end_clean();
@@ -25,11 +31,11 @@ function outputJsonError($message, $code = 500, $details = null) {
     
     // Устанавливаем заголовки если еще не установлены
     if (!headers_sent()) {
-        @header('Content-Type: application/json; charset=UTF-8');
-        @http_response_code($code);
-        @header('Access-Control-Allow-Origin: *');
-        @header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
-        @header('Access-Control-Allow-Headers: Content-Type, Authorization');
+        header('Content-Type: application/json; charset=UTF-8');
+        http_response_code($code);
+        header('Access-Control-Allow-Origin: *');
+        header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
+        header('Access-Control-Allow-Headers: Content-Type, Authorization');
     }
     
     $response = [
@@ -42,8 +48,8 @@ function outputJsonError($message, $code = 500, $details = null) {
         $response['details'] = $details;
     }
     
-    @echo json_encode($response, JSON_UNESCAPED_UNICODE);
-    @exit;
+    echo json_encode($response, JSON_UNESCAPED_UNICODE);
+    exit;
 }
 
 // Функция для безопасного вывода JSON успешного ответа
@@ -55,74 +61,248 @@ function outputJsonSuccess($data, $code = 200) {
     
     // Устанавливаем заголовки если еще не установлены
     if (!headers_sent()) {
-        @header('Content-Type: application/json; charset=UTF-8');
-        @http_response_code($code);
+        header('Content-Type: application/json; charset=UTF-8');
+        http_response_code($code);
         if (function_exists('setCorsHeaders')) {
-            @setCorsHeaders();
+            setCorsHeaders();
         } else {
-            @header('Access-Control-Allow-Origin: *');
+            header('Access-Control-Allow-Origin: *');
         }
-        @header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
-        @header('Access-Control-Allow-Headers: Content-Type, Authorization');
+        header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
+        header('Access-Control-Allow-Headers: Content-Type, Authorization');
     }
     
     $response = array_merge(['success' => true], $data);
-    @echo json_encode($response, JSON_UNESCAPED_UNICODE);
-    @exit;
+    echo json_encode($response, JSON_UNESCAPED_UNICODE);
+    exit;
 }
 
 // Глобальная обработка ошибок для конвертации всех PHP ошибок в JSON
+// Упрощена для избежания рекурсии
 set_error_handler(function($severity, $message, $file, $line) {
     // Игнорируем ошибки, которые не являются критическими
     if (!(error_reporting() & $severity)) {
         return false;
     }
     
+    // Только для критических ошибок
+    if (!in_array($severity, [E_ERROR, E_CORE_ERROR, E_COMPILE_ERROR, E_PARSE, E_RECOVERABLE_ERROR])) {
+        return false;
+    }
+    
+    // Отключаем обработчик, чтобы избежать рекурсии
+    restore_error_handler();
+    
     // Логируем ошибку
     error_log("PHP Error in wallet.php [Severity: $severity]: $message in $file:$line");
     
-    // Выводим JSON ошибку
-    outputJsonError(
-        'PHP Error: ' . $message . ' in ' . basename($file) . ':' . $line,
-        500,
-        ['severity' => $severity, 'file' => basename($file), 'line' => $line]
-    );
+    // Очищаем буфер
+    while (ob_get_level() > 0) {
+        @ob_end_clean();
+    }
     
-    return true;
+    // Устанавливаем заголовки
+    if (!headers_sent()) {
+        header('Content-Type: application/json; charset=UTF-8');
+        http_response_code(500);
+        header('Access-Control-Allow-Origin: *');
+    }
+    
+    // Выводим JSON ошибку напрямую, без вызова функции
+    echo json_encode([
+        'success' => false,
+        'error' => 'PHP Error: ' . $message . ' in ' . basename($file) . ':' . $line,
+        'version' => '2.0.1',
+        'details' => ['severity' => $severity, 'file' => basename($file), 'line' => $line]
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
 }, E_ALL & ~E_NOTICE & ~E_WARNING);
 
 // Обработка фатальных ошибок
+// Упрощена для избежания рекурсии
 register_shutdown_function(function() {
     $error = error_get_last();
     if ($error !== null && in_array($error['type'], [E_ERROR, E_CORE_ERROR, E_COMPILE_ERROR, E_PARSE, E_RECOVERABLE_ERROR])) {
+        // Отключаем обработчик ошибок
+        if (function_exists('restore_error_handler')) {
+            restore_error_handler();
+        }
+        
         error_log("Fatal Error in wallet.php [Type: {$error['type']}]: {$error['message']} in {$error['file']}:{$error['line']}");
         
-        outputJsonError(
-            'Fatal Error: ' . $error['message'] . ' in ' . basename($error['file']) . ':' . $error['line'],
-            500,
-            ['type' => $error['type'], 'file' => basename($error['file']), 'line' => $error['line']]
-        );
+        // Очищаем буфер
+        while (ob_get_level() > 0) {
+            @ob_end_clean();
+        }
+        
+        // Устанавливаем заголовки
+        if (!headers_sent()) {
+            header('Content-Type: application/json; charset=UTF-8');
+            http_response_code(500);
+            header('Access-Control-Allow-Origin: *');
+        }
+        
+        // Выводим JSON ошибку напрямую
+        echo json_encode([
+            'success' => false,
+            'error' => 'Fatal Error: ' . $error['message'] . ' in ' . basename($error['file']) . ':' . $error['line'],
+            'version' => '2.0.1',
+            'details' => ['type' => $error['type'], 'file' => basename($error['file']), 'line' => $error['line']]
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
     }
 });
 
-// Загружаем необходимые файлы с проверкой существования
-$requiredFiles = [
-    __DIR__ . '/../config/database.php',
-    __DIR__ . '/../config/supabase.php',
-    __DIR__ . '/auth.php'
-];
-
-foreach ($requiredFiles as $file) {
-    if (!file_exists($file)) {
-        error_log("Required file not found in wallet.php: $file");
-        outputJsonError("Ошибка загрузки: файл не найден - " . basename($file), 500);
+// Загружаем необходимые файлы с проверкой существования и детальным логированием
+// Пробуем несколько вариантов путей для совместимости с разными структурами серверов
+function findConfigFile($filename) {
+    $possiblePaths = [
+        __DIR__ . '/../config/' . $filename,  // Стандартный путь
+        __DIR__ . '/../../config/' . $filename, // Альтернативный путь
+        $_SERVER['DOCUMENT_ROOT'] . '/config/' . $filename, // От корня документа
+        dirname(__DIR__) . '/config/' . $filename, // Через dirname
+    ];
+    
+    foreach ($possiblePaths as $path) {
+        $realPath = realpath($path);
+        if ($realPath && file_exists($realPath)) {
+            error_log("Wallet.php: Found $filename at $realPath");
+            return $realPath;
+        }
     }
     
+    return null;
+}
+
+function findAuthFile() {
+    $possiblePaths = [
+        __DIR__ . '/auth.php',
+        $_SERVER['DOCUMENT_ROOT'] . '/api/auth.php',
+    ];
+    
+    foreach ($possiblePaths as $path) {
+        $realPath = realpath($path);
+        if ($realPath && file_exists($realPath)) {
+            error_log("Wallet.php: Found auth.php at $realPath");
+            return $realPath;
+        }
+    }
+    
+    return null;
+}
+
+$requiredFiles = [
+    'database' => findConfigFile('database.php'),
+    'supabase' => findConfigFile('supabase.php'),
+    'auth' => findAuthFile()
+];
+
+foreach ($requiredFiles as $name => $file) {
+    // Проверяем существование файла
+    if ($file === null || !file_exists($file)) {
+        $errorMsg = "Required file not found: $name";
+        error_log("Wallet.php ERROR: $errorMsg");
+        error_log("Wallet.php: Searched paths for $name:");
+        error_log("  - " . __DIR__ . '/../config/' . ($name === 'auth' ? 'auth.php' : "$name.php"));
+        error_log("  - " . __DIR__ . '/../../config/' . ($name === 'auth' ? 'auth.php' : "$name.php"));
+        error_log("  - " . ($_SERVER['DOCUMENT_ROOT'] ?? 'N/A') . '/config/' . ($name === 'auth' ? 'auth.php' : "$name.php"));
+        error_log("  - Current __DIR__: " . __DIR__);
+        error_log("  - DOCUMENT_ROOT: " . ($_SERVER['DOCUMENT_ROOT'] ?? 'N/A'));
+        
+        // Выводим ошибку напрямую, без вызова функции
+        while (ob_get_level() > 0) {
+            @ob_end_clean();
+        }
+        if (!headers_sent()) {
+            header('Content-Type: application/json; charset=UTF-8');
+            http_response_code(500);
+            header('Access-Control-Allow-Origin: *');
+        }
+        echo json_encode([
+            'success' => false,
+            'error' => "Ошибка загрузки: файл не найден - $name",
+            'version' => '2.0.1',
+            'details' => [
+                'file' => $name,
+                'searched_paths' => [
+                    __DIR__ . '/../config/' . ($name === 'auth' ? 'auth.php' : "$name.php"),
+                    __DIR__ . '/../../config/' . ($name === 'auth' ? 'auth.php' : "$name.php"),
+                    ($_SERVER['DOCUMENT_ROOT'] ?? 'N/A') . '/config/' . ($name === 'auth' ? 'auth.php' : "$name.php")
+                ],
+                'current_dir' => __DIR__,
+                'document_root' => $_SERVER['DOCUMENT_ROOT'] ?? 'N/A'
+            ]
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    
+    // Проверяем, что файл читаемый
+    if (!is_readable($file)) {
+        $errorMsg = "Required file not readable: $name ($file)";
+        error_log("Wallet.php ERROR: $errorMsg");
+        
+        while (ob_get_level() > 0) {
+            @ob_end_clean();
+        }
+        if (!headers_sent()) {
+            header('Content-Type: application/json; charset=UTF-8');
+            http_response_code(500);
+            header('Access-Control-Allow-Origin: *');
+        }
+        echo json_encode([
+            'success' => false,
+            'error' => "Ошибка загрузки: файл не читаемый - $name",
+            'version' => '2.0.1',
+            'details' => ['file' => $name, 'path' => $file]
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    
+    // Загружаем файл с обработкой ошибок
     try {
+        error_log("Wallet.php: Loading file $name from $file");
         require_once $file;
+        error_log("Wallet.php: Successfully loaded $name");
+    } catch (ParseError $e) {
+        $errorMsg = "Parse error in $name: " . $e->getMessage() . " in " . $e->getFile() . ":" . $e->getLine();
+        error_log("Wallet.php PARSE ERROR: $errorMsg");
+        
+        while (ob_get_level() > 0) {
+            @ob_end_clean();
+        }
+        if (!headers_sent()) {
+            header('Content-Type: application/json; charset=UTF-8');
+            http_response_code(500);
+            header('Access-Control-Allow-Origin: *');
+        }
+        echo json_encode([
+            'success' => false,
+            'error' => "Ошибка синтаксиса в файле: $name",
+            'version' => '2.0.1',
+            'details' => ['file' => $name, 'message' => $e->getMessage(), 'line' => $e->getLine()]
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
     } catch (Throwable $e) {
-        error_log("Error loading file in wallet.php: $file - " . $e->getMessage());
-        outputJsonError("Ошибка загрузки файла: " . basename($file) . " - " . $e->getMessage(), 500);
+        $errorMsg = "Error loading $name: " . $e->getMessage() . " in " . $e->getFile() . ":" . $e->getLine();
+        error_log("Wallet.php LOAD ERROR: $errorMsg");
+        error_log("Wallet.php Exception type: " . get_class($e));
+        error_log("Wallet.php Exception trace: " . $e->getTraceAsString());
+        
+        while (ob_get_level() > 0) {
+            @ob_end_clean();
+        }
+        if (!headers_sent()) {
+            header('Content-Type: application/json; charset=UTF-8');
+            http_response_code(500);
+            header('Access-Control-Allow-Origin: *');
+        }
+        echo json_encode([
+            'success' => false,
+            'error' => "Ошибка загрузки файла: $name - " . $e->getMessage(),
+            'version' => '2.0.1',
+            'details' => ['file' => $name, 'type' => get_class($e), 'line' => $e->getLine()]
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
     }
 }
 
@@ -167,13 +347,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
         @ob_end_clean();
     }
     if (!headers_sent()) {
-        @header('Content-Type: application/json; charset=UTF-8');
-        @header('Access-Control-Allow-Origin: *');
-        @header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
-        @header('Access-Control-Allow-Headers: Content-Type, Authorization');
+        header('Content-Type: application/json; charset=UTF-8');
+        header('Access-Control-Allow-Origin: *');
+        header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
+        header('Access-Control-Allow-Headers: Content-Type, Authorization');
     }
-    @http_response_code(200);
-    @exit;
+    http_response_code(200);
+    exit;
 }
 
 /**

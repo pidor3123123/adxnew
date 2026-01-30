@@ -13,37 +13,80 @@ if (!ob_get_level()) {
 
 // Функция для безопасного вывода JSON
 function outputJson($data, $code = 200) {
+    // Отключаем обработчик ошибок, чтобы избежать рекурсии
+    restore_error_handler();
+    
     while (ob_get_level() > 0) {
         @ob_end_clean();
     }
     
     if (!headers_sent()) {
-        @header('Content-Type: application/json; charset=UTF-8');
-        @http_response_code($code);
-        @header('Access-Control-Allow-Origin: *');
+        header('Content-Type: application/json; charset=UTF-8');
+        http_response_code($code);
+        header('Access-Control-Allow-Origin: *');
     }
     
-    @echo json_encode($data, JSON_UNESCAPED_UNICODE);
-    @exit;
+    echo json_encode($data, JSON_UNESCAPED_UNICODE);
+    exit;
 }
 
-// Обработка ошибок
+// Обработка ошибок (только для критических ошибок)
 set_error_handler(function($severity, $message, $file, $line) {
-    outputJson([
-        'success' => false,
-        'error' => 'PHP Error: ' . $message . ' in ' . basename($file) . ':' . $line,
-        'type' => 'error_handler'
-    ], 500);
+    // Игнорируем ошибки, которые не являются критическими
+    if (!(error_reporting() & $severity)) {
+        return false;
+    }
+    
+    // Только для критических ошибок
+    if (in_array($severity, [E_ERROR, E_CORE_ERROR, E_COMPILE_ERROR, E_PARSE, E_RECOVERABLE_ERROR])) {
+        // Отключаем обработчик, чтобы избежать рекурсии
+        restore_error_handler();
+        
+        while (ob_get_level() > 0) {
+            @ob_end_clean();
+        }
+        
+        if (!headers_sent()) {
+            header('Content-Type: application/json; charset=UTF-8');
+            http_response_code(500);
+            header('Access-Control-Allow-Origin: *');
+        }
+        
+        echo json_encode([
+            'success' => false,
+            'error' => 'PHP Error: ' . $message . ' in ' . basename($file) . ':' . $line,
+            'type' => 'error_handler',
+            'severity' => $severity
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    
+    return false;
 }, E_ALL & ~E_NOTICE & ~E_WARNING);
 
 register_shutdown_function(function() {
     $error = error_get_last();
-    if ($error !== null && in_array($error['type'], [E_ERROR, E_CORE_ERROR, E_COMPILE_ERROR, E_PARSE])) {
-        outputJson([
+    if ($error !== null && in_array($error['type'], [E_ERROR, E_CORE_ERROR, E_COMPILE_ERROR, E_PARSE, E_RECOVERABLE_ERROR])) {
+        // Отключаем обработчик ошибок
+        restore_error_handler();
+        
+        while (ob_get_level() > 0) {
+            @ob_end_clean();
+        }
+        
+        if (!headers_sent()) {
+            header('Content-Type: application/json; charset=UTF-8');
+            http_response_code(500);
+            header('Access-Control-Allow-Origin: *');
+        }
+        
+        echo json_encode([
             'success' => false,
             'error' => 'Fatal Error: ' . $error['message'] . ' in ' . basename($error['file']) . ':' . $error['line'],
-            'type' => 'fatal_error'
-        ], 500);
+            'type' => 'fatal_error',
+            'error_type' => $error['type']
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
     }
 });
 
@@ -65,8 +108,19 @@ try {
         case 'headers':
             // Проверка заголовков
             $headers = [];
-            foreach (getallheaders() ?: [] as $name => $value) {
-                $headers[$name] = $value;
+            // getallheaders() может быть недоступна в некоторых окружениях
+            if (function_exists('getallheaders')) {
+                foreach (getallheaders() ?: [] as $name => $value) {
+                    $headers[$name] = $value;
+                }
+            } else {
+                // Альтернативный способ получения заголовков
+                foreach ($_SERVER as $key => $value) {
+                    if (strpos($key, 'HTTP_') === 0) {
+                        $headerName = str_replace('_', '-', substr($key, 5));
+                        $headers[$headerName] = $value;
+                    }
+                }
             }
             
             outputJson([
