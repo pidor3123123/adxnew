@@ -568,11 +568,120 @@ if (basename($_SERVER['SCRIPT_FILENAME']) === 'auth.php') {
                 throw new Exception('Invalid or expired token', 401);
             }
             
-            // Получение балансов из MySQL (всегда свежие данные, без кэша)
-            $db = getDB();
-            $stmt = $db->prepare('SELECT currency, available, reserved FROM balances WHERE user_id = ?');
-            $stmt->execute([$user['id']]);
-            $balances = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            // Получение балансов: сначала из Supabase (single source of truth), fallback на MySQL
+            $balances = [];
+            
+            // Пытаемся получить баланс из Supabase wallets (если доступно)
+            // Загружаем wallet.php условно для доступа к getSupabaseUserId
+            $supabaseAvailable = false;
+            if (function_exists('getSupabaseClient')) {
+                try {
+                    // Проверяем, доступна ли функция getSupabaseUserId
+                    // Она может быть из wallet.php (если он был загружен) или из sync.php
+                    if (!function_exists('getSupabaseUserId')) {
+                        // Пытаемся загрузить wallet.php только для функции getSupabaseUserId
+                        // Но это может вызвать конфликт, поэтому используем другой подход
+                        // Просто попробуем вызвать через require_once, но с проверкой
+                        if (file_exists(__DIR__ . '/wallet.php')) {
+                            // Не загружаем wallet.php полностью, чтобы избежать конфликтов
+                            // Вместо этого используем прямой запрос к Supabase по email
+                            $supabase = getSupabaseClient();
+                            $email = $user['email'] ?? null;
+                            
+                            if ($email) {
+                                // Ищем пользователя в Supabase по email
+                                $supabaseUser = $supabase->get('users', 'email', $email);
+                                
+                                if ($supabaseUser && isset($supabaseUser['id'])) {
+                                    $supabaseUserId = $supabaseUser['id'];
+                                    $supabaseAvailable = true;
+                                    
+                                    // Получаем балансы из Supabase через RPC
+                                    $result = $supabase->getAllWalletBalances($supabaseUserId);
+                                    
+                                    // Обрабатываем ответ
+                                    if (is_array($result) && isset($result[0]) && is_array($result[0])) {
+                                        $result = $result[0];
+                                    }
+                                    
+                                    if ($result && isset($result['success']) && $result['success']) {
+                                        $balancesData = $result['balances'] ?? [];
+                                        
+                                        if (is_string($balancesData)) {
+                                            $decoded = json_decode($balancesData, true);
+                                            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                                                $balancesData = $decoded;
+                                            } else {
+                                                $balancesData = [];
+                                            }
+                                        }
+                                        
+                                        if (is_array($balancesData)) {
+                                            foreach ($balancesData as $balance) {
+                                                $balances[] = [
+                                                    'currency' => $balance['currency'] ?? 'USD',
+                                                    'available' => (float)($balance['balance'] ?? 0),
+                                                    'reserved' => 0
+                                                ];
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        // Функция getSupabaseUserId уже доступна
+                        try {
+                            $supabase = getSupabaseClient();
+                            $supabaseUserId = getSupabaseUserId($user);
+                            
+                            if ($supabaseUserId) {
+                                $supabaseAvailable = true;
+                                $result = $supabase->getAllWalletBalances($supabaseUserId);
+                                
+                                if (is_array($result) && isset($result[0]) && is_array($result[0])) {
+                                    $result = $result[0];
+                                }
+                                
+                                if ($result && isset($result['success']) && $result['success']) {
+                                    $balancesData = $result['balances'] ?? [];
+                                    
+                                    if (is_string($balancesData)) {
+                                        $decoded = json_decode($balancesData, true);
+                                        if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                                            $balancesData = $decoded;
+                                        } else {
+                                            $balancesData = [];
+                                        }
+                                    }
+                                    
+                                    if (is_array($balancesData)) {
+                                        foreach ($balancesData as $balance) {
+                                            $balances[] = [
+                                                'currency' => $balance['currency'] ?? 'USD',
+                                                'available' => (float)($balance['balance'] ?? 0),
+                                                'reserved' => 0
+                                            ];
+                                        }
+                                    }
+                                }
+                            }
+                        } catch (Exception $e) {
+                            error_log("API /auth.php?action=me: Error using getSupabaseUserId: " . $e->getMessage());
+                        }
+                    }
+                } catch (Exception $e) {
+                    error_log("API /auth.php?action=me: Supabase error: " . $e->getMessage());
+                }
+            }
+            
+            // Fallback: если балансы не получены из Supabase, читаем из MySQL
+            if (empty($balances)) {
+                $db = getDB();
+                $stmt = $db->prepare('SELECT currency, available, reserved FROM balances WHERE user_id = ?');
+                $stmt->execute([$user['id']]);
+                $balances = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            }
             
             // Логируем для отладки (только в development)
             if (defined('DEBUG') && DEBUG) {
