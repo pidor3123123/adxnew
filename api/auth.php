@@ -226,74 +226,6 @@ function getAuthUser(): ?array {
 }
 
 /**
- * Получение Supabase UUID пользователя по MySQL пользователю
- * @param array $mysqlUser Пользователь из MySQL
- * @return string Supabase UUID
- */
-function getSupabaseUserId(array $mysqlUser): ?string {
-    if (!function_exists('getSupabaseClient')) {
-        return null;
-    }
-    
-    $supabase = getSupabaseClient();
-    $email = $mysqlUser['email'] ?? null;
-    $mysqlUserId = $mysqlUser['id'] ?? null;
-    
-    if (!$email) {
-        return null;
-    }
-    
-    // Ищем пользователя в Supabase по email
-    try {
-        $supabaseUser = $supabase->get('users', 'email', $email);
-        
-        if ($supabaseUser && isset($supabaseUser['id'])) {
-            return $supabaseUser['id'];
-        }
-    } catch (Exception $e) {
-        // Игнорируем ошибку
-    }
-    
-    // Если пользователь не найден, пытаемся найти в auth.users
-    try {
-        if (method_exists($supabase, 'findAuthUserByEmail')) {
-            $authUserId = $supabase->findAuthUserByEmail($email);
-            
-            if ($authUserId) {
-                return $authUserId;
-            }
-        }
-    } catch (Exception $e) {
-        // Игнорируем ошибку
-    }
-    
-    // Если пользователь не найден, синхронизируем его (если функция доступна)
-    if (function_exists('syncUserToSupabase') && $mysqlUserId) {
-        try {
-            syncUserToSupabase($mysqlUserId);
-            
-            // Повторно ищем
-            $supabaseUser = $supabase->get('users', 'email', $email);
-            if ($supabaseUser && isset($supabaseUser['id'])) {
-                return $supabaseUser['id'];
-            }
-            
-            // Пробуем еще раз через auth.users
-            if (method_exists($supabase, 'findAuthUserByEmail')) {
-                $authUserId = $supabase->findAuthUserByEmail($email);
-                if ($authUserId) {
-                    return $authUserId;
-                }
-            }
-        } catch (Exception $e) {
-            // Игнорируем ошибку синхронизации
-        }
-    }
-    
-    return null;
-}
-
-/**
  * Создание сессии
  */
 function createSession(int $userId, bool $remember = false): string {
@@ -636,70 +568,15 @@ if (basename($_SERVER['SCRIPT_FILENAME']) === 'auth.php') {
                 throw new Exception('Invalid or expired token', 401);
             }
             
-            // Получение балансов из Supabase wallets (single source of truth)
-            try {
-                $supabase = getSupabaseClient();
-                $supabaseUserId = getSupabaseUserId($user);
-                
-                if ($supabaseUserId) {
-                    // Используем RPC функцию для получения всех балансов
-                    $result = $supabase->getAllWalletBalances($supabaseUserId);
-                    
-                    // Supabase может вернуть JSONB как массив с одним элементом
-                    if (is_array($result) && isset($result[0]) && is_array($result[0])) {
-                        $result = $result[0];
-                    }
-                    
-                    $balances = [];
-                    
-                    if ($result && isset($result['success']) && $result['success']) {
-                        $balancesData = $result['balances'] ?? [];
-                        
-                        // Если balances - это строка JSON, парсим её
-                        if (is_string($balancesData)) {
-                            $decoded = json_decode($balancesData, true);
-                            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-                                $balancesData = $decoded;
-                            } else {
-                                $balancesData = [];
-                            }
-                        }
-                        
-                        // Преобразуем формат из Supabase в формат, ожидаемый фронтендом
-                        if (is_array($balancesData)) {
-                            foreach ($balancesData as $balance) {
-                                $balances[] = [
-                                    'currency' => $balance['currency'] ?? 'USD',
-                                    'available' => (float)($balance['balance'] ?? 0),
-                                    'reserved' => 0 // Reserved balance не используется в новой системе
-                                ];
-                            }
-                        }
-                    } else {
-                        // Fallback: пустой массив
-                        $balances = [];
-                    }
-                } else {
-                    // Если пользователь не синхронизирован с Supabase, возвращаем пустой массив
-                    $balances = [];
-                    error_log("API /auth.php?action=me: User {$user['id']} not found in Supabase");
-                }
-            } catch (Exception $e) {
-                // В случае ошибки логируем и возвращаем пустой массив
-                error_log("API /auth.php?action=me: Error fetching balances from Supabase: " . $e->getMessage());
-                $balances = [];
-            }
+            // Получение балансов из MySQL (всегда свежие данные, без кэша)
+            $db = getDB();
+            $stmt = $db->prepare('SELECT currency, available, reserved FROM balances WHERE user_id = ?');
+            $stmt->execute([$user['id']]);
+            $balances = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
             // Логируем для отладки (только в development)
             if (defined('DEBUG') && DEBUG) {
                 error_log("API /auth.php?action=me: Returning balances for user_id={$user['id']}, count=" . count($balances));
-            }
-            
-            // Устанавливаем заголовки против кэширования
-            if (!headers_sent()) {
-                header('Cache-Control: no-cache, no-store, must-revalidate');
-                header('Pragma: no-cache');
-                header('Expires: 0');
             }
             
             ob_end_clean();

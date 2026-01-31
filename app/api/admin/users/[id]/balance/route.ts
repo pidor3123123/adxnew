@@ -99,6 +99,9 @@ export async function PATCH(
       .maybeSingle()
 
     const finalBalance = parseFloat(updatedWallet?.balance?.toString() || newAvailableBalance.toString())
+    
+    // Wait a bit to ensure transaction is fully processed
+    await new Promise(resolve => setTimeout(resolve, 100))
 
     // Update user_balances for compatibility (if it exists)
     const balanceId = existingBalance?.id || randomUUID()
@@ -165,8 +168,8 @@ export async function PATCH(
               user_id: userId, // Supabase UUID
               email: user?.email,
               currency: currency,
-              available_balance: available_balance ?? balance.available_balance ?? 0,
-              locked_balance: locked_balance ?? balance.locked_balance ?? 0,
+              available_balance: finalBalance, // Use balance from wallets (single source of truth)
+              locked_balance: locked_balance ?? 0,
             },
           }),
         })
