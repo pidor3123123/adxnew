@@ -1319,6 +1319,33 @@
                 TradingState.currentMarket = findMarketForSymbol(symbol);
                 currentSymbolName = symbolData.symbol;
                 currentMarket = findMarketForSymbol(symbol);
+                
+                // Синхронизируем currentAsset с выбранным символом для обновления цены в терминале
+                // Извлекаем базовый символ из TradingView символа (например, "NASDAQ:NVDA" -> "NVDA")
+                let baseSymbol = symbolData.symbol;
+                if (baseSymbol.includes(':')) {
+                    baseSymbol = baseSymbol.split(':')[1];
+                }
+                baseSymbol = baseSymbol.replace('USDT', '').replace('USD', '');
+                
+                // Обновляем currentAsset, если функция selectAsset доступна
+                if (typeof window.selectAsset === 'function') {
+                    // Вызываем selectAsset для синхронизации currentAsset и обновления цены
+                    window.selectAsset(baseSymbol);
+                } else if (typeof window.currentAsset !== 'undefined') {
+                    // Если selectAsset недоступна, обновляем currentAsset напрямую
+                    // Это временное решение, пока цена не обновится через API
+                    const asset = assetList?.find(a => a.symbol === baseSymbol || a.symbol === baseSymbol.toUpperCase());
+                    if (asset) {
+                        window.currentAsset = {
+                            symbol: asset.symbol,
+                            name: asset.name,
+                            price: asset.price,
+                            change: asset.change,
+                            decimals: asset.price < 1 ? 6 : (asset.price < 10 ? 4 : 2)
+                        };
+                    }
+                }
             }
             updateUI();
             updateTradingTerminal();
@@ -1648,8 +1675,39 @@
         // Экспортируем функцию для использования в js/trading.js
         window.updateQuickTradeSummary = updateQuickTradeSummary;
         window.updateQuickTradePrice = updateQuickTradePrice;
+        window.updateNormalTradePrice = updateNormalTradePrice;
         
         // Обновляем цену для быстрой торговли при смене актива
+        function updateNormalTradePrice() {
+            const priceEl = document.getElementById('tradePrice');
+            if (!priceEl) return;
+            
+            // Используем currentAsset.price напрямую (самый надежный источник)
+            let price = 0;
+            if (typeof window.currentAsset !== 'undefined' && window.currentAsset.price && window.currentAsset.price > 0) {
+                price = window.currentAsset.price;
+            } else {
+                // Fallback: пытаемся получить цену из быстрой торговли
+                const quickPriceEl = document.getElementById('quickTradePrice');
+                if (quickPriceEl && quickPriceEl.textContent !== '$0.00') {
+                    const parsedPrice = parseFloat(quickPriceEl.textContent.replace(/[^0-9.]/g, ''));
+                    if (parsedPrice > 0 && parsedPrice < 1000000) { // Проверка на разумность цены
+                        price = parsedPrice;
+                    }
+                }
+            }
+            
+            if (price > 0) {
+                // Форматируем цену с правильным количеством знаков после запятой
+                const decimals = window.currentAsset?.decimals || 2;
+                priceEl.textContent = `$${price.toFixed(decimals)}`;
+                // Обновляем сводку после обновления цены
+                if (typeof updateTradeSummary === 'function') {
+                    updateTradeSummary();
+                }
+            }
+        }
+        
         function updateQuickTradePrice() {
             const priceEl = document.getElementById('quickTradePrice');
             if (!priceEl) return;
@@ -1670,7 +1728,9 @@
             }
             
             if (price > 0) {
-                priceEl.textContent = `$${price.toFixed(2)}`;
+                // Форматируем цену с правильным количеством знаков после запятой
+                const decimals = window.currentAsset?.decimals || 2;
+                priceEl.textContent = `$${price.toFixed(decimals)}`;
                 updateQuickTradeTPSL();
                 updateQuickTradeSummary();
             }
@@ -1731,6 +1791,9 @@
                     quickQuantitySuffixEl.textContent = symbolData.symbol.replace('USDT', '').replace('USD', '');
                 }
             }
+            
+            // Обновляем цену для обычной торговли
+            updateNormalTradePrice();
             
             // Обновляем цену для быстрой торговли
             updateQuickTradePrice();
