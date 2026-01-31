@@ -156,38 +156,86 @@ register_shutdown_function(function() {
 // Загружаем необходимые файлы с проверкой существования и детальным логированием
 // Пробуем несколько вариантов путей для совместимости с разными структурами серверов
 function findConfigFile($filename) {
+    $docRoot = $_SERVER['DOCUMENT_ROOT'] ?? '';
+    $currentDir = __DIR__;
+    $parentDir = dirname($currentDir);
+    
+    // Собираем все возможные пути
     $possiblePaths = [
-        __DIR__ . '/../config/' . $filename,  // Стандартный путь
-        __DIR__ . '/../../config/' . $filename, // Альтернативный путь
-        $_SERVER['DOCUMENT_ROOT'] . '/config/' . $filename, // От корня документа
-        dirname(__DIR__) . '/config/' . $filename, // Через dirname
+        // Относительно текущего файла (api/wallet.php)
+        $currentDir . '/../config/' . $filename,
+        $currentDir . '/../../config/' . $filename,
+        
+        // От корня документа
+        $docRoot . '/config/' . $filename,
+        $docRoot . '/../config/' . $filename,
+        
+        // Через dirname
+        $parentDir . '/config/' . $filename,
+        dirname($parentDir) . '/config/' . $filename,
+        
+        // Абсолютные пути (если DOCUMENT_ROOT установлен)
+        realpath($docRoot . '/config/' . $filename) ?: null,
+        realpath($parentDir . '/config/' . $filename) ?: null,
     ];
     
+    // Убираем null значения
+    $possiblePaths = array_filter($possiblePaths, function($path) {
+        return $path !== null;
+    });
+    
+    // Логируем все проверяемые пути
+    error_log("Wallet.php: Searching for $filename in " . count($possiblePaths) . " possible paths");
+    
     foreach ($possiblePaths as $path) {
+        // Используем realpath для нормализации пути
         $realPath = realpath($path);
-        if ($realPath && file_exists($realPath)) {
-            error_log("Wallet.php: Found $filename at $realPath");
+        
+        if ($realPath && file_exists($realPath) && is_readable($realPath)) {
+            error_log("Wallet.php: ✓ Found $filename at $realPath");
             return $realPath;
+        } else {
+            error_log("Wallet.php: ✗ Not found: $path");
         }
     }
     
+    error_log("Wallet.php: ✗ File $filename not found in any of the searched paths");
     return null;
 }
 
 function findAuthFile() {
+    $docRoot = $_SERVER['DOCUMENT_ROOT'] ?? '';
+    $currentDir = __DIR__;
+    
     $possiblePaths = [
-        __DIR__ . '/auth.php',
-        $_SERVER['DOCUMENT_ROOT'] . '/api/auth.php',
+        // В той же папке, что и wallet.php
+        $currentDir . '/auth.php',
+        realpath($currentDir . '/auth.php') ?: null,
+        
+        // От корня документа
+        $docRoot . '/api/auth.php',
+        realpath($docRoot . '/api/auth.php') ?: null,
     ];
+    
+    // Убираем null значения
+    $possiblePaths = array_filter($possiblePaths, function($path) {
+        return $path !== null;
+    });
+    
+    error_log("Wallet.php: Searching for auth.php in " . count($possiblePaths) . " possible paths");
     
     foreach ($possiblePaths as $path) {
         $realPath = realpath($path);
-        if ($realPath && file_exists($realPath)) {
-            error_log("Wallet.php: Found auth.php at $realPath");
+        
+        if ($realPath && file_exists($realPath) && is_readable($realPath)) {
+            error_log("Wallet.php: ✓ Found auth.php at $realPath");
             return $realPath;
+        } else {
+            error_log("Wallet.php: ✗ Not found: $path");
         }
     }
     
+    error_log("Wallet.php: ✗ File auth.php not found in any of the searched paths");
     return null;
 }
 
@@ -307,13 +355,29 @@ foreach ($requiredFiles as $name => $file) {
 }
 
 // Загружаем sync.php для функции syncUserToSupabase (опционально)
-if (file_exists(__DIR__ . '/sync.php')) {
-    try {
-        require_once __DIR__ . '/sync.php';
-    } catch (Throwable $e) {
-        error_log("Warning: Could not load sync.php in wallet.php: " . $e->getMessage());
-        // Не критично, продолжаем работу
+// Пробуем несколько путей
+$syncPaths = [
+    __DIR__ . '/sync.php',
+    ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/api/sync.php',
+    realpath(__DIR__ . '/sync.php') ?: null,
+];
+
+$syncLoaded = false;
+foreach ($syncPaths as $syncPath) {
+    if ($syncPath && file_exists($syncPath) && is_readable($syncPath)) {
+        try {
+            require_once $syncPath;
+            error_log("Wallet.php: ✓ Loaded sync.php from $syncPath");
+            $syncLoaded = true;
+            break;
+        } catch (Throwable $e) {
+            error_log("Wallet.php: Warning: Could not load sync.php from $syncPath: " . $e->getMessage());
+        }
     }
+}
+
+if (!$syncLoaded) {
+    error_log("Wallet.php: Info: sync.php not found or not loaded (not critical)");
 }
 
 // Устанавливаем заголовки после загрузки всех файлов

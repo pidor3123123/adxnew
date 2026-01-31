@@ -40,51 +40,87 @@ try {
             ]);
             
         case 'step2':
-            // Проверка существования файлов с несколькими вариантами путей
-            $possiblePaths = [
-                'database' => [
-                    __DIR__ . '/../config/database.php',
-                    __DIR__ . '/../../config/database.php',
-                    $_SERVER['DOCUMENT_ROOT'] . '/config/database.php',
-                    dirname(__DIR__) . '/config/database.php'
-                ],
-                'supabase' => [
-                    __DIR__ . '/../config/supabase.php',
-                    __DIR__ . '/../../config/supabase.php',
-                    $_SERVER['DOCUMENT_ROOT'] . '/config/supabase.php',
-                    dirname(__DIR__) . '/config/supabase.php'
-                ],
-                'auth' => [
-                    __DIR__ . '/auth.php',
-                    $_SERVER['DOCUMENT_ROOT'] . '/api/auth.php'
-                ]
-            ];
-            
-            $results = [];
-            foreach ($possiblePaths as $name => $paths) {
-                $found = false;
-                $foundPath = null;
-                foreach ($paths as $path) {
+            // Используем те же функции поиска, что и в wallet.php
+            function findConfigFileTest($filename) {
+                $docRoot = $_SERVER['DOCUMENT_ROOT'] ?? '';
+                $currentDir = __DIR__;
+                $parentDir = dirname($currentDir);
+                
+                $possiblePaths = [
+                    $currentDir . '/../config/' . $filename,
+                    $currentDir . '/../../config/' . $filename,
+                    $docRoot . '/config/' . $filename,
+                    $docRoot . '/../config/' . $filename,
+                    $parentDir . '/config/' . $filename,
+                    dirname($parentDir) . '/config/' . $filename,
+                    realpath($docRoot . '/config/' . $filename) ?: null,
+                    realpath($parentDir . '/config/' . $filename) ?: null,
+                ];
+                
+                $possiblePaths = array_filter($possiblePaths, function($path) {
+                    return $path !== null;
+                });
+                
+                foreach ($possiblePaths as $path) {
                     $realPath = realpath($path);
-                    if ($realPath && file_exists($realPath)) {
-                        $found = true;
-                        $foundPath = $realPath;
-                        break;
+                    if ($realPath && file_exists($realPath) && is_readable($realPath)) {
+                        return $realPath;
                     }
                 }
                 
-                $results[$name] = [
-                    'exists' => $found,
-                    'found_path' => $foundPath,
-                    'searched_paths' => $paths,
+                return null;
+            }
+            
+            function findAuthFileTest() {
+                $docRoot = $_SERVER['DOCUMENT_ROOT'] ?? '';
+                $currentDir = __DIR__;
+                
+                $possiblePaths = [
+                    $currentDir . '/auth.php',
+                    realpath($currentDir . '/auth.php') ?: null,
+                    $docRoot . '/api/auth.php',
+                    realpath($docRoot . '/api/auth.php') ?: null,
+                ];
+                
+                $possiblePaths = array_filter($possiblePaths, function($path) {
+                    return $path !== null;
+                });
+                
+                foreach ($possiblePaths as $path) {
+                    $realPath = realpath($path);
+                    if ($realPath && file_exists($realPath) && is_readable($realPath)) {
+                        return $realPath;
+                    }
+                }
+                
+                return null;
+            }
+            
+            $results = [
+                'database' => [
+                    'exists' => findConfigFileTest('database.php') !== null,
+                    'found_path' => findConfigFileTest('database.php'),
                     'current_dir' => __DIR__,
                     'document_root' => $_SERVER['DOCUMENT_ROOT'] ?? 'N/A'
-                ];
-            }
+                ],
+                'supabase' => [
+                    'exists' => findConfigFileTest('supabase.php') !== null,
+                    'found_path' => findConfigFileTest('supabase.php'),
+                    'current_dir' => __DIR__,
+                    'document_root' => $_SERVER['DOCUMENT_ROOT'] ?? 'N/A'
+                ],
+                'auth' => [
+                    'exists' => findAuthFileTest() !== null,
+                    'found_path' => findAuthFileTest(),
+                    'current_dir' => __DIR__,
+                    'document_root' => $_SERVER['DOCUMENT_ROOT'] ?? 'N/A'
+                ]
+            ];
             
             simpleJsonOutput([
                 'success' => true,
                 'step' => 2,
+                'message' => 'File existence check using same logic as wallet.php',
                 'files' => $results
             ]);
             
