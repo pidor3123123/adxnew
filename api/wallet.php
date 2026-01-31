@@ -603,7 +603,8 @@ try {
     
     // Логируем информацию о пользователе
     if ($user) {
-        error_log("Wallet API: Request from user_id={$user['id']}, email={$user['email'] ?? 'N/A'}, action={$action}");
+        $userEmail = $user['email'] ?? 'N/A';
+        error_log("Wallet API: Request from user_id={$user['id']}, email={$userEmail}, action={$action}");
     } else {
         error_log("Wallet API: Request from unauthenticated user, action={$action}");
     }
@@ -612,13 +613,25 @@ try {
         case 'balances':
             if (!$user) {
                 error_log("Wallet balances API: Unauthorized request - no user found");
-                throw new Exception('Unauthorized', 401);
+                outputJsonError('Unauthorized', 401);
+                exit;
             }
             
             error_log("Wallet balances API: Starting balance fetch for user_id={$user['id']}");
             
             try {
+                // Проверяем доступность getSupabaseClient перед вызовом
+                if (!function_exists('getSupabaseClient')) {
+                    error_log("Wallet balances API: getSupabaseClient function not found");
+                    throw new Exception('Supabase client not available', 500);
+                }
+                
                 $supabase = getSupabaseClient();
+                
+                if (!$supabase) {
+                    error_log("Wallet balances API: getSupabaseClient returned null");
+                    throw new Exception('Failed to initialize Supabase client', 500);
+                }
                 
                 // Пытаемся получить Supabase UUID
                 try {
@@ -654,7 +667,8 @@ try {
                         }
                     } else {
                         // Если синхронизация недоступна, возвращаем пустой баланс
-                        error_log("Wallet balances API: syncUserToSupabase function not available or user ID missing. User ID: " . ($user['id'] ?? 'N/A'));
+                        $userId = $user['id'] ?? 'N/A';
+                        error_log("Wallet balances API: syncUserToSupabase function not available or user ID missing. User ID: " . $userId);
                         outputJsonSuccess([
                             'balances' => [],
                             'total_usd' => 0,
@@ -1178,29 +1192,40 @@ try {
     
 } catch (Throwable $e) {
     // Обработка всех остальных ошибок (Error, TypeError и т.д.)
-    if (ob_get_level() > 0) {
-        ob_end_clean();
+    // Очищаем буфер перед выводом
+    while (ob_get_level() > 0) {
+        @ob_end_clean();
     }
     
+    // Устанавливаем заголовки
     if (!headers_sent()) {
-        header('Content-Type: application/json');
+        header('Content-Type: application/json; charset=UTF-8');
+        http_response_code($e->getCode() && $e->getCode() >= 400 && $e->getCode() < 600 ? $e->getCode() : 500);
+        header('Access-Control-Allow-Origin: *');
+        header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
+        header('Access-Control-Allow-Headers: Content-Type, Authorization');
     }
     
-    http_response_code(500);
-    
+    // Логируем все детали ошибки
     error_log("Wallet API Throwable: " . $e->getMessage());
     error_log("Wallet API Throwable Type: " . get_class($e));
     error_log("Wallet API Throwable File: " . $e->getFile() . ":" . $e->getLine());
+    error_log("Wallet API Throwable Code: " . $e->getCode());
     error_log("Wallet API Throwable Trace: " . $e->getTraceAsString());
     
+    // Всегда показываем детали ошибки для диагностики
     echo json_encode([
         'success' => false,
-        'error' => 'An unexpected error occurred. Please try again later.',
-        'debug' => (defined('DEBUG') && DEBUG) ? [
+        'error' => $e->getMessage(),
+        'version' => '2.0.1',
+        'debug' => [
             'type' => get_class($e),
             'message' => $e->getMessage(),
             'file' => basename($e->getFile()),
-            'line' => $e->getLine()
-        ] : null
+            'line' => $e->getLine(),
+            'code' => $e->getCode(),
+            'trace' => array_slice(explode("\n", $e->getTraceAsString()), 0, 10) // Первые 10 строк trace
+        ]
     ], JSON_UNESCAPED_UNICODE);
+    exit;
 }
