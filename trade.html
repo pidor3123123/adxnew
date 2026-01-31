@@ -1309,7 +1309,7 @@
             }
         }
         
-        function updateChart(symbol) {
+        async function updateChart(symbol) {
             TradingState.currentSymbol = symbol;
             currentSymbol = symbol;
             localStorage.setItem('terminal_symbol', symbol);
@@ -1326,25 +1326,74 @@
                 if (baseSymbol.includes(':')) {
                     baseSymbol = baseSymbol.split(':')[1];
                 }
-                baseSymbol = baseSymbol.replace('USDT', '').replace('USD', '');
+                baseSymbol = baseSymbol.replace('USDT', '').replace('USD', '').toUpperCase();
                 
-                // Обновляем currentAsset, если функция selectAsset доступна
-                if (typeof window.selectAsset === 'function') {
-                    // Вызываем selectAsset для синхронизации currentAsset и обновления цены
-                    window.selectAsset(baseSymbol);
-                } else if (typeof window.currentAsset !== 'undefined') {
-                    // Если selectAsset недоступна, обновляем currentAsset напрямую
-                    // Это временное решение, пока цена не обновится через API
-                    const asset = assetList?.find(a => a.symbol === baseSymbol || a.symbol === baseSymbol.toUpperCase());
-                    if (asset) {
-                        window.currentAsset = {
-                            symbol: asset.symbol,
-                            name: asset.name,
-                            price: asset.price,
-                            change: asset.change,
-                            decimals: asset.price < 1 ? 6 : (asset.price < 10 ? 4 : 2)
-                        };
+                // Обновляем currentAsset напрямую без вызова selectAsset()
+                // Ищем актив в assetList или создаем новый
+                let asset = null;
+                // Пытаемся получить assetList из разных источников
+                const assetListSource = window.assetList || (typeof assetList !== 'undefined' ? assetList : null);
+                if (assetListSource && Array.isArray(assetListSource)) {
+                    asset = assetListSource.find(a => a.symbol === baseSymbol || a.symbol === baseSymbol.toUpperCase());
+                }
+                
+                // Если актив не найден, создаем его с базовыми данными
+                if (!asset) {
+                    const basePrice = (typeof MarketAPI !== 'undefined' && MarketAPI.basePrices) 
+                        ? (MarketAPI.basePrices[baseSymbol] || MarketAPI.basePrices[baseSymbol.toLowerCase()] || 100)
+                        : 100;
+                    
+                    // Определяем тип рынка по символу
+                    let market = 'crypto';
+                    let name = baseSymbol;
+                    
+                    if (baseSymbol.includes('USD') || baseSymbol.includes('EUR') || baseSymbol.includes('GBP') || 
+                        baseSymbol.includes('JPY') || baseSymbol.includes('CHF') || baseSymbol.includes('CAD') || 
+                        baseSymbol.includes('AUD') || baseSymbol.includes('NZD')) {
+                        market = 'forex';
+                        name = baseSymbol.slice(0, 3) + '/' + baseSymbol.slice(3);
+                    } else if (['AAPL', 'GOOGL', 'MSFT', 'AMZN', 'TSLA', 'META', 'NVDA', 'JPM', 'V', 'JNJ'].includes(baseSymbol)) {
+                        market = 'stocks';
+                        name = baseSymbol + ' Stock';
                     }
+                    
+                    asset = {
+                        symbol: baseSymbol,
+                        name: name,
+                        price: basePrice,
+                        change: 0,
+                        market: market
+                    };
+                }
+                
+                // Обновляем window.currentAsset
+                if (asset && typeof window.currentAsset !== 'undefined') {
+                    window.currentAsset.symbol = asset.symbol;
+                    window.currentAsset.name = asset.name;
+                    window.currentAsset.price = asset.price;
+                    window.currentAsset.change = asset.change;
+                    window.currentAsset.decimals = asset.price < 1 ? 6 : (asset.price < 10 ? 4 : 2);
+                } else if (asset) {
+                    window.currentAsset = {
+                        symbol: asset.symbol,
+                        name: asset.name,
+                        price: asset.price,
+                        change: asset.change,
+                        decimals: asset.price < 1 ? 6 : (asset.price < 10 ? 4 : 2)
+                    };
+                }
+                
+                // Загружаем актуальную цену из API
+                if (typeof window.updateAssetPrice === 'function') {
+                    await window.updateAssetPrice();
+                }
+                
+                // Немедленно обновляем цену в UI после обновления currentAsset
+                if (typeof updateNormalTradePrice === 'function') {
+                    updateNormalTradePrice();
+                }
+                if (typeof updateQuickTradePrice === 'function') {
+                    updateQuickTradePrice();
                 }
             }
             updateUI();

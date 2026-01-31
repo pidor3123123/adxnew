@@ -76,6 +76,9 @@ async function loadAssetList() {
         // Объединяем все активы
         assetList = [...cryptoAssets, ...stockAssets, ...forexAssets];
         
+        // Обновляем глобальную ссылку для использования в trade.html
+        window.assetList = assetList;
+        
         renderAssetList(assetList);
     } catch (error) {
         console.error('Error loading asset list:', error);
@@ -600,26 +603,43 @@ async function submitOrder(isQuick = false) {
 /**
  * Load user balances
  */
-async function loadUserBalances() {
+async function loadUserBalances(forceRefresh = false) {
     if (!Auth.isAuthenticated()) {
         console.log('[loadUserBalances] User not authenticated, skipping');
         return;
     }
     
     try {
-        console.log('[loadUserBalances] Fetching user balances...');
-        const result = await Auth.fetchUser();
+        // Используем /wallet.php?action=balances как единый источник данных (Supabase)
+        const url = forceRefresh 
+            ? `/wallet.php?action=balances&_t=${Date.now()}`
+            : '/wallet.php?action=balances';
         
-        if (result && result.balances && Array.isArray(result.balances)) {
-            console.log('[loadUserBalances] Received balances:', result.balances);
+        console.log('[loadUserBalances] Fetching balances from wallet.php...', { url });
+        const result = await API.get(url);
+        console.log('[loadUserBalances] API response received:', {
+            success: result.success,
+            balancesCount: result.balances?.length || 0,
+            totalUsd: result.total_usd,
+            balances: result.balances
+        });
+        
+        if (result && result.success) {
+            // Обновляем балансы из массива balances
+            if (result.balances && Array.isArray(result.balances)) {
+                result.balances.forEach(balance => {
+                    const currency = balance.currency || 'USD';
+                    const available = parseFloat(balance.available) || 0;
+                    userBalances[currency] = available;
+                    console.log(`[loadUserBalances] Updated ${currency} balance:`, available);
+                });
+            }
             
-            // Обновляем балансы
-            result.balances.forEach(balance => {
-                const currency = balance.currency || 'USD';
-                const available = parseFloat(balance.available) || 0;
-                userBalances[currency] = available;
-                console.log(`[loadUserBalances] Updated ${currency} balance:`, available);
-            });
+            // Если USD баланс не найден в массиве, используем total_usd как fallback
+            if (!userBalances.USD && result.total_usd !== undefined) {
+                userBalances.USD = parseFloat(result.total_usd || 0);
+                console.log('[loadUserBalances] Using total_usd as fallback:', userBalances.USD);
+            }
             
             // Получаем USD баланс
             const usdBalance = userBalances.USD || 0;
@@ -635,14 +655,14 @@ async function loadUserBalances() {
                 console.warn('[loadUserBalances] Header balance element not found');
             }
             
-            // Update UI
+            // Update UI - обновляем отображение баланса в терминале
             const side = window.TradingState?.tradeSide || 'buy';
             updateTradeUI(side);
             
             console.log('[loadUserBalances] Balance loading completed successfully');
         } else {
-            console.warn('[loadUserBalances] No balances in result or invalid format:', result);
-            // Если балансы не получены, пытаемся получить из Auth.getUser()
+            console.warn('[loadUserBalances] API returned success=false or invalid response:', result);
+            // Fallback: пытаемся получить баланс из Auth.getUser()
             const user = Auth.getUser();
             if (user && user.balance !== undefined) {
                 const balance = parseFloat(user.balance) || 0;
@@ -674,6 +694,10 @@ async function loadUserBalances() {
                     headerBalance.textContent = formattedBalance;
                     console.log('[loadUserBalances] Error fallback: Updated header balance from Auth.getUser():', formattedBalance);
                 }
+                
+                // Обновляем UI даже при ошибке, чтобы показать хотя бы fallback баланс
+                const side = window.TradingState?.tradeSide || 'buy';
+                updateTradeUI(side);
             }
         } catch (fallbackError) {
             console.error('[loadUserBalances] Fallback error:', fallbackError);
@@ -989,3 +1013,4 @@ window.filterByMarket = filterByMarket;
 window.filterDropdownAssets = filterDropdownAssets;
 window.selectAssetFromDropdown = selectAssetFromDropdown;
 window.updateAssetPrice = updateAssetPrice;
+window.assetList = assetList; // Экспортируем assetList для использования в trade.html

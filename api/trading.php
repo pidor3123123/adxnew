@@ -88,6 +88,58 @@ if (!headers_sent()) {
 }
 
 /**
+ * Получение Supabase UUID пользователя из MySQL user
+ * Упрощенная версия для использования в trading.php
+ * @param array $mysqlUser MySQL user массив с полями id, email
+ * @return string|null UUID пользователя в Supabase или null если не найден
+ */
+if (!function_exists('getSupabaseUserId')) {
+    function getSupabaseUserId(array $mysqlUser): ?string {
+        if (!function_exists('getSupabaseClient')) {
+            return null;
+        }
+        
+        try {
+            $supabase = getSupabaseClient();
+            $email = $mysqlUser['email'] ?? null;
+            
+            if (!$email) {
+                error_log("getSupabaseUserId: User email is missing. MySQL user ID: " . ($mysqlUser['id'] ?? 'N/A'));
+                return null;
+            }
+            
+            // Ищем пользователя в Supabase по email
+            try {
+                $supabaseUser = $supabase->get('users', 'email', $email);
+                
+                if ($supabaseUser && isset($supabaseUser['id'])) {
+                    return $supabaseUser['id'];
+                }
+            } catch (Exception $e) {
+                error_log("getSupabaseUserId: Error searching in users table: " . $e->getMessage());
+            }
+            
+            // Если пользователь не найден, пытаемся найти в auth.users
+            try {
+                if (method_exists($supabase, 'findAuthUserByEmail')) {
+                    $authUserId = $supabase->findAuthUserByEmail($email);
+                    if ($authUserId) {
+                        return $authUserId;
+                    }
+                }
+            } catch (Exception $e) {
+                error_log("getSupabaseUserId: Error searching in auth.users: " . $e->getMessage());
+            }
+            
+            return null;
+        } catch (Exception $e) {
+            error_log("getSupabaseUserId: Error: " . $e->getMessage());
+            return null;
+        }
+    }
+}
+
+/**
  * Установка заголовков для предотвращения кеширования
  */
 function setNoCacheHeaders(): void {
@@ -103,12 +155,60 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 // Получение баланса пользователя
+// Сначала пытается получить баланс из Supabase (единый источник истины), затем использует MySQL как fallback
 function getBalance(int $userId, string $currency): float {
+    // Пытаемся получить баланс из Supabase (единый источник истины)
+    if (function_exists('getSupabaseClient') && function_exists('getSupabaseUserId')) {
+        try {
+            $supabase = getSupabaseClient();
+            
+            // Получаем данные пользователя из MySQL для получения email
+            $db = getDB();
+            $stmt = $db->prepare('SELECT id, email FROM users WHERE id = ?');
+            $stmt->execute([$userId]);
+            $mysqlUser = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($mysqlUser) {
+                // Получаем Supabase UUID пользователя
+                $supabaseUserId = getSupabaseUserId($mysqlUser);
+                
+                if ($supabaseUserId) {
+                    // Получаем баланс из Supabase через RPC
+                    $result = $supabase->getWalletBalance($supabaseUserId, $currency);
+                    
+                    // Обрабатываем ответ RPC
+                    if (is_array($result) && isset($result[0]) && is_array($result[0])) {
+                        $result = $result[0];
+                    }
+                    
+                    if ($result && isset($result['success']) && $result['success'] && isset($result['balance'])) {
+                        $balance = (float)$result['balance'];
+                        error_log("getBalance: Retrieved balance from Supabase for user_id=$userId, currency=$currency: $balance");
+                        return $balance;
+                    } else {
+                        error_log("getBalance: Supabase returned invalid response for user_id=$userId, currency=$currency. Falling back to MySQL.");
+                    }
+                } else {
+                    error_log("getBalance: Could not get Supabase UUID for user_id=$userId. Falling back to MySQL.");
+                }
+            } else {
+                error_log("getBalance: User not found in MySQL for user_id=$userId. Cannot get Supabase balance.");
+            }
+        } catch (Exception $e) {
+            error_log("getBalance: Error getting balance from Supabase for user_id=$userId, currency=$currency: " . $e->getMessage() . ". Falling back to MySQL.");
+        }
+    } else {
+        error_log("getBalance: Supabase functions not available. Using MySQL fallback for user_id=$userId, currency=$currency.");
+    }
+    
+    // Fallback: получаем баланс из MySQL
     $db = getDB();
     $stmt = $db->prepare('SELECT available FROM balances WHERE user_id = ? AND currency = ?');
     $stmt->execute([$userId, $currency]);
     $result = $stmt->fetch();
-    return $result ? (float)$result['available'] : 0.0;
+    $balance = $result ? (float)$result['available'] : 0.0;
+    error_log("getBalance: Retrieved balance from MySQL for user_id=$userId, currency=$currency: $balance");
+    return $balance;
 }
 
 // Обновление баланса
