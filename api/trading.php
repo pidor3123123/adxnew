@@ -102,13 +102,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
-// Получение пользователя из токена
-function getAuthUser(): ?array {
-    $token = getAuthorizationToken();
-    if (!$token) return null;
-    return getUserByToken($token);
-}
-
 // Получение баланса пользователя
 function getBalance(int $userId, string $currency): float {
     $db = getDB();
