@@ -608,6 +608,7 @@ const Auth = {
     
     /**
      * Загрузка баланса пользователя
+     * Использует /wallet.php?action=balances для единого источника данных (Supabase)
      * @param {boolean} forceRefresh - Принудительное обновление без использования кэша
      */
     async loadBalance(forceRefresh = false) {
@@ -619,21 +620,43 @@ const Auth = {
         }
         
         try {
-            console.log('[loadBalance] Fetching user data...');
-            const result = await this.fetchUser(forceRefresh);
-            console.log('[loadBalance] fetchUser result:', result);
+            // Используем /wallet.php?action=balances как единый источник данных (Supabase)
+            const url = forceRefresh 
+                ? `/wallet.php?action=balances&_t=${Date.now()}`
+                : '/wallet.php?action=balances';
             
-            if (result && result.balances) {
-                console.log('[loadBalance] Balances found:', result.balances);
-                const usd = result.balances.find(b => b.currency === 'USD');
-                console.log('[loadBalance] USD balance:', usd);
+            console.log('[loadBalance] Fetching balance from wallet.php...', { url });
+            const result = await API.get(url);
+            console.log('[loadBalance] API response received:', {
+                success: result.success,
+                balancesCount: result.balances?.length || 0,
+                totalUsd: result.total_usd,
+                balances: result.balances
+            });
+            
+            if (result && result.success) {
+                let balance = 0;
                 
-                if (usd) {
-                    const balance = parseFloat(usd.available || 0);
+                // Пытаемся найти USD баланс в массиве balances
+                if (result.balances && Array.isArray(result.balances)) {
+                    const usdBalance = result.balances.find(b => b.currency === 'USD');
+                    if (usdBalance) {
+                        balance = parseFloat(usdBalance.available || 0);
+                        console.log('[loadBalance] USD balance found in balances array:', balance);
+                    }
+                }
+                
+                // Если не нашли в массиве, используем total_usd как fallback
+                if (balance === 0 && result.total_usd !== undefined) {
+                    balance = parseFloat(result.total_usd || 0);
+                    console.log('[loadBalance] Using total_usd as fallback:', balance);
+                }
+                
+                if (balance >= 0) {
                     const formatted = balance.toLocaleString('en-US', { minimumFractionDigits: 2 });
                     console.log('[loadBalance] Formatted balance:', formatted);
                     
-                    // Обновляем баланс в шапке на всех страницах
+                    // Обновляем баланс в шапке на всех страницах (как на wallet.html)
                     const headerBalance = document.getElementById('headerBalance');
                     console.log('[loadBalance] headerBalance element:', headerBalance);
                     
@@ -644,20 +667,56 @@ const Auth = {
                         console.warn('[loadBalance] Element #headerBalance not found!');
                     }
                     
-                    // Обновляем данные пользователя в localStorage
+                    // Обновляем данные пользователя в localStorage для совместимости
                     const user = this.getUser();
                     if (user) {
                         this.setUser({ ...user, balance: balance });
                         console.log('[loadBalance] Balance saved to localStorage');
                     }
                 } else {
-                    console.warn('[loadBalance] USD balance not found in balances array');
+                    console.warn('[loadBalance] Invalid balance value:', balance);
                 }
             } else {
-                console.warn('[loadBalance] No balances in result:', result);
+                console.warn('[loadBalance] API returned success=false or invalid response:', result);
+                // Fallback: пытаемся получить баланс из fetchUser (старый метод)
+                try {
+                    const fallbackResult = await this.fetchUser(forceRefresh);
+                    if (fallbackResult && fallbackResult.balances) {
+                        const usd = fallbackResult.balances.find(b => b.currency === 'USD');
+                        if (usd) {
+                            const balance = parseFloat(usd.available || 0);
+                            const formatted = balance.toLocaleString('en-US', { minimumFractionDigits: 2 });
+                            const headerBalance = document.getElementById('headerBalance');
+                            if (headerBalance) {
+                                headerBalance.textContent = formatted;
+                                console.log('[loadBalance] Fallback: Balance updated from fetchUser:', formatted);
+                            }
+                        }
+                    }
+                } catch (fallbackError) {
+                    console.error('[loadBalance] Fallback error:', fallbackError);
+                }
             }
         } catch (error) {
             console.error('[loadBalance] Error loading balance:', error);
+            // Fallback: пытаемся получить баланс из fetchUser (старый метод)
+            try {
+                const fallbackResult = await this.fetchUser(forceRefresh);
+                if (fallbackResult && fallbackResult.balances) {
+                    const usd = fallbackResult.balances.find(b => b.currency === 'USD');
+                    if (usd) {
+                        const balance = parseFloat(usd.available || 0);
+                        const formatted = balance.toLocaleString('en-US', { minimumFractionDigits: 2 });
+                        const headerBalance = document.getElementById('headerBalance');
+                        if (headerBalance) {
+                            headerBalance.textContent = formatted;
+                            console.log('[loadBalance] Error fallback: Balance updated from fetchUser:', formatted);
+                        }
+                    }
+                }
+            } catch (fallbackError) {
+                console.error('[loadBalance] Error fallback failed:', fallbackError);
+            }
         }
     },
     
