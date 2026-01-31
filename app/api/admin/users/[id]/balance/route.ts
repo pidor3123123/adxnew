@@ -44,14 +44,22 @@ export async function PATCH(
       .maybeSingle()
 
     const oldBalance = existingBalance
-    const oldWalletBalance = parseFloat(existingWallet?.balance?.toString() || '0')
+    // If wallet doesn't exist, balance is 0 (will be created by trigger on first transaction)
+    const oldWalletBalance = existingWallet ? parseFloat(existingWallet.balance?.toString() || '0') : 0
     const newAvailableBalance = parseFloat((available_balance ?? 0).toString())
+    
+    // Log for debugging
+    console.log(`[Admin Balance Update] User: ${userId}, Currency: ${currency}`)
+    console.log(`[Admin Balance Update] Existing wallet:`, existingWallet)
+    console.log(`[Admin Balance Update] Old wallet balance: ${oldWalletBalance}, New balance: ${newAvailableBalance}`)
     
     // Calculate difference
     const difference = newAvailableBalance - oldWalletBalance
 
     // If there's a difference, create a transaction using apply_transaction RPC
+    // This will create the wallet record if it doesn't exist (via trigger)
     if (Math.abs(difference) > 0.0001) { // Use small epsilon to avoid floating point issues
+      console.log(`[Admin Balance Update] Creating transaction with difference: ${difference}`)
       // Use admin_topup for both positive and negative adjustments
       // The RPC function handles negative amounts correctly
       const idempotencyKey = `admin_balance_update_${userId}_${currency}_${Date.now()}_${randomUUID()}`
@@ -59,6 +67,7 @@ export async function PATCH(
       // Call apply_transaction RPC
       // p_amount can be positive (topup) or negative (adjustment down)
       // The RPC function will handle the sign and update the balance accordingly
+      // The trigger will create the wallet record if it doesn't exist
       const { data: transactionResult, error: transactionError } = await supabase.rpc('apply_transaction', {
         p_user_id: userId,
         p_amount: difference.toString(), // Pass difference directly (positive or negative)
@@ -71,26 +80,34 @@ export async function PATCH(
           old_balance: oldWalletBalance,
           new_balance: newAvailableBalance,
           difference: difference,
-          adjustment_type: difference > 0 ? 'increase' : 'decrease'
+          adjustment_type: difference > 0 ? 'increase' : 'decrease',
+          wallet_existed: existingWallet !== null // Track if wallet existed before
         }
       })
 
       if (transactionError) {
-        console.error('Error calling apply_transaction RPC:', transactionError)
+        console.error('[Admin Balance Update] Error calling apply_transaction RPC:', transactionError)
         return NextResponse.json({ 
           error: 'Failed to process transaction: ' + transactionError.message 
         }, { status: 500 })
       }
 
       if (!transactionResult || !transactionResult.success) {
-        console.error('apply_transaction returned error:', transactionResult)
+        console.error('[Admin Balance Update] apply_transaction returned error:', transactionResult)
         return NextResponse.json({ 
           error: 'Transaction failed: ' + (transactionResult?.message || 'Unknown error')
         }, { status: 500 })
       }
+      
+      console.log(`[Admin Balance Update] Transaction created successfully:`, transactionResult)
+    } else {
+      console.log(`[Admin Balance Update] No difference, skipping transaction (old: ${oldWalletBalance}, new: ${newAvailableBalance})`)
     }
 
     // Get updated balance from wallets (single source of truth)
+    // Wait a bit to ensure transaction is fully processed and trigger has executed
+    await new Promise(resolve => setTimeout(resolve, 200))
+    
     const { data: updatedWallet } = await supabase
       .from('wallets')
       .select('balance')
@@ -100,8 +117,12 @@ export async function PATCH(
 
     const finalBalance = parseFloat(updatedWallet?.balance?.toString() || newAvailableBalance.toString())
     
-    // Wait a bit to ensure transaction is fully processed
-    await new Promise(resolve => setTimeout(resolve, 100))
+    console.log(`[Admin Balance Update] Final wallet balance: ${finalBalance} (expected: ${newAvailableBalance})`)
+    
+    // Verify that wallet record exists after transaction
+    if (!updatedWallet && Math.abs(newAvailableBalance) > 0.0001) {
+      console.warn(`[Admin Balance Update] WARNING: Wallet record not found after transaction for ${currency}. This may indicate a trigger issue.`)
+    }
 
     // Update user_balances for compatibility (if it exists)
     const balanceId = existingBalance?.id || randomUUID()

@@ -95,12 +95,20 @@ if (!headers_sent()) {
  */
 if (!function_exists('getSupabaseUserId')) {
     function getSupabaseUserId(array $mysqlUser): ?string {
+        error_log("getSupabaseUserId: START - MySQL user ID: " . ($mysqlUser['id'] ?? 'N/A') . ", email: " . ($mysqlUser['email'] ?? 'N/A'));
+        
         if (!function_exists('getSupabaseClient')) {
+            error_log("getSupabaseUserId: getSupabaseClient() function not available");
             return null;
         }
         
         try {
             $supabase = getSupabaseClient();
+            if (!$supabase) {
+                error_log("getSupabaseUserId: getSupabaseClient() returned null");
+                return null;
+            }
+            
             $email = $mysqlUser['email'] ?? null;
             
             if (!$email) {
@@ -108,32 +116,45 @@ if (!function_exists('getSupabaseUserId')) {
                 return null;
             }
             
+            error_log("getSupabaseUserId: Searching for user with email: $email");
+            
             // Ищем пользователя в Supabase по email
             try {
                 $supabaseUser = $supabase->get('users', 'email', $email);
                 
                 if ($supabaseUser && isset($supabaseUser['id'])) {
+                    error_log("getSupabaseUserId: SUCCESS - Found user in Supabase users table. UUID: {$supabaseUser['id']}");
                     return $supabaseUser['id'];
+                } else {
+                    error_log("getSupabaseUserId: User not found in Supabase users table");
                 }
             } catch (Exception $e) {
-                error_log("getSupabaseUserId: Error searching in users table: " . $e->getMessage());
+                error_log("getSupabaseUserId: Exception searching in users table: " . $e->getMessage());
             }
             
             // Если пользователь не найден, пытаемся найти в auth.users
             try {
                 if (method_exists($supabase, 'findAuthUserByEmail')) {
+                    error_log("getSupabaseUserId: Searching in auth.users");
                     $authUserId = $supabase->findAuthUserByEmail($email);
                     if ($authUserId) {
+                        error_log("getSupabaseUserId: SUCCESS - Found user in auth.users. UUID: $authUserId");
                         return $authUserId;
+                    } else {
+                        error_log("getSupabaseUserId: User not found in auth.users");
                     }
+                } else {
+                    error_log("getSupabaseUserId: findAuthUserByEmail() method not available");
                 }
             } catch (Exception $e) {
-                error_log("getSupabaseUserId: Error searching in auth.users: " . $e->getMessage());
+                error_log("getSupabaseUserId: Exception searching in auth.users: " . $e->getMessage());
             }
             
+            error_log("getSupabaseUserId: END - User not found in Supabase, returning null");
             return null;
         } catch (Exception $e) {
-            error_log("getSupabaseUserId: Error: " . $e->getMessage());
+            error_log("getSupabaseUserId: FATAL ERROR: " . $e->getMessage());
+            error_log("getSupabaseUserId: Exception trace: " . $e->getTraceAsString());
             return null;
         }
     }
@@ -156,11 +177,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 // Получение баланса пользователя
 // Сначала пытается получить баланс из Supabase (единый источник истины), затем использует MySQL как fallback
-function getBalance(int $userId, string $currency): float {
+// @param int $userId ID пользователя
+// @param string $currency Валюта
+// @param bool $returnDebugInfo Если true, возвращает массив с балансом и диагностической информацией
+// @return float|array Баланс или массив с балансом и диагностикой
+function getBalance(int $userId, string $currency, bool $returnDebugInfo = false) {
+    $debugInfo = [
+        'source' => 'unknown',
+        'balance' => 0.0,
+        'supabase_attempted' => false,
+        'supabase_success' => false,
+        'mysql_fallback_used' => false,
+        'error' => null,
+        'details' => []
+    ];
+    
+    error_log("getBalance: START - user_id=$userId, currency=$currency, returnDebugInfo=" . ($returnDebugInfo ? 'true' : 'false'));
+    
     // Пытаемся получить баланс из Supabase (единый источник истины)
     if (function_exists('getSupabaseClient') && function_exists('getSupabaseUserId')) {
+        $debugInfo['supabase_attempted'] = true;
+        error_log("getBalance: Supabase functions are available");
         try {
             $supabase = getSupabaseClient();
+            error_log("getBalance: Supabase client obtained");
             
             // Получаем данные пользователя из MySQL для получения email
             $db = getDB();
@@ -169,45 +209,148 @@ function getBalance(int $userId, string $currency): float {
             $mysqlUser = $stmt->fetch(PDO::FETCH_ASSOC);
             
             if ($mysqlUser) {
+                error_log("getBalance: MySQL user found - id={$mysqlUser['id']}, email={$mysqlUser['email']}");
+                $debugInfo['details']['mysql_user_found'] = true;
+                $debugInfo['details']['mysql_user_email'] = $mysqlUser['email'];
+                
                 // Получаем Supabase UUID пользователя
                 $supabaseUserId = getSupabaseUserId($mysqlUser);
                 
                 if ($supabaseUserId) {
+                    error_log("getBalance: Supabase UUID obtained: $supabaseUserId");
+                    $debugInfo['details']['supabase_uuid'] = $supabaseUserId;
+                    
                     // Получаем баланс из Supabase через RPC
+                    error_log("getBalance: Calling getWalletBalance RPC for user_id=$supabaseUserId, currency=$currency");
                     $result = $supabase->getWalletBalance($supabaseUserId, $currency);
                     
-                    // Обрабатываем ответ RPC
+                    // Логируем полный ответ для диагностики
+                    error_log("getBalance: RPC response type: " . gettype($result));
+                    error_log("getBalance: RPC response (full): " . json_encode($result, JSON_UNESCAPED_UNICODE));
+                    $debugInfo['details']['rpc_response_type'] = gettype($result);
+                    $debugInfo['details']['rpc_response'] = $result;
+                    
+                    // Обрабатываем различные форматы ответа RPC
+                    $balanceData = null;
+                    
+                    // Вариант 1: Массив с одним элементом (JSONB в массиве)
                     if (is_array($result) && isset($result[0]) && is_array($result[0])) {
-                        $result = $result[0];
+                        error_log("getBalance: Response is array with one element");
+                        $balanceData = $result[0];
+                        $debugInfo['details']['response_format'] = 'array_with_one_element';
+                    }
+                    // Вариант 2: Прямой объект/массив
+                    elseif (is_array($result) && isset($result['success'])) {
+                        error_log("getBalance: Response is direct object");
+                        $balanceData = $result;
+                        $debugInfo['details']['response_format'] = 'direct_object';
+                    }
+                    // Вариант 3: JSONB строка (если не распарсилась)
+                    elseif (is_string($result)) {
+                        error_log("getBalance: Response is string, attempting to decode");
+                        $decoded = json_decode($result, true);
+                        if ($decoded !== null && is_array($decoded)) {
+                            $balanceData = $decoded;
+                            error_log("getBalance: Successfully decoded JSONB string");
+                            $debugInfo['details']['response_format'] = 'jsonb_string_decoded';
+                        } else {
+                            error_log("getBalance: Failed to decode JSONB string: $result");
+                            $debugInfo['details']['response_format'] = 'jsonb_string_decode_failed';
+                        }
+                    }
+                    // Вариант 4: Пустой массив или null
+                    elseif (empty($result)) {
+                        error_log("getBalance: Response is empty or null");
+                        $debugInfo['details']['response_format'] = 'empty_or_null';
+                    } else {
+                        error_log("getBalance: Unexpected response format: " . gettype($result));
+                        $debugInfo['details']['response_format'] = 'unexpected_' . gettype($result);
                     }
                     
-                    if ($result && isset($result['success']) && $result['success'] && isset($result['balance'])) {
-                        $balance = (float)$result['balance'];
-                        error_log("getBalance: Retrieved balance from Supabase for user_id=$userId, currency=$currency: $balance");
-                        return $balance;
+                    // Извлекаем баланс из обработанных данных
+                    if ($balanceData && is_array($balanceData)) {
+                        error_log("getBalance: Processing balance data: " . json_encode($balanceData, JSON_UNESCAPED_UNICODE));
+                        $debugInfo['details']['balance_data'] = $balanceData;
+                        
+                        // Проверяем наличие success и balance
+                        if (isset($balanceData['success']) && $balanceData['success'] === true) {
+                            if (isset($balanceData['balance'])) {
+                                $balance = (float)$balanceData['balance'];
+                                $debugInfo['source'] = 'supabase';
+                                $debugInfo['balance'] = $balance;
+                                $debugInfo['supabase_success'] = true;
+                                error_log("getBalance: SUCCESS - Retrieved balance from Supabase for user_id=$userId, currency=$currency: $balance");
+                                
+                                if ($returnDebugInfo) {
+                                    return $debugInfo;
+                                }
+                                return $balance;
+                            } else {
+                                $errorMsg = "Response has success=true but no 'balance' field. Keys: " . implode(', ', array_keys($balanceData));
+                                error_log("getBalance: $errorMsg");
+                                $debugInfo['error'] = $errorMsg;
+                            }
+                        } else {
+                            $successValue = $balanceData['success'] ?? 'not set';
+                            $errorMsg = "Response success field is not true: " . var_export($successValue, true);
+                            error_log("getBalance: $errorMsg");
+                            $debugInfo['error'] = $errorMsg;
+                        }
                     } else {
-                        error_log("getBalance: Supabase returned invalid response for user_id=$userId, currency=$currency. Falling back to MySQL.");
+                        $errorMsg = "Could not extract balance data from response";
+                        error_log("getBalance: $errorMsg");
+                        $debugInfo['error'] = $errorMsg;
                     }
+                    
+                    error_log("getBalance: Supabase returned invalid response for user_id=$userId, currency=$currency. Falling back to MySQL.");
                 } else {
-                    error_log("getBalance: Could not get Supabase UUID for user_id=$userId. Falling back to MySQL.");
+                    $errorMsg = "Could not get Supabase UUID for user_id=$userId";
+                    error_log("getBalance: $errorMsg. Falling back to MySQL.");
+                    $debugInfo['error'] = $errorMsg;
                 }
             } else {
-                error_log("getBalance: User not found in MySQL for user_id=$userId. Cannot get Supabase balance.");
+                $errorMsg = "User not found in MySQL for user_id=$userId";
+                error_log("getBalance: $errorMsg. Cannot get Supabase balance.");
+                $debugInfo['error'] = $errorMsg;
             }
         } catch (Exception $e) {
-            error_log("getBalance: Error getting balance from Supabase for user_id=$userId, currency=$currency: " . $e->getMessage() . ". Falling back to MySQL.");
+            $errorMsg = "Exception getting balance from Supabase: " . $e->getMessage();
+            error_log("getBalance: $errorMsg for user_id=$userId, currency=$currency");
+            error_log("getBalance: Exception trace: " . $e->getTraceAsString());
+            error_log("getBalance: Falling back to MySQL due to exception.");
+            $debugInfo['error'] = $errorMsg;
+            $debugInfo['details']['exception'] = [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ];
         }
     } else {
-        error_log("getBalance: Supabase functions not available. Using MySQL fallback for user_id=$userId, currency=$currency.");
+        $supabaseClientExists = function_exists('getSupabaseClient') ? 'yes' : 'no';
+        $getSupabaseUserIdExists = function_exists('getSupabaseUserId') ? 'yes' : 'no';
+        $errorMsg = "Supabase functions not available. getSupabaseClient: $supabaseClientExists, getSupabaseUserId: $getSupabaseUserIdExists";
+        error_log("getBalance: $errorMsg. Using MySQL fallback for user_id=$userId, currency=$currency.");
+        $debugInfo['error'] = $errorMsg;
+        $debugInfo['details']['supabase_functions'] = [
+            'getSupabaseClient' => $supabaseClientExists,
+            'getSupabaseUserId' => $getSupabaseUserIdExists
+        ];
     }
     
     // Fallback: получаем баланс из MySQL
+    $debugInfo['mysql_fallback_used'] = true;
+    error_log("getBalance: Using MySQL fallback for user_id=$userId, currency=$currency");
     $db = getDB();
     $stmt = $db->prepare('SELECT available FROM balances WHERE user_id = ? AND currency = ?');
     $stmt->execute([$userId, $currency]);
     $result = $stmt->fetch();
     $balance = $result ? (float)$result['available'] : 0.0;
-    error_log("getBalance: Retrieved balance from MySQL for user_id=$userId, currency=$currency: $balance");
+    $debugInfo['source'] = 'mysql';
+    $debugInfo['balance'] = $balance;
+    error_log("getBalance: END - Retrieved balance from MySQL for user_id=$userId, currency=$currency: $balance");
+    
+    if ($returnDebugInfo) {
+        return $debugInfo;
+    }
     return $balance;
 }
 
@@ -452,12 +595,27 @@ try {
             
             try {
                 if ($side === 'buy') {
-                    // Проверяем баланс USD
-                    $usdBalance = getBalance($user['id'], 'USD');
+                    // Проверяем баланс USD с диагностической информацией
+                    $balanceResult = getBalance($user['id'], 'USD', true);
+                    $usdBalance = is_array($balanceResult) ? $balanceResult['balance'] : $balanceResult;
                     $requiredAmount = $total + $fee;
                     
                     if ($usdBalance < $requiredAmount) {
-                        throw new Exception('Insufficient USD balance', 400);
+                        // Формируем детальное сообщение об ошибке с диагностикой
+                        $errorMessage = 'Insufficient USD balance';
+                        $errorDetails = [
+                            'available_balance' => $usdBalance,
+                            'required_amount' => $requiredAmount,
+                            'shortage' => $requiredAmount - $usdBalance,
+                            'balance_source' => is_array($balanceResult) ? $balanceResult['source'] : 'unknown',
+                            'debug_info' => is_array($balanceResult) ? $balanceResult : null
+                        ];
+                        
+                        error_log("Trading API: Insufficient USD balance for user_id={$user['id']}. Available: $usdBalance, Required: $requiredAmount, Source: " . ($errorDetails['balance_source']));
+                        
+                        $exception = new Exception($errorMessage, 400);
+                        $exception->errorDetails = $errorDetails;
+                        throw $exception;
                     }
                     
                     // Списываем USD
@@ -1016,9 +1174,26 @@ try {
                     $closeFee = $closeTotal * 0.001;
                     $requiredAmount = $closeTotal + $closeFee;
                     
-                    $usdBalance = getBalance($user['id'], 'USD');
+                    // Проверяем баланс USD с диагностической информацией
+                    $balanceResult = getBalance($user['id'], 'USD', true);
+                    $usdBalance = is_array($balanceResult) ? $balanceResult['balance'] : $balanceResult;
+                    
                     if ($usdBalance < $requiredAmount) {
-                        throw new Exception('Insufficient USD balance', 400);
+                        // Формируем детальное сообщение об ошибке с диагностикой
+                        $errorMessage = 'Insufficient USD balance';
+                        $errorDetails = [
+                            'available_balance' => $usdBalance,
+                            'required_amount' => $requiredAmount,
+                            'shortage' => $requiredAmount - $usdBalance,
+                            'balance_source' => is_array($balanceResult) ? $balanceResult['source'] : 'unknown',
+                            'debug_info' => is_array($balanceResult) ? $balanceResult : null
+                        ];
+                        
+                        error_log("Trading API: Insufficient USD balance for user_id={$user['id']} when closing order. Available: $usdBalance, Required: $requiredAmount, Source: " . ($errorDetails['balance_source']));
+                        
+                        $exception = new Exception($errorMessage, 400);
+                        $exception->errorDetails = $errorDetails;
+                        throw $exception;
                     }
                     
                     // Списываем USD (пропускаем синхронизацию, будет выполнена после commit)
@@ -1241,8 +1416,15 @@ try {
     $code = (int)$code;
     http_response_code($code);
     
-    echo json_encode([
+    $response = [
         'success' => false,
         'error' => $e->getMessage()
-    ], JSON_NUMERIC_CHECK);
+    ];
+    
+    // Добавляем диагностическую информацию, если она есть
+    if (isset($e->errorDetails)) {
+        $response['debug'] = $e->errorDetails;
+    }
+    
+    echo json_encode($response, JSON_NUMERIC_CHECK | JSON_UNESCAPED_UNICODE);
 }
