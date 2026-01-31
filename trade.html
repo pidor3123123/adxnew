@@ -1934,6 +1934,14 @@
                 Auth.updateUI();
             }
             
+            // Загружаем балансы после инициализации авторизации
+            // Используем небольшую задержку, чтобы Auth.initAuth() успел выполниться
+            setTimeout(async () => {
+                if (typeof loadUserBalances === 'function') {
+                    await loadUserBalances();
+                }
+            }, 300);
+            
             // Load saved state
             const savedSymbol = localStorage.getItem('terminal_symbol');
             if (savedSymbol) {

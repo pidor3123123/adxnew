@@ -14,7 +14,7 @@ let currentAsset = {
 window.currentAsset = currentAsset;
 
 let userBalances = {
-    USD: 10000.00,
+    USD: 0,
     BTC: 0,
     ETH: 0
 };
@@ -601,28 +601,83 @@ async function submitOrder(isQuick = false) {
  * Load user balances
  */
 async function loadUserBalances() {
-    if (!Auth.isAuthenticated()) return;
+    if (!Auth.isAuthenticated()) {
+        console.log('[loadUserBalances] User not authenticated, skipping');
+        return;
+    }
     
     try {
+        console.log('[loadUserBalances] Fetching user balances...');
         const result = await Auth.fetchUser();
         
-        if (result && result.balances) {
+        if (result && result.balances && Array.isArray(result.balances)) {
+            console.log('[loadUserBalances] Received balances:', result.balances);
+            
+            // Обновляем балансы
             result.balances.forEach(balance => {
-                userBalances[balance.currency] = parseFloat(balance.available) || 0;
+                const currency = balance.currency || 'USD';
+                const available = parseFloat(balance.available) || 0;
+                userBalances[currency] = available;
+                console.log(`[loadUserBalances] Updated ${currency} balance:`, available);
             });
+            
+            // Получаем USD баланс
+            const usdBalance = userBalances.USD || 0;
+            const formattedBalance = usdBalance.toLocaleString('en-US', { minimumFractionDigits: 2 });
+            console.log('[loadUserBalances] Formatted USD balance:', formattedBalance);
+            
+            // Update header balance (приоритет: обновляем из API)
+            const headerBalance = document.getElementById('headerBalance');
+            if (headerBalance) {
+                headerBalance.textContent = formattedBalance;
+                console.log('[loadUserBalances] Header balance updated to:', formattedBalance);
+            } else {
+                console.warn('[loadUserBalances] Header balance element not found');
+            }
             
             // Update UI
             const side = window.TradingState?.tradeSide || 'buy';
             updateTradeUI(side);
             
-            // Update header balance
-            const headerBalance = document.getElementById('headerBalance');
-            if (headerBalance) {
-                headerBalance.textContent = (userBalances.USD || 0).toLocaleString('en-US', { minimumFractionDigits: 2 });
+            console.log('[loadUserBalances] Balance loading completed successfully');
+        } else {
+            console.warn('[loadUserBalances] No balances in result or invalid format:', result);
+            // Если балансы не получены, пытаемся получить из Auth.getUser()
+            const user = Auth.getUser();
+            if (user && user.balance !== undefined) {
+                const balance = parseFloat(user.balance) || 0;
+                userBalances.USD = balance;
+                const formattedBalance = balance.toLocaleString('en-US', { minimumFractionDigits: 2 });
+                
+                const headerBalance = document.getElementById('headerBalance');
+                if (headerBalance) {
+                    headerBalance.textContent = formattedBalance;
+                    console.log('[loadUserBalances] Fallback: Updated header balance from Auth.getUser():', formattedBalance);
+                }
+                
+                const side = window.TradingState?.tradeSide || 'buy';
+                updateTradeUI(side);
             }
         }
     } catch (error) {
-        console.error('Error loading balances:', error);
+        console.error('[loadUserBalances] Error loading balances:', error);
+        // Fallback: пытаемся получить баланс из Auth.getUser()
+        try {
+            const user = Auth.getUser();
+            if (user && user.balance !== undefined) {
+                const balance = parseFloat(user.balance) || 0;
+                userBalances.USD = balance;
+                const formattedBalance = balance.toLocaleString('en-US', { minimumFractionDigits: 2 });
+                
+                const headerBalance = document.getElementById('headerBalance');
+                if (headerBalance) {
+                    headerBalance.textContent = formattedBalance;
+                    console.log('[loadUserBalances] Error fallback: Updated header balance from Auth.getUser():', formattedBalance);
+                }
+            }
+        } catch (fallbackError) {
+            console.error('[loadUserBalances] Fallback error:', fallbackError);
+        }
     }
 }
 
