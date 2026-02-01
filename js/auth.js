@@ -625,12 +625,14 @@ const Auth = {
                 ? `/api/wallet.php?action=balances&_t=${Date.now()}`
                 : '/api/wallet.php?action=balances';
             
-            console.log('[loadBalance] Fetching balance from wallet.php...', { url });
+            const token = this.getToken();
+            console.log('[loadBalance] Fetching balance from wallet.php...', { url, hasToken: !!token });
             const response = await fetch(url, {
                 method: 'GET',
                 headers: {
                     'Accept': 'application/json',
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    ...(token && { 'Authorization': `Bearer ${token}` })
                 },
                 credentials: 'include'
             });

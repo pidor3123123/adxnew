@@ -5,6 +5,14 @@
     RewriteEngine On
     RewriteBase /
     
+    # Pass Authorization header to PHP
+    # Apache by default strips the Authorization header
+    RewriteCond %{HTTP:Authorization} ^(.*)
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%1]
+    
+    # Also set it for CGI/FastCGI mode
+    SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1
+    
     # Перенаправление на HTTPS (раскомментируйте для production)
     # RewriteCond %{HTTPS} off
     # RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]

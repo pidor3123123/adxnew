@@ -1029,8 +1029,8 @@
         
         async function loadBalances(forceRefresh = false) {
             const url = forceRefresh 
-                ? `/wallet.php?action=balances&_t=${Date.now()}`
-                : '/wallet.php?action=balances';
+                ? `/api/wallet.php?action=balances&_t=${Date.now()}`
+                : '/api/wallet.php?action=balances';
             
             console.log('[loadBalances] Starting balance load, forceRefresh:', forceRefresh);
             console.log('[loadBalances] Request URL:', url);
@@ -1038,7 +1038,26 @@
             console.log('[loadBalances] User authenticated:', Auth.isAuthenticated());
             
             try {
-                const result = await API.get(url);
+                const token = Auth.getToken();
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                        ...(token && { 'Authorization': `Bearer ${token}` })
+                    },
+                    credentials: 'include'
+                });
+                
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        console.warn('[loadBalances] 401 Unauthorized - user may need to re-login');
+                        throw new Error('Unauthorized');
+                    }
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const result = await response.json();
                 
                 console.log('[loadBalances] API response received:', {
                     success: result.success,
@@ -1396,7 +1415,27 @@
         
         async function loadTransactions() {
             try {
-                const result = await API.get('/wallet.php?action=transactions', { limit: 10 });
+                const token = Auth.getToken();
+                const url = `/api/wallet.php?action=transactions&limit=10`;
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                        ...(token && { 'Authorization': `Bearer ${token}` })
+                    },
+                    credentials: 'include'
+                });
+                
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        console.warn('[loadTransactions] 401 Unauthorized - user may need to re-login');
+                        return;
+                    }
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const result = await response.json();
                 
                 if (result.success) {
                     renderTransactions(result.transactions);
@@ -1585,10 +1624,30 @@
             }
             
             try {
-                const result = await API.post('/wallet.php?action=deposit', {
-                    currency: currency,
-                    amount: amount
+                const token = Auth.getToken();
+                const response = await fetch('/api/wallet.php?action=deposit', {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                        ...(token && { 'Authorization': `Bearer ${token}` })
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        currency: currency,
+                        amount: amount
+                    })
                 });
+                
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        NovaTrade.showToast('Ошибка', 'Требуется авторизация', 'error');
+                        return;
+                    }
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const result = await response.json();
                 
                 if (result.success) {
                     NovaTrade.showToast('Успешно', 'Баланс пополнен', 'success');
@@ -1610,11 +1669,31 @@
             const formData = new FormData(e.target);
             
             try {
-                const result = await API.post('/wallet.php?action=withdraw', {
-                    currency: formData.get('currency'),
-                    amount: parseFloat(formData.get('amount')),
-                    address: formData.get('address')
+                const token = Auth.getToken();
+                const response = await fetch('/api/wallet.php?action=withdraw', {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                        ...(token && { 'Authorization': `Bearer ${token}` })
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        currency: formData.get('currency'),
+                        amount: parseFloat(formData.get('amount')),
+                        address: formData.get('address')
+                    })
                 });
+                
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        NovaTrade.showToast('Ошибка', 'Требуется авторизация', 'error');
+                        return;
+                    }
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const result = await response.json();
                 
                 if (result.success) {
                     NovaTrade.showToast('Успешно', 'Заявка на вывод создана', 'success');
@@ -1622,6 +1701,8 @@
                     e.target.reset();
                     await loadBalances();
                     await loadTransactions();
+                } else {
+                    NovaTrade.showToast('Ошибка', result.error || 'Не удалось создать заявку на вывод', 'error');
                 }
             } catch (error) {
                 NovaTrade.showToast('Ошибка', error.message, 'error');

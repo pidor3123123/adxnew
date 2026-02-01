@@ -244,59 +244,86 @@ function createSkeleton(type = 'text', count = 1) {
 
 /**
  * Управление выпадающим меню пользователя
+ * Использует portal pattern - перемещает dropdown в body для выхода из stacking context
  */
 function initUserMenu() {
-    const userMenu = document.querySelector('.user-menu');
-    if (!userMenu) return;
+    const trigger = document.querySelector('.user-menu-trigger');
+    const dropdown = document.querySelector('.user-dropdown');
     
-    // Проверяем, видно ли меню (может быть скрыто через data-auth)
-    const computedStyle = window.getComputedStyle(userMenu);
-    if (computedStyle.display === 'none') {
-        // Меню скрыто, возможно еще не обновлен UI - попробуем позже
-        return;
+    if (!trigger || !dropdown) return;
+    if (trigger.dataset.initialized === 'true') return;
+    
+    // Move dropdown to body to escape stacking context
+    if (dropdown.parentElement !== document.body) {
+        document.body.appendChild(dropdown);
     }
     
-    const trigger = userMenu.querySelector('.user-menu-trigger');
-    if (!trigger) return;
-    
-    // Проверяем, не инициализировано ли уже меню
-    if (trigger.dataset.initialized === 'true') {
-        return;
-    }
-    
-    // Удаляем старые обработчики если есть
-    const newTrigger = trigger.cloneNode(true);
-    trigger.parentNode.replaceChild(newTrigger, trigger);
-    
-    // Добавляем обработчик клика
-    newTrigger.addEventListener('click', (e) => {
+    // Position dropdown below trigger on click
+    trigger.addEventListener('click', (e) => {
         e.stopPropagation();
         e.preventDefault();
-        userMenu.classList.toggle('open');
+        
+        const isOpen = dropdown.classList.contains('open');
+        
+        if (isOpen) {
+            // Close menu and reset inline styles
+            dropdown.classList.remove('open');
+            dropdown.style.display = '';  // Reset to CSS default
+            dropdown.style.visibility = '';  // Reset visibility
+        } else {
+            // Open menu - calculate position
+            // First make dropdown visible temporarily to get its width
+            dropdown.style.display = 'block';
+            dropdown.style.visibility = 'hidden';
+            
+            const rect = trigger.getBoundingClientRect();
+            const dropdownWidth = dropdown.offsetWidth;
+            
+            // Position dropdown: right edge of menu aligns with right edge of trigger
+            dropdown.style.top = `${rect.bottom + 8}px`;
+            dropdown.style.left = `${rect.right - dropdownWidth}px`;
+            dropdown.style.right = 'auto';
+            
+            // Make it visible again and add open class
+            dropdown.style.visibility = '';
+            dropdown.classList.add('open');
+        }
     });
     
-    // Помечаем как инициализированное
-    newTrigger.dataset.initialized = 'true';
+    trigger.dataset.initialized = 'true';
     
-    // Закрываем меню при клике вне его (только один обработчик на документ)
+    // Close on click outside (only one handler per document)
     if (!document.userMenuClickHandler) {
         document.userMenuClickHandler = (e) => {
-            const allUserMenus = document.querySelectorAll('.user-menu');
-            allUserMenus.forEach(menu => {
-                if (!menu.contains(e.target)) {
-                    menu.classList.remove('open');
-                }
-            });
+            if (!dropdown.contains(e.target) && !trigger.contains(e.target)) {
+                dropdown.classList.remove('open');
+                // Reset inline styles when closing
+                dropdown.style.display = '';
+                dropdown.style.visibility = '';
+            }
         };
         document.addEventListener('click', document.userMenuClickHandler);
     }
     
-    // Закрываем меню при клике на элемент внутри dropdown
-    const dropdownItems = userMenu.querySelectorAll('.dropdown-item');
-    dropdownItems.forEach(item => {
+    // Close on dropdown item click
+    dropdown.querySelectorAll('.dropdown-item').forEach(item => {
         item.addEventListener('click', () => {
-            userMenu.classList.remove('open');
+            dropdown.classList.remove('open');
+            // Reset inline styles when closing
+            dropdown.style.display = '';
+            dropdown.style.visibility = '';
         });
+    });
+    
+    // Reposition on window resize
+    window.addEventListener('resize', () => {
+        if (dropdown.classList.contains('open')) {
+            const rect = trigger.getBoundingClientRect();
+            const dropdownWidth = dropdown.offsetWidth;
+            dropdown.style.top = `${rect.bottom + 8}px`;
+            dropdown.style.left = `${rect.right - dropdownWidth}px`;
+            dropdown.style.right = 'auto';
+        }
     });
 }
 

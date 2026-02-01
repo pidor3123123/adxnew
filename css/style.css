@@ -617,23 +617,18 @@ h6 { font-size: 1rem; }
 }
 
 .user-dropdown {
-    position: absolute;
-    top: calc(100% + 8px);
-    right: 0;
+    position: fixed;
+    top: auto;
+    left: auto;
+    right: auto;
     min-width: 220px;
     background: var(--bg-elevated);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-lg);
-    opacity: 0;
-    visibility: hidden;
-    transform: translateY(-8px);
-    transition: all var(--transition-fast);
-    z-index: 10000 !important;
+    display: none;
+    z-index: 999999 !important;
     overflow: visible !important;
-    overflow-x: visible !important;
-    overflow-y: visible !important;
-    max-height: none !important;
     pointer-events: auto !important;
 }
 
@@ -641,10 +636,8 @@ h6 { font-size: 1rem; }
     pointer-events: auto !important;
 }
 
-.user-menu.open .user-dropdown {
-    opacity: 1;
-    visibility: visible;
-    transform: translateY(0);
+.user-dropdown.open {
+    display: block;
     pointer-events: auto !important;
 }
 
@@ -652,6 +645,15 @@ h6 { font-size: 1rem; }
 .user-menu.open .user-dropdown,
 .user-menu.open .user-dropdown * {
     pointer-events: auto !important;
+}
+
+/* Force user-dropdown to be fully visible - override header restrictions */
+.user-dropdown,
+.user-dropdown *,
+.user-menu.open .user-dropdown,
+.user-menu.open .user-dropdown * {
+    max-height: none !important;
+    overflow: visible !important;
 }
 
 .user-menu.open .user-menu-trigger {

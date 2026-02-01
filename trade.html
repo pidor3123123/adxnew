@@ -2050,22 +2050,13 @@
         function calculateStopLossFromTime(minutes, entryPrice, side) {
             if (!entryPrice || entryPrice <= 0) return 0;
             
-            // SL обычно составляет 50% от потенциальной прибыли
-            const profitPercent = {
-                1: 2,
-                5: 6,
-                15: 10,
-                30: 12,
-                60: 15,
-                240: 18
-            };
-            
-            const percent = (profitPercent[minutes] || 2) * 0.5; // 50% от TP
+            // Fixed -5% Stop Loss for all timeframes
+            const percent = 5;
             
             if (side === 'buy') {
-                return entryPrice * (1 - percent / 100);
+                return entryPrice * (1 - percent / 100);  // Price - 5%
             } else {
-                return entryPrice * (1 + percent / 100);
+                return entryPrice * (1 + percent / 100);  // Price + 5%
             }
         }
         
@@ -2076,11 +2067,8 @@
             const minutes = parseInt(timeBtn.dataset.minutes) || 1;
             const side = document.querySelector('#quickTradeMode .trade-tab.active')?.dataset.side || 'buy';
             
-            // Получаем текущую цену актива
-            const priceEl = document.getElementById('quickTradePrice');
-            if (!priceEl) return;
-            
-            const entryPrice = parseFloat(priceEl.textContent.replace(/[^0-9.]/g, '')) || 0;
+            // Use currentAsset.price instead of reading from DOM
+            const entryPrice = window.currentAsset?.price || 0;
             if (entryPrice <= 0) return;
             
             const tp = calculateTakeProfitFromTime(minutes, entryPrice, side);
@@ -2209,10 +2197,12 @@
                             }
                         }
                         
-                        // Получаем цену из currentAsset
-                        const price = (typeof window.currentAsset !== 'undefined' && window.currentAsset.price) 
-                            ? window.currentAsset.price 
-                            : (typeof currentAsset !== 'undefined' && currentAsset.price ? currentAsset.price : 0);
+                        // Get price with fallback
+                        let price = window.currentAsset?.price || 0;
+                        if (price === 0 && typeof MarketAPI !== 'undefined') {
+                            const symbol = window.currentAsset?.symbol || TradingState.currentSymbol || 'BTC';
+                            price = MarketAPI.basePrices?.[symbol] || MarketAPI.basePrices?.['BTC'] || 78350;
+                        }
                         
                         console.log('[Percentage Button] percent:', percent, 'available:', available, 'price:', price);
                         
@@ -2281,10 +2271,12 @@
                             }
                         }
                         
-                        // Получаем цену из currentAsset
-                        const price = (typeof window.currentAsset !== 'undefined' && window.currentAsset.price) 
-                            ? window.currentAsset.price 
-                            : (typeof currentAsset !== 'undefined' && currentAsset.price ? currentAsset.price : 0);
+                        // Get price with fallback
+                        let price = window.currentAsset?.price || 0;
+                        if (price === 0 && typeof MarketAPI !== 'undefined') {
+                            const symbol = window.currentAsset?.symbol || TradingState.currentSymbol || 'BTC';
+                            price = MarketAPI.basePrices?.[symbol] || MarketAPI.basePrices?.['BTC'] || 78350;
+                        }
                         
                         if (price > 0 && available > 0) {
                             const quantity = (available * percent / 100) / price;
@@ -2325,17 +2317,18 @@
         // Функция обновления сводки быстрой торговли
         function updateQuickTradeSummary() {
             const quantityInput = document.getElementById('quickQuantity');
-            const priceEl = document.getElementById('quickTradePrice');
             const feeEl = document.getElementById('quickTradeFee');
             const totalEl = document.getElementById('quickTradeTotal');
             
-            if (!quantityInput || !priceEl || !feeEl || !totalEl) return;
+            if (!quantityInput || !feeEl || !totalEl) return;
             
             const quantity = parseFloat(quantityInput.value) || 0;
-            const marketPrice = parseFloat(priceEl.textContent.replace(/[^0-9.]/g, '')) || 0;
             
-            if (marketPrice > 0) {
-                const total = quantity * marketPrice;
+            // Use currentAsset.price instead of reading from DOM
+            const price = window.currentAsset?.price || 0;
+            
+            if (price > 0) {
+                const total = quantity * price;
                 const fee = total * 0.001;
                 const finalTotal = total + fee;
                 
@@ -2380,16 +2373,16 @@
         
         function updateTradeSummary() {
             const quantityInput = document.getElementById('quantity');
-            const priceEl = document.getElementById('tradePrice');
             const feeEl = document.getElementById('tradeFee');
             const totalEl = document.getElementById('tradeTotal');
             
-            if (!quantityInput || !priceEl || !feeEl || !totalEl) return;
+            if (!quantityInput || !feeEl || !totalEl) return;
             
             const quantity = parseFloat(quantityInput.value) || 0;
-            const marketPrice = parseFloat(priceEl.textContent.replace(/[^0-9.]/g, '')) || 0;
             
-            let price = marketPrice;
+            // Use currentAsset.price instead of reading from DOM
+            let price = window.currentAsset?.price || 0;
+            
             if (TradingState.orderType === 'limit') {
                 const limitPriceInput = document.getElementById('limitPrice');
                 if (limitPriceInput) {
