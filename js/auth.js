@@ -620,13 +620,26 @@ const Auth = {
         }
         
         try {
-            // Используем /wallet.php?action=balances как единый источник данных (Supabase)
+            // Используем /api/wallet.php?action=balances как единый источник данных (Supabase)
             const url = forceRefresh 
-                ? `/wallet.php?action=balances&_t=${Date.now()}`
-                : '/wallet.php?action=balances';
+                ? `/api/wallet.php?action=balances&_t=${Date.now()}`
+                : '/api/wallet.php?action=balances';
             
             console.log('[loadBalance] Fetching balance from wallet.php...', { url });
-            const result = await API.get(url);
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+                credentials: 'include'
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const result = await response.json();
             console.log('[loadBalance] API response received:', {
                 success: result.success,
                 balancesCount: result.balances?.length || 0,

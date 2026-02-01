@@ -610,13 +610,26 @@ async function loadUserBalances(forceRefresh = false) {
     }
     
     try {
-        // Используем /wallet.php?action=balances как единый источник данных (Supabase)
+        // Используем /api/wallet.php?action=balances как единый источник данных (Supabase)
         const url = forceRefresh 
-            ? `/wallet.php?action=balances&_t=${Date.now()}`
-            : '/wallet.php?action=balances';
+            ? `/api/wallet.php?action=balances&_t=${Date.now()}`
+            : '/api/wallet.php?action=balances';
         
         console.log('[loadUserBalances] Fetching balances from wallet.php...', { url });
-        const result = await API.get(url);
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            },
+            credentials: 'include'
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
         console.log('[loadUserBalances] API response received:', {
             success: result.success,
             balancesCount: result.balances?.length || 0,
@@ -718,6 +731,7 @@ async function updateAssetPrice() {
     
     try {
         const symbol = currentAsset.symbol.toUpperCase();
+        console.log(`[updateAssetPrice] Starting price update for ${symbol}, current price: $${currentAsset.price || 0}`);
         
         // Определяем тип рынка
         const cryptoSymbols = ['BTC', 'ETH', 'BNB', 'XRP', 'SOL', 'ADA', 'DOGE', 'DOT', 'MATIC', 'LTC'];
@@ -752,24 +766,34 @@ async function updateAssetPrice() {
             
             if (coin && coin.current_price) {
                 newPrice = coin.current_price;
-                console.log(`Updated ${symbol} price: $${newPrice}`);
+                console.log(`[updateAssetPrice] Updated ${symbol} price from API: $${newPrice}`);
             } else {
-                console.warn(`Coin not found for symbol ${symbol}`, cryptoData);
+                console.warn(`[updateAssetPrice] Coin not found for symbol ${symbol}`, cryptoData);
             }
         } else if (stockSymbols.includes(symbol)) {
             // Акции: получаем из Alpha Vantage или списка акций
             const stocksData = await MarketAPI.getStockPrices();
+            console.log(`[updateAssetPrice] Fetched ${stocksData.length} stocks from API`);
             const stock = stocksData.find(s => s.symbol.toUpperCase() === symbol);
             if (stock && stock.price) {
                 newPrice = stock.price;
+                console.log(`[updateAssetPrice] Updated ${symbol} stock price from API: $${newPrice}`);
+            } else {
+                console.warn(`[updateAssetPrice] Stock not found for symbol ${symbol}`);
             }
         } else if (forexSymbols.includes(symbol)) {
             // Форекс: получаем из списка форекс
             const forexData = await MarketAPI.getForexRates();
+            console.log(`[updateAssetPrice] Fetched ${forexData.length} forex pairs from API`);
             const forex = forexData.find(f => f.symbol.toUpperCase() === symbol);
             if (forex && forex.price) {
                 newPrice = forex.price;
+                console.log(`[updateAssetPrice] Updated ${symbol} forex price from API: $${newPrice}`);
+            } else {
+                console.warn(`[updateAssetPrice] Forex pair not found for symbol ${symbol}`);
             }
+        } else {
+            console.warn(`[updateAssetPrice] Unknown symbol type: ${symbol}`);
         }
         
         // Обновляем цену, если получили новую
@@ -803,17 +827,24 @@ async function updateAssetPrice() {
                 
                 // Update global reference
                 window.currentAsset = currentAsset;
+                console.log(`[updateAssetPrice] Updated window.currentAsset.price to $${newPrice}`);
                 
                 // Обновляем цену в UI для обычной торговли
                 const tradePriceEl = document.getElementById('tradePrice');
                 if (tradePriceEl) {
-                    tradePriceEl.textContent = NovaTrade.formatCurrency(newPrice);
+                    const formattedPrice = NovaTrade.formatCurrency(newPrice);
+                    tradePriceEl.textContent = formattedPrice;
+                    console.log(`[updateAssetPrice] Updated tradePrice element: ${formattedPrice}`);
+                } else {
+                    console.warn('[updateAssetPrice] tradePrice element not found');
                 }
                 
                 // Обновляем цену в UI для быстрой торговли (используем напрямую newPrice)
                 const quickTradePriceEl = document.getElementById('quickTradePrice');
                 if (quickTradePriceEl) {
-                    quickTradePriceEl.textContent = NovaTrade.formatCurrency(newPrice);
+                    const formattedPrice = NovaTrade.formatCurrency(newPrice);
+                    quickTradePriceEl.textContent = formattedPrice;
+                    console.log(`[updateAssetPrice] Updated quickTradePrice element: ${formattedPrice}`);
                     // Обновляем TP/SL и сводку для быстрой торговли
                     if (typeof window.updateQuickTradeTPSL === 'function') {
                         window.updateQuickTradeTPSL();
@@ -821,6 +852,8 @@ async function updateAssetPrice() {
                     if (typeof window.updateQuickTradeSummary === 'function') {
                         window.updateQuickTradeSummary();
                     }
+                } else {
+                    console.warn('[updateAssetPrice] quickTradePrice element not found');
                 }
                 
                 // Обновляем сводки
@@ -856,10 +889,13 @@ async function updateAssetPrice() {
         } else {
             console.warn(`Failed to get price for ${symbol}, newPrice:`, newPrice);
         }
-    } catch (error) {
-        console.error('Error updating asset price:', error);
+        } catch (error) {
+            console.error('[updateAssetPrice] Error updating asset price:', error);
+            console.error('[updateAssetPrice] Error stack:', error.stack);
+        }
+    } else {
+        console.warn(`[updateAssetPrice] No price received or price is 0. newPrice: ${newPrice}`);
     }
-}
 
 /**
  * Realtime price updates from API

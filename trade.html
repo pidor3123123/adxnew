@@ -1796,20 +1796,27 @@
                     TradingState.chartWidget = new TradingView.widget(widgetConfig);
                     chartWidget = TradingState.chartWidget;
                     
-                    // Подписываемся на события виджета для синхронизации цены
-                    if (chartWidget) {
-                        // Когда график готов, синхронизируем цену
-                        chartWidget.on('chart_ready', () => {
-                            console.log('TradingView chart ready - syncing price');
-                            setTimeout(() => syncPriceFromTradingView(), 500);
-                        });
-                        
-                        // Когда меняется символ, обновляем цену
-                        chartWidget.on('symbol_changed', (data) => {
-                            console.log('TradingView symbol changed:', data);
-                            setTimeout(() => syncPriceFromTradingView(), 1000);
-                        });
-                    }
+                    // TradingView widget не предоставляет публичный API для событий
+                    // Используем setTimeout для отложенного обновления цены после создания виджета
+                    console.log('[TradingView] Widget created, scheduling price sync...');
+                    
+                    // Обновляем цену через 2 секунды после создания виджета (даем время на загрузку)
+                    setTimeout(async () => {
+                        console.log('[TradingView] Syncing price after widget initialization');
+                        // Обновляем цену из API
+                        if (typeof window.updateAssetPrice === 'function') {
+                            await window.updateAssetPrice();
+                        }
+                        // Обновляем UI
+                        if (typeof updateQuickTradePrice === 'function') {
+                            updateQuickTradePrice();
+                        }
+                        if (typeof updateNormalTradePrice === 'function') {
+                            updateNormalTradePrice();
+                        }
+                        // Продолжаем периодическое обновление
+                        syncPriceFromTradingView();
+                    }, 2000);
                 }
             }
             
@@ -1931,9 +1938,15 @@
                 
                 // Если актив не найден, создаем его с базовыми данными
                 if (!asset) {
-                    const basePrice = (typeof MarketAPI !== 'undefined' && MarketAPI.basePrices) 
-                        ? (MarketAPI.basePrices[baseSymbol] || MarketAPI.basePrices[baseSymbol.toLowerCase()] || 100)
-                        : 100;
+                    // Используем реальную базовую цену из MarketAPI, если доступна
+                    let basePrice = 43250; // Дефолт для BTC
+                    if (typeof MarketAPI !== 'undefined' && MarketAPI.basePrices) {
+                        basePrice = MarketAPI.basePrices[baseSymbol] 
+                            || MarketAPI.basePrices[baseSymbol.toLowerCase()] 
+                            || MarketAPI.basePrices['BTC'] 
+                            || 43250; // Fallback на BTC цену
+                    }
+                    console.log(`[updateChart] Creating asset for ${baseSymbol} with base price: $${basePrice}`);
                     
                     // Определяем тип рынка по символу
                     let market = 'crypto';
@@ -2321,19 +2334,25 @@
         // Обновляем цену для быстрой торговли при смене актива
         function updateNormalTradePrice() {
             const priceEl = document.getElementById('tradePrice');
-            if (!priceEl) return;
+            if (!priceEl) {
+                console.warn('[updateNormalTradePrice] tradePrice element not found');
+                return;
+            }
             
             // Используем currentAsset.price напрямую (самый надежный источник)
             let price = 0;
             if (typeof window.currentAsset !== 'undefined' && window.currentAsset.price && window.currentAsset.price > 0) {
                 price = window.currentAsset.price;
+                console.log(`[updateNormalTradePrice] Using currentAsset.price: $${price}`);
             } else {
+                console.warn(`[updateNormalTradePrice] currentAsset.price is invalid: ${window.currentAsset?.price || 'undefined'}`);
                 // Fallback: пытаемся получить цену из быстрой торговли
                 const quickPriceEl = document.getElementById('quickTradePrice');
                 if (quickPriceEl && quickPriceEl.textContent !== '$0.00') {
                     const parsedPrice = parseFloat(quickPriceEl.textContent.replace(/[^0-9.]/g, ''));
                     if (parsedPrice > 0 && parsedPrice < 1000000) { // Проверка на разумность цены
                         price = parsedPrice;
+                        console.log(`[updateNormalTradePrice] Using fallback price from quickTradePrice: $${price}`);
                     }
                 }
             }
@@ -2341,29 +2360,39 @@
             if (price > 0) {
                 // Форматируем цену с правильным количеством знаков после запятой
                 const decimals = window.currentAsset?.decimals || 2;
-                priceEl.textContent = `$${price.toFixed(decimals)}`;
+                const formattedPrice = `$${price.toFixed(decimals)}`;
+                priceEl.textContent = formattedPrice;
+                console.log(`[updateNormalTradePrice] Updated tradePrice to: ${formattedPrice}`);
                 // Обновляем сводку после обновления цены
                 if (typeof updateTradeSummary === 'function') {
                     updateTradeSummary();
                 }
+            } else {
+                console.warn(`[updateNormalTradePrice] Price is 0 or invalid, not updating UI`);
             }
         }
         
         function updateQuickTradePrice() {
             const priceEl = document.getElementById('quickTradePrice');
-            if (!priceEl) return;
+            if (!priceEl) {
+                console.warn('[updateQuickTradePrice] quickTradePrice element not found');
+                return;
+            }
             
             // Используем currentAsset.price напрямую (самый надежный источник)
             let price = 0;
             if (typeof window.currentAsset !== 'undefined' && window.currentAsset.price && window.currentAsset.price > 0) {
                 price = window.currentAsset.price;
+                console.log(`[updateQuickTradePrice] Using currentAsset.price: $${price}`);
             } else {
+                console.warn(`[updateQuickTradePrice] currentAsset.price is invalid: ${window.currentAsset?.price || 'undefined'}`);
                 // Fallback: пытаемся получить цену из обычной торговли
                 const normalPriceEl = document.getElementById('tradePrice');
                 if (normalPriceEl && normalPriceEl.textContent !== '$0.00') {
                     const parsedPrice = parseFloat(normalPriceEl.textContent.replace(/[^0-9.]/g, ''));
                     if (parsedPrice > 0 && parsedPrice < 1000000) { // Проверка на разумность цены
                         price = parsedPrice;
+                        console.log(`[updateQuickTradePrice] Using fallback price from tradePrice: $${price}`);
                     }
                 }
             }
@@ -2371,9 +2400,13 @@
             if (price > 0) {
                 // Форматируем цену с правильным количеством знаков после запятой
                 const decimals = window.currentAsset?.decimals || 2;
-                priceEl.textContent = `$${price.toFixed(decimals)}`;
+                const formattedPrice = `$${price.toFixed(decimals)}`;
+                priceEl.textContent = formattedPrice;
+                console.log(`[updateQuickTradePrice] Updated quickTradePrice to: ${formattedPrice}`);
                 updateQuickTradeTPSL();
                 updateQuickTradeSummary();
+            } else {
+                console.warn(`[updateQuickTradePrice] Price is 0 or invalid, not updating UI`);
             }
         }
         
@@ -2664,6 +2697,35 @@
             initTradingTerminal();
             initAssetDropdown();
             initMarketOverview();
+            
+            // Загружаем список активов и обновляем цену после инициализации
+            setTimeout(async () => {
+                try {
+                    // Загружаем список активов, если функция доступна
+                    if (typeof loadAssetList === 'function') {
+                        await loadAssetList();
+                        console.log('[trade.html] Asset list loaded');
+                    }
+                    
+                    // Обновляем цену из API
+                    if (typeof window.updateAssetPrice === 'function') {
+                        await window.updateAssetPrice();
+                        console.log('[trade.html] Asset price updated from API');
+                    }
+                    
+                    // Принудительно обновляем UI цены
+                    if (typeof updateQuickTradePrice === 'function') {
+                        updateQuickTradePrice();
+                        console.log('[trade.html] Quick trade price UI updated');
+                    }
+                    if (typeof updateNormalTradePrice === 'function') {
+                        updateNormalTradePrice();
+                        console.log('[trade.html] Normal trade price UI updated');
+                    }
+                } catch (error) {
+                    console.error('[trade.html] Error updating price on load:', error);
+                }
+            }, 1000); // Даем время на загрузку API и инициализацию
             
             // Инициализация user menu (после обновления UI)
             setTimeout(() => {
