@@ -2199,15 +2199,32 @@
             document.querySelectorAll('#normalTradeMode .trade-percent-btn').forEach(btn => {
                 btn.addEventListener('click', () => {
                     const percent = parseFloat(btn.dataset.percent);
-                    const availableEl = document.getElementById('availableBalance');
-                    const priceEl = document.getElementById('tradePrice');
-                    if (availableEl && priceEl && quantityInput) {
-                        const available = parseFloat(availableEl.textContent.replace(/[^0-9.]/g, ''));
-                        const price = parseFloat(priceEl.textContent.replace(/[^0-9.]/g, ''));
-                        if (price > 0) {
+                    if (quantityInput) {
+                        // Получаем баланс из Auth или используем значение по умолчанию
+                        let available = 0;
+                        if (typeof Auth !== 'undefined' && typeof Auth.getUser === 'function') {
+                            const user = Auth.getUser();
+                            if (user && user.balances) {
+                                const usdBalance = user.balances.find(b => b.currency === 'USD');
+                                if (usdBalance) {
+                                    available = parseFloat(usdBalance.available || 0);
+                                }
+                            }
+                        }
+                        
+                        // Получаем цену из currentAsset
+                        const price = (typeof window.currentAsset !== 'undefined' && window.currentAsset.price) 
+                            ? window.currentAsset.price 
+                            : (typeof currentAsset !== 'undefined' && currentAsset.price ? currentAsset.price : 0);
+                        
+                        if (price > 0 && available > 0) {
                             const quantity = (available * percent / 100) / price;
                             quantityInput.value = quantity.toFixed(8);
-                            updateTradeSummary();
+                            if (typeof updateTradeSummary === 'function') {
+                                updateTradeSummary();
+                            }
+                        } else {
+                            console.warn('[Percentage Button] Cannot calculate: price=', price, 'available=', available);
                         }
                     }
                 });
@@ -2254,17 +2271,32 @@
             document.querySelectorAll('#quickTradeMode .trade-percent-btn').forEach(btn => {
                 btn.addEventListener('click', () => {
                     const percent = parseFloat(btn.dataset.percent);
-                    const availableEl = document.getElementById('quickAvailableBalance');
-                    const priceEl = document.getElementById('quickTradePrice');
-                    if (availableEl && priceEl && quickQuantityInput) {
-                        const available = parseFloat(availableEl.textContent.replace(/[^0-9.]/g, ''));
-                        const price = parseFloat(priceEl.textContent.replace(/[^0-9.]/g, ''));
-                        if (price > 0) {
+                    if (quickQuantityInput) {
+                        // Получаем баланс из Auth или используем значение по умолчанию
+                        let available = 0;
+                        if (typeof Auth !== 'undefined' && typeof Auth.getUser === 'function') {
+                            const user = Auth.getUser();
+                            if (user && user.balances) {
+                                const usdBalance = user.balances.find(b => b.currency === 'USD');
+                                if (usdBalance) {
+                                    available = parseFloat(usdBalance.available || 0);
+                                }
+                            }
+                        }
+                        
+                        // Получаем цену из currentAsset
+                        const price = (typeof window.currentAsset !== 'undefined' && window.currentAsset.price) 
+                            ? window.currentAsset.price 
+                            : (typeof currentAsset !== 'undefined' && currentAsset.price ? currentAsset.price : 0);
+                        
+                        if (price > 0 && available > 0) {
                             const quantity = (available * percent / 100) / price;
                             quickQuantityInput.value = quantity.toFixed(8);
                             if (typeof updateQuickTradeSummary === 'function') {
                                 updateQuickTradeSummary();
                             }
+                        } else {
+                            console.warn('[Quick Percentage Button] Cannot calculate: price=', price, 'available=', available);
                         }
                     }
                 });

@@ -1029,8 +1029,8 @@
         
         async function loadBalances(forceRefresh = false) {
             const url = forceRefresh 
-                ? `/wallet.php?action=balances&_t=${Date.now()}`
-                : '/wallet.php?action=balances';
+                ? `/api/wallet.php?action=balances&_t=${Date.now()}`
+                : '/api/wallet.php?action=balances';
             
             console.log('[loadBalances] Starting balance load, forceRefresh:', forceRefresh);
             console.log('[loadBalances] Request URL:', url);
@@ -1076,6 +1076,11 @@
                     if (headerBalanceEl) {
                         headerBalanceEl.textContent = 
                             (balances.USD || 0).toLocaleString('en-US', { minimumFractionDigits: 2 });
+                    }
+                    
+                    // Обновляем доступный баланс в форме вывода
+                    if (typeof updateWithdrawAvailable === 'function') {
+                        updateWithdrawAvailable();
                     }
                     
                     console.log('[loadBalances] Balance display updated successfully');
@@ -1391,7 +1396,7 @@
         
         async function loadTransactions() {
             try {
-                const result = await API.get('/wallet.php?action=transactions', { limit: 10 });
+                const result = await API.get('/api/wallet.php?action=transactions', { limit: 10 });
                 
                 if (result.success) {
                     renderTransactions(result.transactions);
@@ -1580,7 +1585,7 @@
             }
             
             try {
-                const result = await API.post('/wallet.php?action=deposit', {
+                const result = await API.post('/api/wallet.php?action=deposit', {
                     currency: currency,
                     amount: amount
                 });
@@ -1605,7 +1610,7 @@
             const formData = new FormData(e.target);
             
             try {
-                const result = await API.post('/wallet.php?action=withdraw', {
+                const result = await API.post('/api/wallet.php?action=withdraw', {
                     currency: formData.get('currency'),
                     amount: parseFloat(formData.get('amount')),
                     address: formData.get('address')
