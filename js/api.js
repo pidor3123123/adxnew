@@ -174,6 +174,57 @@ const MarketAPI = {
     cache: new Map(),
     cacheTime: 10000, // 10 секунд для более актуальных данных
     
+    // Finnhub API теперь используется через PHP прокси (api/market.php)
+    // Это позволяет избежать проблем с CORS
+    
+    /**
+     * Получить котировку акции через PHP прокси (избегаем CORS)
+     */
+    async getStockQuote(symbol) {
+        try {
+            const response = await fetch(`/api/market.php?action=stock_quote&symbol=${encodeURIComponent(symbol)}`, {
+                headers: {
+                    'Accept': 'application/json',
+                    'Cache-Control': 'no-cache'
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const result = await response.json();
+            
+            if (result.success && result.data && result.data.price > 0) {
+                // Обновляем базовую цену
+                this.basePrices[symbol] = result.data.price;
+                return {
+                    price: result.data.price,
+                    change: result.data.change || 0,
+                    changePercent: result.data.changePercent || 0,
+                    high: result.data.high || result.data.price,
+                    low: result.data.low || result.data.price,
+                    open: result.data.open || result.data.price,
+                    previousClose: result.data.previousClose || result.data.price
+                };
+            }
+        } catch (error) {
+            console.warn(`[MarketAPI] Failed to fetch stock quote for ${symbol}:`, error);
+        }
+        
+        // Fallback на базовую цену
+        const basePrice = this.basePrices[symbol] || 100;
+        return {
+            price: basePrice,
+            change: 0,
+            changePercent: 0,
+            high: basePrice,
+            low: basePrice,
+            open: basePrice,
+            previousClose: basePrice
+        };
+    }
+    
     /**
      * Получить данные с кэшированием
      */
@@ -317,44 +368,169 @@ const MarketAPI = {
     },
     
     /**
-     * Получить данные акций (моковые данные)
+     * Получить данные акций через PHP прокси (избегаем CORS)
      */
     async getStockPrices() {
         return this.getCached('stock_prices', async () => {
-            // Актуальные цены акций (обновлено 01.02.2026)
-            // TODO: В продакшене заменить на реальное API (Alpha Vantage, Yahoo Finance)
-            return [
-                { symbol: 'AAPL', name: 'Apple Inc.', price: 225.50, change: 1.85, changePercent: 0.83 },
-                { symbol: 'GOOGL', name: 'Alphabet Inc.', price: 195.20, change: 2.15, changePercent: 1.11 },
-                { symbol: 'MSFT', name: 'Microsoft Corp.', price: 415.80, change: 3.20, changePercent: 0.78 },
-                { symbol: 'AMZN', name: 'Amazon.com Inc.', price: 228.40, change: 4.50, changePercent: 2.01 },
-                { symbol: 'TSLA', name: 'Tesla Inc.', price: 395.60, change: -8.20, changePercent: -2.03 },
-                { symbol: 'META', name: 'Meta Platforms', price: 615.30, change: 12.40, changePercent: 2.06 },
-                { symbol: 'NVDA', name: 'NVIDIA Corp.', price: 191.50, change: -0.24, changePercent: -0.13 },
-                { symbol: 'JPM', name: 'JPMorgan Chase', price: 255.40, change: 1.85, changePercent: 0.73 },
-                { symbol: 'V', name: 'Visa Inc.', price: 325.20, change: 2.10, changePercent: 0.65 },
-                { symbol: 'JNJ', name: 'Johnson & Johnson', price: 148.90, change: -0.45, changePercent: -0.30 }
+            const maxRetries = 3;
+            const retryDelay = 1000;
+            
+            for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                try {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 10000);
+                    
+                    // Используем PHP прокси вместо прямого запроса к Finnhub
+                    const response = await fetch('/api/market.php?action=stocks', {
+                        signal: controller.signal,
+                        headers: {
+                            'Accept': 'application/json',
+                            'Cache-Control': 'no-cache'
+                        }
+                    });
+                    
+                    clearTimeout(timeoutId);
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    
+                    const result = await response.json();
+                    
+                    if (result.success && Array.isArray(result.data) && result.data.length > 0) {
+                        // Обновляем базовые цены для fallback
+                        result.data.forEach(stock => {
+                            if (stock.price > 0) {
+                                this.basePrices[stock.symbol] = stock.price;
+                            }
+                        });
+                        return result.data;
+                    }
+                } catch (error) {
+                    console.warn(`[MarketAPI] Failed to fetch stock prices (attempt ${attempt}):`, error);
+                    if (attempt < maxRetries) {
+                        await new Promise(resolve => setTimeout(resolve, retryDelay * attempt));
+                    }
+                }
+            }
+            
+            // Fallback на базовые цены
+            const stockList = [
+                { symbol: 'AAPL', name: 'Apple Inc.' },
+                { symbol: 'GOOGL', name: 'Alphabet Inc.' },
+                { symbol: 'MSFT', name: 'Microsoft Corp.' },
+                { symbol: 'AMZN', name: 'Amazon.com Inc.' },
+                { symbol: 'TSLA', name: 'Tesla Inc.' },
+                { symbol: 'META', name: 'Meta Platforms' },
+                { symbol: 'NVDA', name: 'NVIDIA Corp.' },
+                { symbol: 'JPM', name: 'JPMorgan Chase' },
+                { symbol: 'V', name: 'Visa Inc.' },
+                { symbol: 'JNJ', name: 'Johnson & Johnson' }
             ];
+            
+            return stockList.map(stock => ({
+                symbol: stock.symbol,
+                name: stock.name,
+                price: this.basePrices[stock.symbol] || 100,
+                change: 0,
+                changePercent: 0
+            }));
         });
     },
     
     /**
-     * Получить курсы форекс (моковые данные)
+     * Получить курсы форекс через PHP прокси (избегаем CORS)
      */
     async getForexRates() {
         return this.getCached('forex_rates', async () => {
-            return [
-                { symbol: 'EURUSD', name: 'EUR/USD', price: 1.0872, change: 0.0015, changePercent: 0.14 },
-                { symbol: 'GBPUSD', name: 'GBP/USD', price: 1.2698, change: -0.0023, changePercent: -0.18 },
-                { symbol: 'USDJPY', name: 'USD/JPY', price: 148.52, change: 0.45, changePercent: 0.30 },
-                { symbol: 'USDCHF', name: 'USD/CHF', price: 0.8742, change: 0.0012, changePercent: 0.14 },
-                { symbol: 'AUDUSD', name: 'AUD/USD', price: 0.6578, change: 0.0028, changePercent: 0.43 },
-                { symbol: 'USDCAD', name: 'USD/CAD', price: 1.3485, change: -0.0018, changePercent: -0.13 },
-                { symbol: 'NZDUSD', name: 'NZD/USD', price: 0.6142, change: 0.0035, changePercent: 0.57 },
-                { symbol: 'EURGBP', name: 'EUR/GBP', price: 0.8561, change: 0.0008, changePercent: 0.09 },
-                { symbol: 'EURJPY', name: 'EUR/JPY', price: 161.42, change: 0.62, changePercent: 0.39 },
-                { symbol: 'GBPJPY', name: 'GBP/JPY', price: 188.58, change: -0.35, changePercent: -0.19 }
+            const maxRetries = 3;
+            const retryDelay = 1000;
+            
+            for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                try {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 10000);
+                    
+                    // Используем PHP прокси вместо прямого запроса к Finnhub
+                    const response = await fetch('/api/market.php?action=forex', {
+                        signal: controller.signal,
+                        headers: {
+                            'Accept': 'application/json',
+                            'Cache-Control': 'no-cache'
+                        }
+                    });
+                    
+                    clearTimeout(timeoutId);
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    
+                    const result = await response.json();
+                    
+                    if (result.success && Array.isArray(result.data) && result.data.length > 0) {
+                        // Обновляем базовые цены для fallback
+                        result.data.forEach(forex => {
+                            if (forex.price > 0) {
+                                this.basePrices[forex.symbol] = forex.price;
+                            }
+                        });
+                        return result.data;
+                    }
+                } catch (error) {
+                    console.warn(`[MarketAPI] Failed to fetch forex rates (attempt ${attempt}):`, error);
+                    if (attempt < maxRetries) {
+                        await new Promise(resolve => setTimeout(resolve, retryDelay * attempt));
+                    }
+                }
+            }
+            
+            // Fallback на базовые цены
+            const forexList = [
+                { symbol: 'EURUSD', name: 'EUR/USD' },
+                { symbol: 'GBPUSD', name: 'GBP/USD' },
+                { symbol: 'USDJPY', name: 'USD/JPY' },
+                { symbol: 'USDCHF', name: 'USD/CHF' },
+                { symbol: 'AUDUSD', name: 'AUD/USD' },
+                { symbol: 'USDCAD', name: 'USD/CAD' },
+                { symbol: 'NZDUSD', name: 'NZD/USD' },
+                { symbol: 'EURGBP', name: 'EUR/GBP' },
+                { symbol: 'EURJPY', name: 'EUR/JPY' },
+                { symbol: 'GBPJPY', name: 'GBP/JPY' }
             ];
+            
+            return forexList.map(forex => ({
+                symbol: forex.symbol,
+                name: forex.name,
+                price: this.basePrices[forex.symbol] || 1.0,
+                change: 0,
+                changePercent: 0
+            }));
+        });
+    },
+                    } else {
+                        // Fallback
+                        results.push({
+                            symbol: forex.symbol,
+                            name: forex.name,
+                            price: this.basePrices[forex.symbol] || 1,
+                            change: 0,
+                            changePercent: 0
+                        });
+                    }
+                } catch (error) {
+                    console.warn(`Failed to get forex rate for ${forex.symbol}:`, error);
+                    results.push({
+                        symbol: forex.symbol,
+                        name: forex.name,
+                        price: this.basePrices[forex.symbol] || 1,
+                        change: 0,
+                        changePercent: 0
+                    });
+                }
+            }
+            
+            return results;
         });
     },
     

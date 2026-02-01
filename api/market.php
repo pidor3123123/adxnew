@@ -5,6 +5,9 @@
 
 require_once __DIR__ . '/../config/database.php';
 
+// Finnhub API key
+define('FINNHUB_API_KEY', 'd5kp6a9r01qt47mel7vgd5kp6a9r01qt47mel800');
+
 header('Content-Type: application/json');
 setCorsHeaders();
 header('Access-Control-Allow-Methods: GET, OPTIONS');
@@ -96,150 +99,269 @@ function getMockCryptoPrices(): array {
 }
 
 /**
- * Моковые данные акций
+ * Получение реальных данных акций через Finnhub API
  */
 function getStockPrices(): array {
-    return [
-        ['symbol' => 'AAPL', 'name' => 'Apple Inc.', 'price' => 178.52, 'change' => 1.24, 'changePercent' => 0.70],
-        ['symbol' => 'GOOGL', 'name' => 'Alphabet Inc.', 'price' => 141.80, 'change' => -0.95, 'changePercent' => -0.67],
-        ['symbol' => 'MSFT', 'name' => 'Microsoft Corporation', 'price' => 378.91, 'change' => 4.52, 'changePercent' => 1.21],
-        ['symbol' => 'AMZN', 'name' => 'Amazon.com Inc.', 'price' => 155.34, 'change' => 2.18, 'changePercent' => 1.42],
-        ['symbol' => 'TSLA', 'name' => 'Tesla Inc.', 'price' => 248.50, 'change' => -5.30, 'changePercent' => -2.09],
-        ['symbol' => 'META', 'name' => 'Meta Platforms Inc.', 'price' => 355.67, 'change' => 7.23, 'changePercent' => 2.08],
-        ['symbol' => 'NVDA', 'name' => 'NVIDIA Corporation', 'price' => 495.22, 'change' => 12.45, 'changePercent' => 2.58],
-        ['symbol' => 'JPM', 'name' => 'JPMorgan Chase & Co.', 'price' => 172.85, 'change' => 0.95, 'changePercent' => 0.55],
-        ['symbol' => 'V', 'name' => 'Visa Inc.', 'price' => 258.30, 'change' => 1.67, 'changePercent' => 0.65],
-        ['symbol' => 'JNJ', 'name' => 'Johnson & Johnson', 'price' => 156.42, 'change' => -0.28, 'changePercent' => -0.18],
-    ];
-}
-
-/**
- * Получение реальных данных форекса из ExchangeRate-API
- */
-function getForexRates(): array {
-    $pairs = [
-        'EURUSD' => ['from' => 'EUR', 'to' => 'USD', 'name' => 'EUR/USD'],
-        'GBPUSD' => ['from' => 'GBP', 'to' => 'USD', 'name' => 'GBP/USD'],
-        'USDJPY' => ['from' => 'USD', 'to' => 'JPY', 'name' => 'USD/JPY'],
-        'USDCHF' => ['from' => 'USD', 'to' => 'CHF', 'name' => 'USD/CHF'],
-        'AUDUSD' => ['from' => 'AUD', 'to' => 'USD', 'name' => 'AUD/USD'],
-        'USDCAD' => ['from' => 'USD', 'to' => 'CAD', 'name' => 'USD/CAD'],
-        'NZDUSD' => ['from' => 'NZD', 'to' => 'USD', 'name' => 'NZD/USD'],
-        'EURGBP' => ['from' => 'EUR', 'to' => 'GBP', 'name' => 'EUR/GBP'],
-        'EURJPY' => ['from' => 'EUR', 'to' => 'JPY', 'name' => 'EUR/JPY'],
-        'GBPJPY' => ['from' => 'GBP', 'to' => 'JPY', 'name' => 'GBP/JPY']
+    $cacheKey = 'stock_prices';
+    // Кэширование на 30 секунд для соблюдения лимитов API (60 запросов/минуту)
+    $cached = getCachedData($cacheKey);
+    if ($cached !== null) {
+        error_log("[API] Cache hit for stock_prices");
+        return $cached;
+    }
+    
+    $symbols = ['AAPL', 'GOOGL', 'MSFT', 'AMZN', 'TSLA', 'META', 'NVDA', 'JPM', 'V', 'JNJ'];
+    $stockNames = [
+        'AAPL' => 'Apple Inc.',
+        'GOOGL' => 'Alphabet Inc.',
+        'MSFT' => 'Microsoft Corporation',
+        'AMZN' => 'Amazon.com Inc.',
+        'TSLA' => 'Tesla Inc.',
+        'META' => 'Meta Platforms Inc.',
+        'NVDA' => 'NVIDIA Corporation',
+        'JPM' => 'JPMorgan Chase & Co.',
+        'V' => 'Visa Inc.',
+        'JNJ' => 'Johnson & Johnson'
     ];
     
     $results = [];
+    $maxRetries = 2;
+    $retryDelay = 0.5; // секунды
     
-    try {
-        // Получаем все курсы за один запрос
-        $url = 'https://api.exchangerate-api.com/v4/latest/USD';
-        
-        $context = stream_context_create([
-            'http' => [
-                'timeout' => 10,
-                'header' => 'Accept: application/json'
-            ]
-        ]);
-        
-        $response = @file_get_contents($url, false, $context);
-        
-        if ($response !== false) {
-            $data = json_decode($response, true);
-            
-            if (isset($data['rates'])) {
-                $rates = $data['rates'];
+    foreach ($symbols as $symbol) {
+        for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
+            try {
+                $url = "https://finnhub.io/api/v1/quote?symbol={$symbol}&token=" . FINNHUB_API_KEY;
                 
-                foreach ($pairs as $symbol => $pair) {
-                    $from = $pair['from'];
-                    $to = $pair['to'];
+                $context = stream_context_create([
+                    'http' => [
+                        'timeout' => 10,
+                        'method' => 'GET',
+                        'header' => [
+                            'Accept: application/json',
+                            'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                        ],
+                        'ignore_errors' => true
+                    ]
+                ]);
+                
+                $response = @file_get_contents($url, false, $context);
+                
+                if ($response !== false) {
+                    $data = json_decode($response, true);
                     
-                    try {
-                        if ($from === 'USD') {
-                            // Если базовая валюта USD, берем напрямую из rates
-                            $rate = $rates[$to] ?? null;
-                        } else {
-                            // Если базовая валюта не USD, нужно получить курс через USD
-                            $fromUrl = "https://api.exchangerate-api.com/v4/latest/{$from}";
-                            $fromResponse = @file_get_contents($fromUrl, false, $context);
-                            
-                            if ($fromResponse !== false) {
-                                $fromData = json_decode($fromResponse, true);
-                                if (isset($fromData['rates'][$to])) {
-                                    $rate = $fromData['rates'][$to];
-                                } else {
-                                    // Вычисляем через USD
-                                    $fromToUsd = $fromData['rates']['USD'] ?? null;
-                                    $usdToTo = $rates[$to] ?? null;
-                                    if ($fromToUsd && $usdToTo) {
-                                        $rate = $usdToTo / $fromToUsd;
-                                    } else {
-                                        $rate = null;
-                                    }
-                                }
-                            } else {
-                                $rate = null;
-                            }
-                        }
-                        
-                        if ($rate !== null && $rate > 0) {
-                            // Вычисляем изменение (небольшая вариация для демонстрации)
-                            $change = $rate * (rand(-50, 50) / 10000);
-                            $changePercent = ($change / $rate) * 100;
-                            
-                            $results[] = [
-                                'symbol' => $symbol,
-                                'name' => $pair['name'],
-                                'price' => round($rate, 4),
-                                'change' => round($change, 4),
-                                'changePercent' => round($changePercent, 2)
-                            ];
-                            continue;
-                        }
-                    } catch (Exception $e) {
-                        error_log("Error fetching forex rate for {$symbol}: " . $e->getMessage());
+                    if (json_last_error() === JSON_ERROR_NONE && isset($data['c']) && $data['c'] > 0) {
+                        $results[] = [
+                            'symbol' => $symbol,
+                            'name' => $stockNames[$symbol] ?? $symbol,
+                            'price' => round($data['c'], 2),
+                            'change' => round($data['d'] ?? 0, 2),
+                            'changePercent' => round($data['dp'] ?? 0, 2)
+                        ];
+                        error_log("[API] Successfully fetched stock price for {$symbol} (attempt $attempt)");
+                        break; // Успешно получили данные, выходим из цикла попыток
+                    } else {
+                        error_log("[API] Invalid response for {$symbol} (attempt $attempt): " . json_last_error_msg());
                     }
-                    
-                    // Fallback на моковые данные
-                    $mockRates = [
-                        'EURUSD' => 1.0872, 'GBPUSD' => 1.2698, 'USDJPY' => 148.52, 'USDCHF' => 0.8742,
-                        'AUDUSD' => 0.6578, 'USDCAD' => 1.3485, 'NZDUSD' => 0.6142, 'EURGBP' => 0.8561,
-                        'EURJPY' => 161.42, 'GBPJPY' => 188.58
-                    ];
-                    
-                    $results[] = [
-                        'symbol' => $symbol,
-                        'name' => $pair['name'],
-                        'price' => $mockRates[$symbol] ?? 1.0,
-                        'change' => rand(-50, 50) / 10000,
-                        'changePercent' => rand(-30, 30) / 100
-                    ];
+                } else {
+                    $error = error_get_last();
+                    $errorMsg = $error ? $error['message'] : 'Unknown error';
+                    error_log("[API] Finnhub API request failed for {$symbol} (attempt $attempt): $errorMsg");
                 }
                 
-                return $results;
+                // Если не последняя попытка, ждем перед повтором
+                if ($attempt < $maxRetries) {
+                    usleep($retryDelay * 1000000 * $attempt); // Микросекунды
+                }
+            } catch (Exception $e) {
+                error_log("[API] Exception fetching stock price for {$symbol}: " . $e->getMessage());
             }
         }
-    } catch (Exception $e) {
-        error_log("Error fetching forex rates: " . $e->getMessage());
+        
+        // Если не удалось получить данные, используем моковые значения
+        if (empty(array_filter($results, function($r) use ($symbol) { return $r['symbol'] === $symbol; }))) {
+            $mockPrices = [
+                'AAPL' => 178.52, 'GOOGL' => 141.80, 'MSFT' => 378.91, 'AMZN' => 155.34,
+                'TSLA' => 248.50, 'META' => 355.67, 'NVDA' => 495.22, 'JPM' => 172.85,
+                'V' => 258.30, 'JNJ' => 156.42
+            ];
+            $results[] = [
+                'symbol' => $symbol,
+                'name' => $stockNames[$symbol] ?? $symbol,
+                'price' => $mockPrices[$symbol] ?? 100.00,
+                'change' => 0,
+                'changePercent' => 0
+            ];
+        }
     }
     
-    // Fallback на моковые данные, если API недоступен
-    $fallbackData = [
-        ['symbol' => 'EURUSD', 'name' => 'EUR/USD', 'price' => 1.0872, 'change' => 0.0015, 'changePercent' => 0.14],
-        ['symbol' => 'GBPUSD', 'name' => 'GBP/USD', 'price' => 1.2698, 'change' => -0.0023, 'changePercent' => -0.18],
-        ['symbol' => 'USDJPY', 'name' => 'USD/JPY', 'price' => 148.52, 'change' => 0.45, 'changePercent' => 0.30],
-        ['symbol' => 'USDCHF', 'name' => 'USD/CHF', 'price' => 0.8742, 'change' => 0.0012, 'changePercent' => 0.14],
-        ['symbol' => 'AUDUSD', 'name' => 'AUD/USD', 'price' => 0.6578, 'change' => 0.0028, 'changePercent' => 0.43],
-        ['symbol' => 'USDCAD', 'name' => 'USD/CAD', 'price' => 1.3485, 'change' => -0.0018, 'changePercent' => -0.13],
-        ['symbol' => 'NZDUSD', 'name' => 'NZD/USD', 'price' => 0.6142, 'change' => 0.0035, 'changePercent' => 0.57],
-        ['symbol' => 'EURGBP', 'name' => 'EUR/GBP', 'price' => 0.8561, 'change' => 0.0008, 'changePercent' => 0.09],
-        ['symbol' => 'EURJPY', 'name' => 'EUR/JPY', 'price' => 161.42, 'change' => 0.62, 'changePercent' => 0.39],
-        ['symbol' => 'GBPJPY', 'name' => 'GBP/JPY', 'price' => 188.58, 'change' => -0.35, 'changePercent' => -0.19],
+    // Сохраняем в кэш на 30 секунд
+    setCachedData($cacheKey, $results, 30);
+    return $results;
+}
+
+/**
+ * Получение цены одной акции через Finnhub API
+ */
+function getStockQuote(string $symbol): ?array {
+    $cacheKey = 'stock_quote_' . strtoupper($symbol);
+    // Кэширование на 15 секунд для более частых обновлений
+    $cached = getCachedData($cacheKey);
+    if ($cached !== null) {
+        error_log("[API] Cache hit for stock_quote_{$symbol}");
+        return $cached;
+    }
+    
+    $symbol = strtoupper($symbol);
+    $maxRetries = 2;
+    $retryDelay = 0.5;
+    
+    for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
+        try {
+            $url = "https://finnhub.io/api/v1/quote?symbol={$symbol}&token=" . FINNHUB_API_KEY;
+            
+            $context = stream_context_create([
+                'http' => [
+                    'timeout' => 10,
+                    'method' => 'GET',
+                    'header' => [
+                        'Accept: application/json',
+                        'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                    ],
+                    'ignore_errors' => true
+                ]
+            ]);
+            
+            $response = @file_get_contents($url, false, $context);
+            
+            if ($response !== false) {
+                $data = json_decode($response, true);
+                
+                if (json_last_error() === JSON_ERROR_NONE && isset($data['c']) && $data['c'] > 0) {
+                    $result = [
+                        'symbol' => $symbol,
+                        'price' => round($data['c'], 2),
+                        'change' => round($data['d'] ?? 0, 2),
+                        'changePercent' => round($data['dp'] ?? 0, 2),
+                        'open' => round($data['o'] ?? $data['c'], 2),
+                        'high' => round($data['h'] ?? $data['c'], 2),
+                        'low' => round($data['l'] ?? $data['c'], 2),
+                        'previousClose' => round($data['pc'] ?? $data['c'], 2)
+                    ];
+                    
+                    // Сохраняем в кэш на 15 секунд
+                    setCachedData($cacheKey, $result, 15);
+                    error_log("[API] Successfully fetched stock quote for {$symbol}");
+                    return $result;
+                }
+            }
+            
+            if ($attempt < $maxRetries) {
+                usleep($retryDelay * 1000000 * $attempt);
+            }
+        } catch (Exception $e) {
+            error_log("[API] Exception fetching stock quote for {$symbol}: " . $e->getMessage());
+        }
+    }
+    
+    return null;
+}
+
+/**
+ * Получение реальных данных форекса через Finnhub API
+ */
+function getForexRates(): array {
+    $cacheKey = 'forex_rates';
+    // Кэширование на 30 секунд
+    $cached = getCachedData($cacheKey);
+    if ($cached !== null) {
+        error_log("[API] Cache hit for forex_rates");
+        return $cached;
+    }
+    
+    // Finnhub использует формат OANDA: для форекса
+    $pairs = [
+        'EURUSD' => ['finnhub' => 'OANDA:EUR_USD', 'name' => 'EUR/USD'],
+        'GBPUSD' => ['finnhub' => 'OANDA:GBP_USD', 'name' => 'GBP/USD'],
+        'USDJPY' => ['finnhub' => 'OANDA:USD_JPY', 'name' => 'USD/JPY'],
+        'USDCHF' => ['finnhub' => 'OANDA:USD_CHF', 'name' => 'USD/CHF'],
+        'AUDUSD' => ['finnhub' => 'OANDA:AUD_USD', 'name' => 'AUD/USD'],
+        'USDCAD' => ['finnhub' => 'OANDA:USD_CAD', 'name' => 'USD/CAD'],
+        'NZDUSD' => ['finnhub' => 'OANDA:NZD_USD', 'name' => 'NZD/USD'],
+        'EURGBP' => ['finnhub' => 'OANDA:EUR_GBP', 'name' => 'EUR/GBP'],
+        'EURJPY' => ['finnhub' => 'OANDA:EUR_JPY', 'name' => 'EUR/JPY'],
+        'GBPJPY' => ['finnhub' => 'OANDA:GBP_JPY', 'name' => 'GBP/JPY']
     ];
     
-    setCachedData($cacheKey, $fallbackData);
-    return $fallbackData;
+    $results = [];
+    $maxRetries = 2;
+    $retryDelay = 0.5;
+    
+    foreach ($pairs as $symbol => $pair) {
+        $finnhubSymbol = $pair['finnhub'];
+        
+        for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
+            try {
+                $url = "https://finnhub.io/api/v1/forex/quote?symbol={$finnhubSymbol}&token=" . FINNHUB_API_KEY;
+                
+                $context = stream_context_create([
+                    'http' => [
+                        'timeout' => 10,
+                        'method' => 'GET',
+                        'header' => [
+                            'Accept: application/json',
+                            'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                        ],
+                        'ignore_errors' => true
+                    ]
+                ]);
+                
+                $response = @file_get_contents($url, false, $context);
+                
+                if ($response !== false) {
+                    $data = json_decode($response, true);
+                    
+                    if (json_last_error() === JSON_ERROR_NONE && isset($data['c']) && $data['c'] > 0) {
+                        $results[] = [
+                            'symbol' => $symbol,
+                            'name' => $pair['name'],
+                            'price' => round($data['c'], 4),
+                            'change' => round($data['d'] ?? 0, 4),
+                            'changePercent' => round($data['dp'] ?? 0, 2)
+                        ];
+                        error_log("[API] Successfully fetched forex rate for {$symbol} (attempt $attempt)");
+                        break; // Успешно получили данные
+                    }
+                }
+                
+                if ($attempt < $maxRetries) {
+                    usleep($retryDelay * 1000000 * $attempt);
+                }
+            } catch (Exception $e) {
+                error_log("[API] Exception fetching forex rate for {$symbol}: " . $e->getMessage());
+            }
+        }
+        
+        // Если не удалось получить данные, используем моковые значения
+        if (empty(array_filter($results, function($r) use ($symbol) { return $r['symbol'] === $symbol; }))) {
+            $mockRates = [
+                'EURUSD' => 1.0872, 'GBPUSD' => 1.2698, 'USDJPY' => 148.52, 'USDCHF' => 0.8742,
+                'AUDUSD' => 0.6578, 'USDCAD' => 1.3485, 'NZDUSD' => 0.6142, 'EURGBP' => 0.8561,
+                'EURJPY' => 161.42, 'GBPJPY' => 188.58
+            ];
+            $results[] = [
+                'symbol' => $symbol,
+                'name' => $pair['name'],
+                'price' => $mockRates[$symbol] ?? 1.0,
+                'change' => 0,
+                'changePercent' => 0
+            ];
+        }
+    }
+    
+    // Сохраняем в кэш на 30 секунд
+    setCachedData($cacheKey, $results, 30);
+    return $results;
 }
 
 /**
@@ -276,6 +398,21 @@ try {
             echo json_encode([
                 'success' => true,
                 'data' => getStockPrices()
+            ]);
+            break;
+            
+        case 'stock_quote':
+            $symbol = strtoupper($_GET['symbol'] ?? '');
+            if (empty($symbol)) {
+                throw new Exception('Symbol parameter is required', 400);
+            }
+            $quote = getStockQuote($symbol);
+            if ($quote === null) {
+                throw new Exception('Stock quote not found', 404);
+            }
+            echo json_encode([
+                'success' => true,
+                'data' => $quote
             ]);
             break;
             

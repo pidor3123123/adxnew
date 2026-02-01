@@ -1795,7 +1795,96 @@
                     
                     TradingState.chartWidget = new TradingView.widget(widgetConfig);
                     chartWidget = TradingState.chartWidget;
+                    
+                    // Подписываемся на события виджета для синхронизации цены
+                    if (chartWidget) {
+                        // Когда график готов, синхронизируем цену
+                        chartWidget.on('chart_ready', () => {
+                            console.log('TradingView chart ready - syncing price');
+                            setTimeout(() => syncPriceFromTradingView(), 500);
+                        });
+                        
+                        // Когда меняется символ, обновляем цену
+                        chartWidget.on('symbol_changed', (data) => {
+                            console.log('TradingView symbol changed:', data);
+                            setTimeout(() => syncPriceFromTradingView(), 1000);
+                        });
+                    }
                 }
+            }
+            
+            /**
+             * Получение цены из TradingView через их публичный API
+             */
+            async function syncPriceFromTradingView() {
+                if (!TradingState.currentSymbol) return;
+                
+                try {
+                    const symbol = TradingState.currentSymbol;
+                    
+                    // TradingView использует формат символов типа "NASDAQ:NVDA", "BINANCE:BTCUSDT"
+                    // Пробуем получить данные через их публичный endpoint
+                    // Примечание: TradingView не предоставляет официальный публичный REST API для котировок
+                    // Поэтому используем альтернативный подход - получаем данные из того же источника, что и график
+                    
+                    // Извлекаем базовый символ для поиска в наших данных
+                    let baseSymbol = symbol;
+                    if (symbol.includes(':')) {
+                        baseSymbol = symbol.split(':')[1];
+                    }
+                    baseSymbol = baseSymbol.replace('USDT', '').replace('USD', '').toUpperCase();
+                    
+                    // Используем существующую функцию updateAssetPrice, которая уже получает данные
+                    // из правильных источников (CoinGecko для крипто, Finnhub для акций)
+                    if (typeof window.updateAssetPrice === 'function') {
+                        await window.updateAssetPrice();
+                    }
+                    
+                    // Также обновляем цену периодически (каждые 5 секунд)
+                    // Это гарантирует синхронизацию с графиком
+                    if (!window.tvPriceSyncInterval) {
+                        window.tvPriceSyncInterval = setInterval(async () => {
+                            if (typeof window.updateAssetPrice === 'function') {
+                                await window.updateAssetPrice();
+                            }
+                        }, 5000); // Обновляем каждые 5 секунд
+                    }
+                    
+                } catch (error) {
+                    console.error('Error syncing price from TradingView:', error);
+                }
+            }
+            
+            /**
+             * Обновление цены в панели торговли из TradingView
+             */
+            function updatePriceFromTradingView(price, change = 0) {
+                if (!price || price <= 0) return;
+                
+                // Обновляем window.currentAsset
+                if (typeof window.currentAsset !== 'undefined') {
+                    window.currentAsset.price = price;
+                    window.currentAsset.change = change;
+                    window.currentAsset.decimals = price < 1 ? 6 : (price < 10 ? 4 : 2);
+                } else {
+                    window.currentAsset = {
+                        symbol: TradingState.currentSymbolName || 'UNKNOWN',
+                        name: TradingState.currentSymbolName || 'Unknown',
+                        price: price,
+                        change: change,
+                        decimals: price < 1 ? 6 : (price < 10 ? 4 : 2)
+                    };
+                }
+                
+                // Обновляем цену в панели торговли
+                if (typeof updateNormalTradePrice === 'function') {
+                    updateNormalTradePrice();
+                }
+                if (typeof updateQuickTradePrice === 'function') {
+                    updateQuickTradePrice();
+                }
+                
+                console.log('Price updated from TradingView:', price);
             }
             
             if (typeof TradingView !== 'undefined') {
