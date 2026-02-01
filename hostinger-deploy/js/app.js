@@ -249,8 +249,20 @@ function initUserMenu() {
     const userMenu = document.querySelector('.user-menu');
     if (!userMenu) return;
     
+    // Проверяем, видно ли меню (может быть скрыто через data-auth)
+    const computedStyle = window.getComputedStyle(userMenu);
+    if (computedStyle.display === 'none') {
+        // Меню скрыто, возможно еще не обновлен UI - попробуем позже
+        return;
+    }
+    
     const trigger = userMenu.querySelector('.user-menu-trigger');
     if (!trigger) return;
+    
+    // Проверяем, не инициализировано ли уже меню
+    if (trigger.dataset.initialized === 'true') {
+        return;
+    }
     
     // Удаляем старые обработчики если есть
     const newTrigger = trigger.cloneNode(true);
@@ -263,12 +275,21 @@ function initUserMenu() {
         userMenu.classList.toggle('open');
     });
     
-    // Закрываем меню при клике вне его
-    document.addEventListener('click', (e) => {
-        if (!userMenu.contains(e.target)) {
-            userMenu.classList.remove('open');
-        }
-    });
+    // Помечаем как инициализированное
+    newTrigger.dataset.initialized = 'true';
+    
+    // Закрываем меню при клике вне его (только один обработчик на документ)
+    if (!document.userMenuClickHandler) {
+        document.userMenuClickHandler = (e) => {
+            const allUserMenus = document.querySelectorAll('.user-menu');
+            allUserMenus.forEach(menu => {
+                if (!menu.contains(e.target)) {
+                    menu.classList.remove('open');
+                }
+            });
+        };
+        document.addEventListener('click', document.userMenuClickHandler);
+    }
     
     // Закрываем меню при клике на элемент внутри dropdown
     const dropdownItems = userMenu.querySelectorAll('.dropdown-item');
@@ -286,50 +307,103 @@ function initMobileMenu() {
     const toggle = document.querySelector('.mobile-menu-toggle');
     const nav = document.querySelector('.nav-main');
     let mobileMenu = document.querySelector('.mobile-menu');
+    let mobileMenuOverlay = document.querySelector('.mobile-menu-overlay');
+    
+    // Создаем overlay, если его нет
+    if (!mobileMenuOverlay) {
+        mobileMenuOverlay = document.createElement('div');
+        mobileMenuOverlay.className = 'mobile-menu-overlay';
+        document.body.appendChild(mobileMenuOverlay);
+    }
     
     // Создаем мобильное меню, если его нет
     if (!mobileMenu && nav) {
         mobileMenu = document.createElement('div');
         mobileMenu.className = 'mobile-menu';
-        mobileMenu.innerHTML = '<div class="mobile-menu-content"></div>';
+        
+        // Создаем header с логотипом и кнопкой закрытия
+        const logo = document.querySelector('.logo');
+        const logoHTML = logo ? logo.outerHTML : '<div class="logo"><span>ADX Finance</span></div>';
+        
+        mobileMenu.innerHTML = `
+            <div class="mobile-menu-header">
+                ${logoHTML}
+                <button class="mobile-menu-close" aria-label="Закрыть меню">
+                    <i class="bi bi-x"></i>
+                </button>
+            </div>
+            <div class="mobile-menu-content"></div>
+        `;
         document.body.appendChild(mobileMenu);
         
         // Копируем навигационные ссылки в мобильное меню
         const menuContent = mobileMenu.querySelector('.mobile-menu-content');
         const navLinks = nav.querySelectorAll('.nav-link');
+        
         navLinks.forEach(link => {
             const clonedLink = link.cloneNode(true);
             clonedLink.addEventListener('click', () => {
-                mobileMenu.classList.remove('open');
-                toggle?.querySelector('i')?.classList.remove('bi-x');
-                toggle?.querySelector('i')?.classList.add('bi-list');
+                closeMobileMenu();
             });
             menuContent.appendChild(clonedLink);
         });
+        
+        // Обработчик закрытия через кнопку X
+        const closeBtn = mobileMenu.querySelector('.mobile-menu-close');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', closeMobileMenu);
+        }
+        
+        // Обработчик закрытия через overlay
+        mobileMenuOverlay.addEventListener('click', closeMobileMenu);
     }
     
     if (!toggle || !mobileMenu) return;
     
-    toggle.addEventListener('click', (e) => {
-        e.stopPropagation();
-        mobileMenu.classList.toggle('open');
+    // Функция открытия меню
+    function openMobileMenu() {
+        mobileMenu.classList.add('open');
+        mobileMenuOverlay.classList.add('open');
+        document.body.classList.add('mobile-menu-open');
         const icon = toggle.querySelector('i');
         if (icon) {
-            icon.classList.toggle('bi-list');
-            icon.classList.toggle('bi-x');
+            icon.classList.remove('bi-list');
+            icon.classList.add('bi-x');
+        }
+    }
+    
+    // Функция закрытия меню
+    function closeMobileMenu() {
+        mobileMenu.classList.remove('open');
+        mobileMenuOverlay.classList.remove('open');
+        document.body.classList.remove('mobile-menu-open');
+        const icon = toggle.querySelector('i');
+        if (icon) {
+            icon.classList.remove('bi-x');
+            icon.classList.add('bi-list');
+        }
+    }
+    
+    // Переключение меню
+    toggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (mobileMenu.classList.contains('open')) {
+            closeMobileMenu();
+        } else {
+            openMobileMenu();
         }
     });
     
-    // Закрытие меню при клике вне его
-    document.addEventListener('click', (e) => {
-        if (!mobileMenu.contains(e.target) && !toggle.contains(e.target)) {
-            mobileMenu.classList.remove('open');
-            const icon = toggle.querySelector('i');
-            if (icon) {
-                icon.classList.remove('bi-x');
-                icon.classList.add('bi-list');
-            }
+    // Закрытие при нажатии Escape
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && mobileMenu.classList.contains('open')) {
+            closeMobileMenu();
         }
+    });
+    
+    // Предотвращаем закрытие при клике внутри меню
+    mobileMenu.addEventListener('click', (e) => {
+        e.stopPropagation();
     });
 }
 
@@ -352,10 +426,29 @@ function setActiveNav() {
  * Инициализация при загрузке страницы
  */
 document.addEventListener('DOMContentLoaded', () => {
-    initTheme();
-    initUserMenu();
-    initMobileMenu();
-    setActiveNav();
+    try { 
+        initTheme(); 
+    } catch(e) { 
+        console.error('Theme init error:', e); 
+    }
+    
+    try { 
+        initUserMenu(); 
+    } catch(e) { 
+        console.error('UserMenu init error:', e); 
+    }
+    
+    try { 
+        initMobileMenu(); 
+    } catch(e) { 
+        console.error('MobileMenu init error:', e); 
+    }
+    
+    try { 
+        setActiveNav(); 
+    } catch(e) { 
+        console.error('ActiveNav error:', e); 
+    }
 });
 
 // Экспорт для глобального использования

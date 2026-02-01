@@ -5,8 +5,8 @@
 let currentAsset = {
     symbol: 'BTC',
     name: 'Bitcoin',
-    price: 43250.00,
-    change: 2.45,
+    price: 0, // Будет загружено из API
+    change: 0,
     decimals: 8
 };
 
@@ -14,14 +14,22 @@ let currentAsset = {
 window.currentAsset = currentAsset;
 
 let userBalances = {
-    USD: 10000.00,
+    USD: 0,
     BTC: 0,
     ETH: 0
 };
 
-let tradeSide = 'buy';
-let orderType = 'market';
+// Используем глобальный объект TradingState вместо локальных переменных
+// Если объект не существует, создаем его
+if (!window.TradingState) {
+    window.TradingState = {
+        tradeSide: 'buy',
+        orderType: 'market'
+    };
+}
 let assetList = [];
+
+// WebSocket больше не используется - используем только API опрос
 
 /**
  * Load asset list (crypto, stocks, forex)
@@ -67,6 +75,9 @@ async function loadAssetList() {
         
         // Объединяем все активы
         assetList = [...cryptoAssets, ...stockAssets, ...forexAssets];
+        
+        // Обновляем глобальную ссылку для использования в trade.html
+        window.assetList = assetList;
         
         renderAssetList(assetList);
     } catch (error) {
@@ -116,6 +127,8 @@ function filterAssetList(query) {
  * Select asset
  */
 async function selectAsset(symbol) {
+    const oldSymbol = currentAsset?.symbol;
+    
     let asset = assetList.find(a => a.symbol === symbol || a.symbol === symbol.toUpperCase());
     
     // Если актив не найден в списке, создаём его с базовыми данными
@@ -153,13 +166,27 @@ async function selectAsset(symbol) {
         decimals: asset.price < 1 ? 6 : (asset.price < 10 ? 4 : 2)
     };
     
-    // Update global reference for charts.js
     window.currentAsset = currentAsset;
     
     // Update UI
     document.getElementById('currentAsset').textContent = asset.market === 'forex' ? asset.symbol : `${asset.symbol}/USD`;
     document.getElementById('currentAssetName').textContent = asset.name;
     document.getElementById('quantitySuffix').textContent = asset.symbol;
+    
+    // Обновляем цену из API для всех активов (криптовалюты, акции, форекс)
+    await updateAssetPrice();
+    
+    // Логируем выбор актива
+    if (window.Logger) {
+        window.Logger.userAction('Asset selected', { 
+            symbol: currentAsset.symbol, 
+            name: currentAsset.name,
+            oldSymbol: oldSymbol 
+        });
+    }
+    
+    // Запускаем обновление цен в реальном времени через API
+    startPriceUpdates();
     
     // Update icon based on market type
     const iconEl = document.getElementById('assetIcon');
@@ -178,11 +205,6 @@ async function selectAsset(symbol) {
     // Update button
     updateTradeButton();
     
-    // Load chart with current selected interval
-    const activeInterval = document.querySelector('.chart-timeframe.active');
-    const interval = activeInterval ? activeInterval.dataset.interval : '4h';
-    await loadChartData(symbol, interval);
-    
     // Update summary
     updateTradeSummary();
     
@@ -196,7 +218,9 @@ async function selectAsset(symbol) {
  * Update trade UI
  */
 function updateTradeUI(side, parentSection = null) {
-    tradeSide = side;
+    if (window.TradingState) {
+        window.TradingState.tradeSide = side;
+    }
     
     // Определяем, какая форма активна
     const isQuick = parentSection?.id === 'quickTradeMode';
@@ -243,9 +267,10 @@ function updateTradeUI(side, parentSection = null) {
 function updateTradeButton() {
     const submitBtn = document.getElementById('submitTradeBtn');
     if (submitBtn) {
+        const side = window.TradingState?.tradeSide || 'buy';
         submitBtn.innerHTML = `
-            <i class="bi bi-${tradeSide === 'buy' ? 'cart-plus' : 'cart-dash'}"></i>
-            ${tradeSide === 'buy' ? 'Купить' : 'Продать'} ${currentAsset.symbol}
+            <i class="bi bi-${side === 'buy' ? 'cart-plus' : 'cart-dash'}"></i>
+            ${side === 'buy' ? 'Купить' : 'Продать'} ${currentAsset.symbol}
         `;
     }
 }
@@ -303,7 +328,7 @@ function calculateQuantityByPercent(percent, mode = 'normal') {
     // Получаем активную сторону из соответствующей формы
     const modeSelector = mode === 'quick' ? '#quickTradeMode' : '#normalTradeMode';
     const activeTab = document.querySelector(`${modeSelector} .trade-tab.active`);
-    const side = activeTab?.dataset.side || tradeSide;
+    const side = activeTab?.dataset.side || (window.TradingState?.tradeSide || 'buy');
     
     // Получаем step из input поля
     const step = parseFloat(quantityInput.getAttribute('step')) || 0.0001;
@@ -347,14 +372,15 @@ function calculateQuantityByPercent(percent, mode = 'normal') {
 function updateTradeSummary() {
     const quantity = parseFloat(document.getElementById('quantity')?.value) || 0;
     const limitPrice = parseFloat(document.getElementById('limitPrice')?.value) || currentAsset.price;
+    const orderType = window.TradingState?.orderType || 'market';
     const price = orderType === 'limit' ? limitPrice : currentAsset.price;
     
     const total = quantity * price;
     const fee = total * 0.001; // 0.1% fee
+    const tradeSide = window.TradingState?.tradeSide || 'buy';
     const finalTotal = tradeSide === 'buy' ? total + fee : total - fee;
     
-    // Update display
-    document.getElementById('tradePrice').textContent = NovaTrade.formatCurrency(price);
+    // Update display (price is no longer shown, users see it on the chart)
     document.getElementById('tradeFee').textContent = NovaTrade.formatCurrency(fee);
     document.getElementById('tradeTotal').textContent = NovaTrade.formatCurrency(finalTotal);
 }
@@ -364,25 +390,23 @@ function updateTradeSummary() {
  */
 function updateQuickTradeSummary() {
     const quantity = parseFloat(document.getElementById('quickQuantity')?.value) || 0;
-    const limitPrice = parseFloat(document.getElementById('quickLimitPrice')?.value) || currentAsset.price;
-    const activeOrderType = document.querySelector('#quickTradeForm .tab.active');
-    const type = activeOrderType?.dataset.type || 'market';
-    const price = type === 'limit' ? limitPrice : currentAsset.price;
     
-    // Получаем активную сторону
+    // Используем цену напрямую из currentAsset (синхронизируется с графиком)
+    const price = currentAsset?.price || 0;
+    
+    // Получаем активную сторону из быстрой торговли
     const activeTab = document.querySelector('#quickTradeMode .trade-tab.active');
-    const side = activeTab?.dataset.side || 'buy';
+    const side = activeTab?.dataset.side || (window.TradingState?.tradeSide || 'buy');
     
     const total = quantity * price;
     const fee = total * 0.001; // 0.1% fee
     const finalTotal = side === 'buy' ? total + fee : total - fee;
     
     // Update display
-    const priceEl = document.getElementById('quickTradePrice');
     const feeEl = document.getElementById('quickTradeFee');
     const totalEl = document.getElementById('quickTradeTotal');
     
-    if (priceEl) priceEl.textContent = NovaTrade.formatCurrency(price);
+    // Цена уже должна быть установлена, не перезаписываем её
     if (feeEl) feeEl.textContent = NovaTrade.formatCurrency(fee);
     if (totalEl) totalEl.textContent = NovaTrade.formatCurrency(finalTotal);
 }
@@ -425,11 +449,69 @@ async function submitOrder(isQuick = false) {
         
         // Получаем активную вкладку Купить/Продать
         const activeMode = isQuick ? document.querySelector('#quickTradeMode .trade-tab.active') : document.querySelector('#normalTradeMode .trade-tab.active');
-        const side = activeMode?.dataset.side || tradeSide;
+        const side = activeMode?.dataset.side || (window.TradingState?.tradeSide || 'buy');
         
-        // Получаем тип ордера
-        const activeOrderType = isQuick ? document.querySelector('#quickTradeForm .tab.active') : document.querySelector('#tradeForm .tab.active');
-        const type = activeOrderType?.dataset.type || orderType;
+        // Получаем тип ордера (быстрая торговля всегда рыночная)
+        const type = isQuick ? 'market' : (window.TradingState?.orderType || 'market');
+        
+        // Определяем цену входа для валидации TP/SL
+        let entryPrice;
+        if (isQuick) {
+            // Для быстрой торговли получаем цену из quickTradePrice
+            const quickPriceEl = document.getElementById('quickTradePrice');
+            entryPrice = quickPriceEl ? parseFloat(quickPriceEl.textContent.replace(/[^0-9.]/g, '')) : (currentAsset?.price || null);
+        } else {
+            entryPrice = type === 'limit' && limitPrice ? limitPrice : (currentAsset?.price || null);
+        }
+        
+        // Валидация TP/SL для быстрой торговли
+        if (isQuick && entryPrice) {
+            if (takeProfit !== null && takeProfit !== undefined && !isNaN(takeProfit)) {
+                if (side === 'buy' && takeProfit <= entryPrice) {
+                    NovaTrade.showToast('Ошибка', 'Take Profit должен быть выше цены входа', 'error');
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalText;
+                    return;
+                }
+                if (side === 'sell' && takeProfit >= entryPrice) {
+                    NovaTrade.showToast('Ошибка', 'Take Profit должен быть ниже цены входа', 'error');
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalText;
+                    return;
+                }
+            }
+            
+            if (stopLoss !== null && stopLoss !== undefined && !isNaN(stopLoss)) {
+                if (side === 'buy' && stopLoss >= entryPrice) {
+                    NovaTrade.showToast('Ошибка', 'Stop Loss должен быть ниже цены входа', 'error');
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalText;
+                    return;
+                }
+                if (side === 'sell' && stopLoss <= entryPrice) {
+                    NovaTrade.showToast('Ошибка', 'Stop Loss должен быть выше цены входа', 'error');
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalText;
+                    return;
+                }
+            }
+        }
+        
+        // Получаем время сделки для быстрой торговли
+        let tradeDuration = null;
+        if (isQuick) {
+            const activeTimeBtn = document.querySelector('.trade-time-btn.active');
+            if (activeTimeBtn) {
+                const timeStr = activeTimeBtn.dataset.time;
+                // Преобразуем время в секунды
+                if (timeStr === '1m') tradeDuration = 60;
+                else if (timeStr === '5m') tradeDuration = 300;
+                else if (timeStr === '15m') tradeDuration = 900;
+                else if (timeStr === '30m') tradeDuration = 1800;
+                else if (timeStr === '1h') tradeDuration = 3600;
+                else if (timeStr === '4h') tradeDuration = 14400;
+            }
+        }
         
         const orderData = {
             symbol: currentAsset.symbol,
@@ -437,16 +519,42 @@ async function submitOrder(isQuick = false) {
             type: type,
             quantity: quantity,
             price: type === 'limit' ? limitPrice : null,
-            current_price: currentAsset.price || null, // Отправляем текущую цену для валидации
+            current_price: entryPrice, // Отправляем цену входа для валидации
             take_profit: takeProfit || null,
-            stop_loss: stopLoss || null
+            stop_loss: stopLoss || null,
+            trade_duration: tradeDuration // Длительность в секундах для быстрой торговли
         };
+        
+        // Логируем попытку создания ордера
+        if (window.Logger) {
+            window.Logger.trade('Order submission', {
+                symbol: currentAsset.symbol,
+                side,
+                type,
+                quantity,
+                isQuick,
+                takeProfit,
+                stopLoss,
+                tradeDuration
+            });
+        }
         
         const result = await TradingAPI.createOrder(orderData);
         
         if (result.success) {
             const tpSlInfo = (takeProfit || stopLoss) ? 
                 ` (TP: ${takeProfit || '—'}, SL: ${stopLoss || '—'})` : '';
+            
+            // Логируем успешное создание ордера
+            if (window.Logger) {
+                window.Logger.trade('Order created successfully', {
+                    orderId: result.order?.id,
+                    symbol: currentAsset.symbol,
+                    side,
+                    quantity,
+                    isQuick
+                });
+            }
             
             NovaTrade.showToast(
                 'Ордер создан', 
@@ -464,7 +572,20 @@ async function submitOrder(isQuick = false) {
             
             // Update balances
             await loadUserBalances();
+            
+            // Обновляем баланс в header
+            if (typeof Auth !== 'undefined' && typeof Auth.loadBalance === 'function') {
+                await Auth.loadBalance();
+            }
         } else {
+            // Логируем ошибку создания ордера
+            if (window.Logger) {
+                window.Logger.trade('Order creation failed', {
+                    symbol: currentAsset.symbol,
+                    side,
+                    error: result.error
+                });
+            }
             NovaTrade.showToast('Ошибка', result.error || 'Не удалось создать ордер', 'error');
         }
     } catch (error) {
@@ -478,52 +599,327 @@ async function submitOrder(isQuick = false) {
 /**
  * Load user balances
  */
-async function loadUserBalances() {
-    if (!Auth.isAuthenticated()) return;
+async function loadUserBalances(forceRefresh = false) {
+    if (!Auth.isAuthenticated()) {
+        console.log('[loadUserBalances] User not authenticated, skipping');
+        return;
+    }
     
     try {
-        const result = await Auth.fetchUser();
+        // Используем /api/wallet.php?action=balances как единый источник данных (Supabase)
+        const url = forceRefresh 
+            ? `/api/wallet.php?action=balances&_t=${Date.now()}`
+            : '/api/wallet.php?action=balances';
         
-        if (result && result.balances) {
-            result.balances.forEach(balance => {
-                userBalances[balance.currency] = parseFloat(balance.available) || 0;
-            });
+        console.log('[loadUserBalances] Fetching balances from wallet.php...', { url });
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            },
+            credentials: 'include'
+        });
+        
+        if (!response.ok) {
+            // Специальная обработка 401 - не прерываем выполнение, только логируем
+            if (response.status === 401) {
+                console.warn('[loadUserBalances] 401 Unauthorized - user may need to re-login');
+                // Не выбрасываем ошибку, чтобы не прерывать другие функции
+                return;
+            }
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        console.log('[loadUserBalances] API response received:', {
+            success: result.success,
+            balancesCount: result.balances?.length || 0,
+            totalUsd: result.total_usd,
+            balances: result.balances
+        });
+        
+        if (result && result.success) {
+            // Обновляем балансы из массива balances
+            if (result.balances && Array.isArray(result.balances)) {
+                result.balances.forEach(balance => {
+                    const currency = balance.currency || 'USD';
+                    const available = parseFloat(balance.available) || 0;
+                    userBalances[currency] = available;
+                    console.log(`[loadUserBalances] Updated ${currency} balance:`, available);
+                });
+            }
             
-            // Update UI
-            updateTradeUI(tradeSide);
+            // Если USD баланс не найден в массиве, используем total_usd как fallback
+            if (!userBalances.USD && result.total_usd !== undefined) {
+                userBalances.USD = parseFloat(result.total_usd || 0);
+                console.log('[loadUserBalances] Using total_usd as fallback:', userBalances.USD);
+            }
             
-            // Update header balance
+            // Получаем USD баланс
+            const usdBalance = userBalances.USD || 0;
+            const formattedBalance = usdBalance.toLocaleString('en-US', { minimumFractionDigits: 2 });
+            console.log('[loadUserBalances] Formatted USD balance:', formattedBalance);
+            
+            // Update header balance (приоритет: обновляем из API)
             const headerBalance = document.getElementById('headerBalance');
             if (headerBalance) {
-                headerBalance.textContent = (userBalances.USD || 0).toLocaleString('en-US', { minimumFractionDigits: 2 });
+                headerBalance.textContent = formattedBalance;
+                console.log('[loadUserBalances] Header balance updated to:', formattedBalance);
+            } else {
+                console.warn('[loadUserBalances] Header balance element not found');
+            }
+            
+            // Update UI - обновляем отображение баланса в терминале
+            const side = window.TradingState?.tradeSide || 'buy';
+            updateTradeUI(side);
+            
+            console.log('[loadUserBalances] Balance loading completed successfully');
+        } else {
+            console.warn('[loadUserBalances] API returned success=false or invalid response:', result);
+            // Fallback: пытаемся получить баланс из Auth.getUser()
+            const user = Auth.getUser();
+            if (user && user.balance !== undefined) {
+                const balance = parseFloat(user.balance) || 0;
+                userBalances.USD = balance;
+                const formattedBalance = balance.toLocaleString('en-US', { minimumFractionDigits: 2 });
+                
+                const headerBalance = document.getElementById('headerBalance');
+                if (headerBalance) {
+                    headerBalance.textContent = formattedBalance;
+                    console.log('[loadUserBalances] Fallback: Updated header balance from Auth.getUser():', formattedBalance);
+                }
+                
+                const side = window.TradingState?.tradeSide || 'buy';
+                updateTradeUI(side);
             }
         }
     } catch (error) {
-        console.error('Error loading balances:', error);
+        console.error('[loadUserBalances] Error loading balances:', error);
+        // Fallback: пытаемся получить баланс из Auth.getUser()
+        try {
+            const user = Auth.getUser();
+            if (user && user.balance !== undefined) {
+                const balance = parseFloat(user.balance) || 0;
+                userBalances.USD = balance;
+                const formattedBalance = balance.toLocaleString('en-US', { minimumFractionDigits: 2 });
+                
+                const headerBalance = document.getElementById('headerBalance');
+                if (headerBalance) {
+                    headerBalance.textContent = formattedBalance;
+                    console.log('[loadUserBalances] Error fallback: Updated header balance from Auth.getUser():', formattedBalance);
+                }
+                
+                // Обновляем UI даже при ошибке, чтобы показать хотя бы fallback баланс
+                const side = window.TradingState?.tradeSide || 'buy';
+                updateTradeUI(side);
+            }
+        } catch (fallbackError) {
+            console.error('[loadUserBalances] Fallback error:', fallbackError);
+        }
     }
 }
 
+// WebSocket функции удалены - используем только API опрос для всех активов
+
 /**
- * Realtime price updates simulation
+ * Обновление цены актива из API (fallback для акций и форекса)
  */
-function startPriceUpdates() {
-    setInterval(() => {
-        // Simulate small price change
-        const change = (Math.random() - 0.5) * 0.002;
-        currentAsset.price = currentAsset.price * (1 + change);
+async function updateAssetPrice() {
+    if (!currentAsset || !currentAsset.symbol) {
+        console.warn('[updateAssetPrice] No current asset or symbol');
+        return;
+    }
+    
+    try {
+        const symbol = currentAsset.symbol.toUpperCase();
+        console.log(`[updateAssetPrice] Starting price update for ${symbol}, current price: $${currentAsset.price || 0}`);
         
-        // Update global reference
-        window.currentAsset = currentAsset;
+        // Определяем тип рынка
+        const cryptoSymbols = ['BTC', 'ETH', 'BNB', 'XRP', 'SOL', 'ADA', 'DOGE', 'DOT', 'MATIC', 'LTC'];
+        const stockSymbols = ['AAPL', 'GOOGL', 'MSFT', 'AMZN', 'TSLA', 'META', 'NVDA', 'JPM', 'V', 'JNJ'];
+        const forexSymbols = ['EURUSD', 'GBPUSD', 'USDJPY', 'USDCHF', 'AUDUSD', 'USDCAD', 'NZDUSD', 'EURGBP', 'EURJPY', 'GBPJPY'];
         
-        // Update price display
-        const priceEl = document.getElementById('currentPrice');
-        if (priceEl) {
-            priceEl.textContent = NovaTrade.formatCurrency(currentAsset.price);
+        let newPrice = null;
+        
+        if (cryptoSymbols.includes(symbol)) {
+            // Криптовалюты: получаем из CoinGecko
+            const cryptoData = await MarketAPI.getCryptoPrices();
+            if (!cryptoData || !Array.isArray(cryptoData)) {
+                console.error('Invalid crypto data received:', cryptoData);
+                return;
+            }
+            
+            const coin = cryptoData.find(c => {
+                const coinSymbol = (c.symbol || '').toUpperCase();
+                const coinId = (c.id || '').toLowerCase();
+                return coinSymbol === symbol || 
+                       (symbol === 'BTC' && (coinSymbol === 'BTC' || coinId === 'bitcoin')) ||
+                       (symbol === 'ETH' && (coinSymbol === 'ETH' || coinId === 'ethereum')) ||
+                       (symbol === 'BNB' && (coinSymbol === 'BNB' || coinId === 'binancecoin')) ||
+                       (symbol === 'XRP' && (coinSymbol === 'XRP' || coinId === 'ripple')) ||
+                       (symbol === 'SOL' && (coinSymbol === 'SOL' || coinId === 'solana')) ||
+                       (symbol === 'ADA' && (coinSymbol === 'ADA' || coinId === 'cardano')) ||
+                       (symbol === 'DOGE' && (coinSymbol === 'DOGE' || coinId === 'dogecoin')) ||
+                       (symbol === 'DOT' && (coinSymbol === 'DOT' || coinId === 'polkadot')) ||
+                       (symbol === 'MATIC' && (coinSymbol === 'MATIC' || coinId === 'polygon-ecosystem-token')) ||
+                       (symbol === 'LTC' && (coinSymbol === 'LTC' || coinId === 'litecoin'));
+            });
+            
+            if (coin && coin.current_price) {
+                newPrice = coin.current_price;
+                console.log(`[updateAssetPrice] Updated ${symbol} price from API: $${newPrice}`);
+            } else {
+                console.warn(`[updateAssetPrice] Coin not found for symbol ${symbol}`, cryptoData);
+            }
+        } else if (stockSymbols.includes(symbol)) {
+            // Акции: получаем из Alpha Vantage или списка акций
+            const stocksData = await MarketAPI.getStockPrices();
+            console.log(`[updateAssetPrice] Fetched ${stocksData.length} stocks from API`);
+            const stock = stocksData.find(s => s.symbol.toUpperCase() === symbol);
+            if (stock && stock.price) {
+                newPrice = stock.price;
+                console.log(`[updateAssetPrice] Updated ${symbol} stock price from API: $${newPrice}`);
+            } else {
+                console.warn(`[updateAssetPrice] Stock not found for symbol ${symbol}`);
+            }
+        } else if (forexSymbols.includes(symbol)) {
+            // Форекс: получаем из списка форекс
+            const forexData = await MarketAPI.getForexRates();
+            console.log(`[updateAssetPrice] Fetched ${forexData.length} forex pairs from API`);
+            const forex = forexData.find(f => f.symbol.toUpperCase() === symbol);
+            if (forex && forex.price) {
+                newPrice = forex.price;
+                console.log(`[updateAssetPrice] Updated ${symbol} forex price from API: $${newPrice}`);
+            } else {
+                console.warn(`[updateAssetPrice] Forex pair not found for symbol ${symbol}`);
+            }
+        } else {
+            console.warn(`[updateAssetPrice] Unknown symbol type: ${symbol}`);
         }
+        
+        // Обновляем цену, если получили новую
+        if (newPrice !== null && newPrice > 0) {
+            const oldPrice = currentAsset.price || 0;
+            
+            // Обновляем цену только если она изменилась (более чем на 0.01%)
+            if (oldPrice === 0 || Math.abs((newPrice - oldPrice) / oldPrice) > 0.0001) {
+                currentAsset.price = newPrice;
+                
+                // Вычисляем изменение
+                if (oldPrice > 0) {
+                    currentAsset.change = ((newPrice - oldPrice) / oldPrice) * 100;
+                } else {
+                    // Если старая цена была 0, получаем изменение из API
+                    if (cryptoSymbols.includes(symbol)) {
+                        const cryptoData = await MarketAPI.getCryptoPrices();
+                        const coin = cryptoData.find(c => {
+                            const coinSymbol = (c.symbol || '').toUpperCase();
+                            return coinSymbol === symbol;
+                        });
+                        if (coin && coin.price_change_percentage_24h !== undefined) {
+                            currentAsset.change = coin.price_change_percentage_24h;
+                        } else {
+                            currentAsset.change = 0;
+                        }
+                    } else {
+                        currentAsset.change = 0;
+                    }
+                }
+                
+                // Update global reference
+                window.currentAsset = currentAsset;
+                console.log(`[updateAssetPrice] Updated window.currentAsset.price to $${newPrice}`);
+                
+                // Обновляем цену в UI для обычной торговли
+                const tradePriceEl = document.getElementById('tradePrice');
+                if (tradePriceEl) {
+                    const formattedPrice = NovaTrade.formatCurrency(newPrice);
+                    tradePriceEl.textContent = formattedPrice;
+                    console.log(`[updateAssetPrice] Updated tradePrice element: ${formattedPrice}`);
+                } else {
+                    console.warn('[updateAssetPrice] tradePrice element not found');
+                }
+                
+                // Обновляем цену в UI для быстрой торговли (используем напрямую newPrice)
+                const quickTradePriceEl = document.getElementById('quickTradePrice');
+                if (quickTradePriceEl) {
+                    const formattedPrice = NovaTrade.formatCurrency(newPrice);
+                    quickTradePriceEl.textContent = formattedPrice;
+                    console.log(`[updateAssetPrice] Updated quickTradePrice element: ${formattedPrice}`);
+                    // Обновляем TP/SL и сводку для быстрой торговли
+                    if (typeof window.updateQuickTradeTPSL === 'function') {
+                        window.updateQuickTradeTPSL();
+                    }
+                    if (typeof window.updateQuickTradeSummary === 'function') {
+                        window.updateQuickTradeSummary();
+                    }
+                } else {
+                    console.warn('[updateAssetPrice] quickTradePrice element not found');
+                }
+                
+                // Обновляем сводки
+                if (typeof updateTradeSummary === 'function') {
+                    updateTradeSummary();
+                }
+                
+                // Update price display
+                const priceEl = document.getElementById('currentPrice');
+                const changeEl = document.getElementById('currentChange');
+                
+                if (priceEl) {
+                    priceEl.textContent = NovaTrade.formatCurrency(currentAsset.price);
+                }
+                
+                if (changeEl) {
+                    if (oldPrice > 0) {
+                        const changeAmount = newPrice - oldPrice;
+                        changeEl.innerHTML = `
+                            <i class="bi bi-caret-${currentAsset.change >= 0 ? 'up' : 'down'}-fill"></i>
+                            ${currentAsset.change >= 0 ? '+' : ''}${currentAsset.change.toFixed(2)}% (${NovaTrade.formatCurrency(changeAmount)})
+                        `;
+                    } else {
+                        // Если старая цена была 0, показываем только процент изменения
+                        changeEl.innerHTML = `
+                            <i class="bi bi-caret-${currentAsset.change >= 0 ? 'up' : 'down'}-fill"></i>
+                            ${currentAsset.change >= 0 ? '+' : ''}${currentAsset.change.toFixed(2)}%
+                        `;
+                    }
+                    changeEl.className = `change ${currentAsset.change >= 0 ? 'up' : 'down'}`;
+                }
+            }
+        } else {
+            console.warn(`Failed to get price for ${symbol}, newPrice:`, newPrice);
+        }
+        } catch (error) {
+            console.error('[updateAssetPrice] Error updating asset price:', error);
+            console.error('[updateAssetPrice] Error stack:', error.stack);
+        }
+    } else {
+        console.warn(`[updateAssetPrice] No price received or price is 0. newPrice: ${newPrice}`);
+    }
+
+/**
+ * Realtime price updates from API
+ */
+let priceUpdateInterval = null;
+
+function startPriceUpdates() {
+    // Останавливаем предыдущий интервал, если он есть
+    if (priceUpdateInterval) {
+        clearInterval(priceUpdateInterval);
+    }
+    
+    // Обновляем цену сразу для всех активов
+    updateAssetPrice();
+    
+    // Обновляем цену каждые 2 секунды для всех активов (криптовалюты, акции, форекс)
+    priceUpdateInterval = setInterval(() => {
+        updateAssetPrice();
         
         // Update trade summary if quantity entered
         updateTradeSummary();
-    }, 1500); // Update every 1.5 seconds
+    }, 2000); // Update every 2 seconds
 }
 
 // Initialize on load
@@ -654,3 +1050,5 @@ window.closeAssetDropdown = closeAssetDropdown;
 window.filterByMarket = filterByMarket;
 window.filterDropdownAssets = filterDropdownAssets;
 window.selectAssetFromDropdown = selectAssetFromDropdown;
+window.updateAssetPrice = updateAssetPrice;
+window.assetList = assetList; // Экспортируем assetList для использования в trade.html
