@@ -1399,10 +1399,6 @@
                                 <span class="trade-summary-value" id="availableBalance" style="color: var(--text-primary); font-weight: 500; font-family: 'JetBrains Mono', monospace;">$10,000.00</span>
                             </div>
                             <div class="trade-summary-row" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8125rem;">
-                                <span class="trade-summary-label" style="color: var(--text-tertiary);">Цена</span>
-                                <span class="trade-summary-value" id="tradePrice" style="color: var(--text-primary); font-weight: 500; font-family: 'JetBrains Mono', monospace;">$0.00</span>
-                            </div>
-                            <div class="trade-summary-row" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8125rem;">
                                 <span class="trade-summary-label" style="color: var(--text-tertiary);">Комиссия (0.1%)</span>
                                 <span class="trade-summary-value" id="tradeFee" style="color: var(--text-primary); font-weight: 500; font-family: 'JetBrains Mono', monospace;">$0.00</span>
                             </div>
@@ -1493,10 +1489,6 @@
                                 <div class="trade-summary-row" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8125rem;">
                                     <span class="trade-summary-label" style="color: var(--text-tertiary);">Доступно</span>
                                     <span class="trade-summary-value" id="quickAvailableBalance" style="color: var(--text-primary); font-weight: 500; font-family: 'JetBrains Mono', monospace;">$10,000.00</span>
-                                </div>
-                                <div class="trade-summary-row" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8125rem;">
-                                    <span class="trade-summary-label" style="color: var(--text-tertiary);">Цена</span>
-                                    <span class="trade-summary-value" id="quickTradePrice" style="color: var(--text-primary); font-weight: 500; font-family: 'JetBrains Mono', monospace;">$0.00</span>
                                 </div>
                                 <div class="trade-summary-row" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8125rem;">
                                     <span class="trade-summary-label" style="color: var(--text-tertiary);">Комиссия (0.1%)</span>
@@ -2331,82 +2323,19 @@
         window.updateQuickTradePrice = updateQuickTradePrice;
         window.updateNormalTradePrice = updateNormalTradePrice;
         
-        // Обновляем цену для быстрой торговли при смене актива
+        // Обновляем сводку для обычной торговли (цена больше не отображается, пользователи видят её на графике)
         function updateNormalTradePrice() {
-            const priceEl = document.getElementById('tradePrice');
-            if (!priceEl) {
-                console.warn('[updateNormalTradePrice] tradePrice element not found');
-                return;
-            }
-            
-            // Используем currentAsset.price напрямую (самый надежный источник)
-            let price = 0;
-            if (typeof window.currentAsset !== 'undefined' && window.currentAsset.price && window.currentAsset.price > 0) {
-                price = window.currentAsset.price;
-                console.log(`[updateNormalTradePrice] Using currentAsset.price: $${price}`);
-            } else {
-                console.warn(`[updateNormalTradePrice] currentAsset.price is invalid: ${window.currentAsset?.price || 'undefined'}`);
-                // Fallback: пытаемся получить цену из быстрой торговли
-                const quickPriceEl = document.getElementById('quickTradePrice');
-                if (quickPriceEl && quickPriceEl.textContent !== '$0.00') {
-                    const parsedPrice = parseFloat(quickPriceEl.textContent.replace(/[^0-9.]/g, ''));
-                    if (parsedPrice > 0 && parsedPrice < 1000000) { // Проверка на разумность цены
-                        price = parsedPrice;
-                        console.log(`[updateNormalTradePrice] Using fallback price from quickTradePrice: $${price}`);
-                    }
-                }
-            }
-            
-            if (price > 0) {
-                // Форматируем цену с правильным количеством знаков после запятой
-                const decimals = window.currentAsset?.decimals || 2;
-                const formattedPrice = `$${price.toFixed(decimals)}`;
-                priceEl.textContent = formattedPrice;
-                console.log(`[updateNormalTradePrice] Updated tradePrice to: ${formattedPrice}`);
-                // Обновляем сводку после обновления цены
-                if (typeof updateTradeSummary === 'function') {
-                    updateTradeSummary();
-                }
-            } else {
-                console.warn(`[updateNormalTradePrice] Price is 0 or invalid, not updating UI`);
+            // Цена больше не отображается в терминале, но обновляем сводку (комиссия, итого)
+            if (typeof updateTradeSummary === 'function') {
+                updateTradeSummary();
             }
         }
         
         function updateQuickTradePrice() {
-            const priceEl = document.getElementById('quickTradePrice');
-            if (!priceEl) {
-                console.warn('[updateQuickTradePrice] quickTradePrice element not found');
-                return;
-            }
-            
-            // Используем currentAsset.price напрямую (самый надежный источник)
-            let price = 0;
-            if (typeof window.currentAsset !== 'undefined' && window.currentAsset.price && window.currentAsset.price > 0) {
-                price = window.currentAsset.price;
-                console.log(`[updateQuickTradePrice] Using currentAsset.price: $${price}`);
-            } else {
-                console.warn(`[updateQuickTradePrice] currentAsset.price is invalid: ${window.currentAsset?.price || 'undefined'}`);
-                // Fallback: пытаемся получить цену из обычной торговли
-                const normalPriceEl = document.getElementById('tradePrice');
-                if (normalPriceEl && normalPriceEl.textContent !== '$0.00') {
-                    const parsedPrice = parseFloat(normalPriceEl.textContent.replace(/[^0-9.]/g, ''));
-                    if (parsedPrice > 0 && parsedPrice < 1000000) { // Проверка на разумность цены
-                        price = parsedPrice;
-                        console.log(`[updateQuickTradePrice] Using fallback price from tradePrice: $${price}`);
-                    }
-                }
-            }
-            
-            if (price > 0) {
-                // Форматируем цену с правильным количеством знаков после запятой
-                const decimals = window.currentAsset?.decimals || 2;
-                const formattedPrice = `$${price.toFixed(decimals)}`;
-                priceEl.textContent = formattedPrice;
-                console.log(`[updateQuickTradePrice] Updated quickTradePrice to: ${formattedPrice}`);
-                updateQuickTradeTPSL();
+            // Цена больше не отображается в терминале, но обновляем сводку (комиссия, итого)
+            updateQuickTradeTPSL();
+            if (typeof updateQuickTradeSummary === 'function') {
                 updateQuickTradeSummary();
-            } else {
-                console.warn(`[updateQuickTradePrice] Price is 0 or invalid, not updating UI`);
             }
         }
         
@@ -2473,21 +2402,13 @@
             updateQuickTradePrice();
         }
         
-        // Инициализация цены для быстрой торговли
+        // Инициализация для быстрой торговли (цена больше не отображается)
         function initQuickTradePrice() {
-            const priceEl = document.getElementById('quickTradePrice');
-            if (priceEl && typeof window.currentAsset !== 'undefined' && window.currentAsset.price) {
-                priceEl.textContent = `$${window.currentAsset.price.toFixed(2)}`;
-            } else if (priceEl) {
-                // Пытаемся получить цену из обычной торговли
-                const normalPriceEl = document.getElementById('tradePrice');
-                if (normalPriceEl && normalPriceEl.textContent !== '$0.00') {
-                    priceEl.textContent = normalPriceEl.textContent;
-                } else {
-                    priceEl.textContent = '$0.00';
-                }
-            }
+            // Цена больше не отображается в терминале, только обновляем TPSL и сводку
             updateQuickTradeTPSL();
+            if (typeof updateQuickTradeSummary === 'function') {
+                updateQuickTradeSummary();
+            }
         }
         
         function initAssetDropdown() {

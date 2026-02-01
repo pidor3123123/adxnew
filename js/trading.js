@@ -380,8 +380,7 @@ function updateTradeSummary() {
     const tradeSide = window.TradingState?.tradeSide || 'buy';
     const finalTotal = tradeSide === 'buy' ? total + fee : total - fee;
     
-    // Update display
-    document.getElementById('tradePrice').textContent = NovaTrade.formatCurrency(price);
+    // Update display (price is no longer shown, users see it on the chart)
     document.getElementById('tradeFee').textContent = NovaTrade.formatCurrency(fee);
     document.getElementById('tradeTotal').textContent = NovaTrade.formatCurrency(finalTotal);
 }
@@ -392,11 +391,8 @@ function updateTradeSummary() {
 function updateQuickTradeSummary() {
     const quantity = parseFloat(document.getElementById('quickQuantity')?.value) || 0;
     
-    // Получаем цену из элемента quickTradePrice (быстрая торговля всегда рыночная)
-    const priceEl = document.getElementById('quickTradePrice');
-    if (!priceEl) return;
-    
-    const price = parseFloat(priceEl.textContent.replace(/[^0-9.]/g, '')) || (currentAsset?.price || 0);
+    // Используем цену напрямую из currentAsset (синхронизируется с графиком)
+    const price = currentAsset?.price || 0;
     
     // Получаем активную сторону из быстрой торговли
     const activeTab = document.querySelector('#quickTradeMode .trade-tab.active');
