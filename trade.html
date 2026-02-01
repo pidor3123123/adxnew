@@ -534,7 +534,7 @@
             .terminal-header {
                 flex-wrap: wrap !important;
                 gap: 8px !important;
-                padding: 8px 12px !important;
+                padding: 8px 10px !important;
                 height: auto !important;
                 min-height: 50px;
             }
@@ -578,17 +578,36 @@
             .trading-terminal {
                 flex: 1 !important;
                 min-height: 300px !important;
-                padding: 12px !important;
+                padding: 16px 12px !important;
                 order: 2;
                 overflow-y: auto;
                 -webkit-overflow-scrolling: touch;
             }
             
-            /* Market Overview - компактный */
+            /* Увеличиваем ширину элементов */
+            .trade-mode-tabs,
+            .trade-tabs,
+            .order-type-tabs,
+            .trade-input-group,
+            .trade-percent-buttons,
+            .trade-summary,
+            .trade-action-btn {
+                width: 100% !important;
+                max-width: 100% !important;
+            }
+            
+            .trade-mode-content {
+                width: 100% !important;
+                padding: 0 !important;
+            }
+            
+            /* Market Overview - удобный для переключения */
             .market-overview {
-                height: 70px !important;
-                padding: 8px 12px !important;
+                height: 90px !important;
+                padding: 10px 8px !important;
                 order: 3;
+                position: relative;
+                z-index: 100;
             }
             
             .market-overview-content {
@@ -792,6 +811,31 @@
                 min-height: 48px !important;
                 font-size: 16px !important;
                 padding: 12px 16px !important;
+                width: 100% !important;
+                box-sizing: border-box !important;
+            }
+            
+            .trade-input-group {
+                width: 100% !important;
+                display: flex !important;
+                flex-direction: column !important;
+                gap: 6px !important;
+            }
+            
+            .trade-input-wrapper {
+                width: 100% !important;
+            }
+            
+            .trade-percent-buttons {
+                display: grid !important;
+                grid-template-columns: repeat(4, 1fr) !important;
+                gap: 8px !important;
+                width: 100% !important;
+            }
+            
+            .trade-summary {
+                width: 100% !important;
+                padding: 12px !important;
             }
             
             /* Quick trade - упрощенный интерфейс */
@@ -847,20 +891,38 @@
                 border-radius: 2px;
             }
             
-            /* Market items - компактные карточки */
+            /* Market items - удобные карточки для touch */
             .market-item {
-                min-width: 80px !important;
-                width: 80px !important;
-                height: 60px !important;
+                min-width: 90px !important;
+                width: 90px !important;
+                height: 70px !important;
                 flex-shrink: 0;
-                padding: 8px !important;
-                font-size: 0.75rem !important;
+                padding: 10px 8px !important;
+                font-size: 0.8125rem !important;
                 cursor: pointer;
                 transition: all 0.2s ease;
+                border-radius: 8px !important;
+                display: flex !important;
+                flex-direction: column !important;
+                align-items: center !important;
+                justify-content: center !important;
+                gap: 4px !important;
             }
             
             .market-item:active {
                 transform: scale(0.95);
+            }
+            
+            .market-item img,
+            .market-item .asset-icon {
+                width: 28px !important;
+                height: 28px !important;
+            }
+            
+            .market-item span,
+            .market-item .asset-name {
+                font-size: 0.75rem !important;
+                font-weight: 500 !important;
             }
         }
         
@@ -934,8 +996,23 @@
             }
             
             .trading-terminal {
-                padding: 10px !important;
+                padding: 12px 8px !important;
                 min-height: 280px !important;
+            }
+            
+            .trade-mode-tabs,
+            .trade-tabs,
+            .order-type-tabs {
+                padding: 4px !important;
+                gap: 4px !important;
+            }
+            
+            .trade-input-wrapper {
+                width: 100% !important;
+            }
+            
+            .trade-input {
+                width: 100% !important;
             }
             
             .trade-form {
@@ -998,8 +1075,14 @@
             }
             
             .market-overview {
-                height: 60px !important;
-                padding: 6px 10px !important;
+                height: 85px !important;
+                padding: 8px 6px !important;
+            }
+            
+            .market-item {
+                min-width: 85px !important;
+                width: 85px !important;
+                height: 65px !important;
             }
         }
         
