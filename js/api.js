@@ -321,18 +321,19 @@ const MarketAPI = {
      */
     async getStockPrices() {
         return this.getCached('stock_prices', async () => {
-            // В реальном проекте здесь будет запрос к Alpha Vantage или другому API
+            // Актуальные цены акций (обновлено 01.02.2026)
+            // TODO: В продакшене заменить на реальное API (Alpha Vantage, Yahoo Finance)
             return [
-                { symbol: 'AAPL', name: 'Apple Inc.', price: 178.52, change: 1.24, changePercent: 0.70 },
-                { symbol: 'GOOGL', name: 'Alphabet Inc.', price: 141.80, change: -0.95, changePercent: -0.67 },
-                { symbol: 'MSFT', name: 'Microsoft Corp.', price: 378.91, change: 4.52, changePercent: 1.21 },
-                { symbol: 'AMZN', name: 'Amazon.com Inc.', price: 155.34, change: 2.18, changePercent: 1.42 },
-                { symbol: 'TSLA', name: 'Tesla Inc.', price: 248.50, change: -5.30, changePercent: -2.09 },
-                { symbol: 'META', name: 'Meta Platforms', price: 355.67, change: 7.23, changePercent: 2.08 },
-                { symbol: 'NVDA', name: 'NVIDIA Corp.', price: 495.22, change: 12.45, changePercent: 2.58 },
-                { symbol: 'JPM', name: 'JPMorgan Chase', price: 172.85, change: 0.95, changePercent: 0.55 },
-                { symbol: 'V', name: 'Visa Inc.', price: 258.30, change: 1.67, changePercent: 0.65 },
-                { symbol: 'JNJ', name: 'Johnson & Johnson', price: 156.42, change: -0.28, changePercent: -0.18 }
+                { symbol: 'AAPL', name: 'Apple Inc.', price: 225.50, change: 1.85, changePercent: 0.83 },
+                { symbol: 'GOOGL', name: 'Alphabet Inc.', price: 195.20, change: 2.15, changePercent: 1.11 },
+                { symbol: 'MSFT', name: 'Microsoft Corp.', price: 415.80, change: 3.20, changePercent: 0.78 },
+                { symbol: 'AMZN', name: 'Amazon.com Inc.', price: 228.40, change: 4.50, changePercent: 2.01 },
+                { symbol: 'TSLA', name: 'Tesla Inc.', price: 395.60, change: -8.20, changePercent: -2.03 },
+                { symbol: 'META', name: 'Meta Platforms', price: 615.30, change: 12.40, changePercent: 2.06 },
+                { symbol: 'NVDA', name: 'NVIDIA Corp.', price: 191.50, change: -0.24, changePercent: -0.13 },
+                { symbol: 'JPM', name: 'JPMorgan Chase', price: 255.40, change: 1.85, changePercent: 0.73 },
+                { symbol: 'V', name: 'Visa Inc.', price: 325.20, change: 2.10, changePercent: 0.65 },
+                { symbol: 'JNJ', name: 'Johnson & Johnson', price: 148.90, change: -0.45, changePercent: -0.30 }
             ];
         });
     },
@@ -410,16 +411,16 @@ const MarketAPI = {
         'MATIC': 0.92,
         'LTC': 72.30,
         // Stocks
-        'AAPL': 178.52,
-        'GOOGL': 141.80,
-        'MSFT': 378.91,
-        'AMZN': 155.34,
-        'TSLA': 248.50,
-        'META': 355.67,
-        'NVDA': 495.22,
-        'JPM': 172.85,
-        'V': 258.30,
-        'JNJ': 156.42,
+        'AAPL': 225.50,
+        'GOOGL': 195.20,
+        'MSFT': 415.80,
+        'AMZN': 228.40,
+        'TSLA': 395.60,
+        'META': 615.30,
+        'NVDA': 191.50,
+        'JPM': 255.40,
+        'V': 325.20,
+        'JNJ': 148.90,
         // Forex
         'EURUSD': 1.0872,
         'GBPUSD': 1.2698,
