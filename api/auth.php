@@ -212,6 +212,15 @@ function getUserByToken(string $token): ?array {
 }
 
 /**
+ * Получение текущего авторизованного пользователя
+ */
+function getAuthUser(): ?array {
+    $token = getAuthorizationToken();
+    if (!$token) return null;
+    return getUserByToken($token);
+}
+
+/**
  * Создание сессии
  */
 function createSession(int $userId, bool $remember = false): string {

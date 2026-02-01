@@ -19,12 +19,7 @@ require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/../config/supabase.php';
 
-// Получение пользователя из токена
-function getAuthUser(): ?array {
-    $token = getAuthorizationToken();
-    if (!$token) return null;
-    return getUserByToken($token);
-}
+// getAuthUser() теперь определена в auth.php
 
 // Получение баланса пользователя
 function getBalance(int $userId, string $currency): float {
