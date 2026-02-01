@@ -626,6 +626,12 @@ async function loadUserBalances(forceRefresh = false) {
         });
         
         if (!response.ok) {
+            // Специальная обработка 401 - не прерываем выполнение, только логируем
+            if (response.status === 401) {
+                console.warn('[loadUserBalances] 401 Unauthorized - user may need to re-login');
+                // Не выбрасываем ошибку, чтобы не прерывать другие функции
+                return;
+            }
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         

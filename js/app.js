@@ -426,10 +426,29 @@ function setActiveNav() {
  * Инициализация при загрузке страницы
  */
 document.addEventListener('DOMContentLoaded', () => {
-    initTheme();
-    initUserMenu();
-    initMobileMenu();
-    setActiveNav();
+    try { 
+        initTheme(); 
+    } catch(e) { 
+        console.error('Theme init error:', e); 
+    }
+    
+    try { 
+        initUserMenu(); 
+    } catch(e) { 
+        console.error('UserMenu init error:', e); 
+    }
+    
+    try { 
+        initMobileMenu(); 
+    } catch(e) { 
+        console.error('MobileMenu init error:', e); 
+    }
+    
+    try { 
+        setActiveNav(); 
+    } catch(e) { 
+        console.error('ActiveNav error:', e); 
+    }
 });
 
 // Экспорт для глобального использования

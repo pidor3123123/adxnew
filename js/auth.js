@@ -636,6 +636,12 @@ const Auth = {
             });
             
             if (!response.ok) {
+                // Специальная обработка 401 - не прерываем выполнение, только логируем
+                if (response.status === 401) {
+                    console.warn('[loadBalance] 401 Unauthorized - user may need to re-login');
+                    // Не выбрасываем ошибку, чтобы не прерывать другие функции
+                    return;
+                }
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
             
@@ -822,6 +828,15 @@ const Auth = {
             const headerBalance = document.getElementById('headerBalance');
             if (headerBalance) {
                 headerBalance.textContent = '0.00';
+            }
+        }
+        
+        // Переинициализируем меню после обновления UI (особенно важно после авторизации)
+        if (typeof initUserMenu === 'function') {
+            try {
+                initUserMenu();
+            } catch (e) {
+                console.error('[updateUI] Error reinitializing user menu:', e);
             }
         }
     }
