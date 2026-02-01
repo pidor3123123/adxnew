@@ -4,22 +4,11 @@
  */
 
 require_once __DIR__ . '/../config/database.php';
-require_once __DIR__ . '/auth.php';
 
 header('Content-Type: application/json');
 setCorsHeaders();
 header('Access-Control-Allow-Methods: POST, GET, PUT, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
-
-/**
- * Установка заголовков для предотвращения кеширования
- * Используется для динамических данных (баланс, транзакции, профиль)
- */
-function setNoCacheHeaders(): void {
-    header('Cache-Control: no-cache, no-store, must-revalidate, max-age=0');
-    header('Pragma: no-cache');
-    header('Expires: 0');
-}
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
@@ -58,6 +47,24 @@ function getAuthorizationToken(): string {
     return trim($token);
 }
 
+function getAuthUser(): ?array {
+    $token = getAuthorizationToken();
+    
+    if (!$token) return null;
+    
+    $db = getDB();
+    $stmt = $db->prepare('
+        SELECT u.* FROM users u
+        JOIN user_sessions s ON s.user_id = u.id
+        WHERE s.token = ? AND s.expires_at > NOW() AND u.is_active = 1
+    ');
+    $stmt->execute([$token]);
+    $user = $stmt->fetch();
+    
+    if ($user) unset($user['password']);
+    return $user ?: null;
+}
+
 $method = $_SERVER['REQUEST_METHOD'];
 $action = $_GET['action'] ?? '';
 
@@ -71,7 +78,6 @@ try {
     switch ($action) {
         case 'profile':
             if ($method === 'GET') {
-                setNoCacheHeaders();
                 echo json_encode([
                     'success' => true,
                     'user' => $user
@@ -92,7 +98,6 @@ try {
                 ');
                 $stmt->execute([$firstName, $lastName, $phone, $country, $user['id']]);
                 
-                setNoCacheHeaders();
                 echo json_encode([
                     'success' => true,
                     'message' => 'Profile updated'

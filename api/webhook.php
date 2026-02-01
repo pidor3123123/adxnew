@@ -91,8 +91,7 @@ try {
                         $supabaseUserId,
                         $currency,
                         (float)($available ?? 0),
-                        (float)($locked ?? 0),
-                        $email // Передаем email из webhook для более надежного поиска
+                        (float)($locked ?? 0)
                     );
                     error_log("✓ Balance synced successfully from Supabase to MySQL");
                     
