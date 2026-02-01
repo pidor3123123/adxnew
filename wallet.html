@@ -66,6 +66,24 @@
                 align-items: flex-start;
             }
             
+            .wallet-total {
+                padding: 24px 20px;
+            }
+            
+            .wallet-total-value {
+                font-size: 2.5rem;
+            }
+            
+            .wallet-actions {
+                flex-direction: column;
+                width: 100%;
+            }
+            
+            .wallet-actions .btn {
+                width: 100%;
+                min-height: 48px;
+            }
+            
             .currency-card {
                 padding: 16px;
             }
@@ -76,8 +94,38 @@
                 font-size: 1.125rem;
             }
             
+            .balance-item {
+                padding: 16px;
+                flex-wrap: wrap;
+            }
+            
+            .balance-amount {
+                width: 100%;
+                text-align: left;
+                margin-top: 12px;
+            }
+            
             .transaction-item {
-                padding: 12px;
+                padding: 16px;
+                flex-wrap: wrap;
+                gap: 12px;
+            }
+            
+            .transaction-icon {
+                width: 40px;
+                height: 40px;
+                font-size: 1.125rem;
+            }
+            
+            .transaction-info {
+                flex: 1;
+                min-width: 0;
+            }
+            
+            .transaction-amount {
+                width: 100%;
+                text-align: left;
+                margin-top: 8px;
             }
         }
         
@@ -111,19 +159,58 @@
                 font-size: 1.5rem;
             }
             
+            .wallet-total {
+                padding: 20px 16px;
+            }
+            
+            .wallet-total-value {
+                font-size: 2rem;
+            }
+            
+            .currency-card {
+                padding: 12px;
+            }
+            
+            .currency-balance {
+                font-size: 1.5rem;
+            }
+            
+            .balance-item {
+                padding: 12px;
+            }
+            
             .transaction-item {
                 flex-direction: column;
-                gap: 8px;
+                gap: 12px;
                 padding: 12px;
+            }
+            
+            .transaction-icon {
+                width: 36px;
+                height: 36px;
+                font-size: 1rem;
             }
             
             .transaction-info {
                 width: 100%;
             }
             
+            .transaction-title {
+                font-size: 0.9375rem;
+            }
+            
+            .transaction-date {
+                font-size: 0.75rem;
+            }
+            
             .transaction-amount {
                 width: 100%;
                 text-align: left;
+                margin-top: 8px;
+            }
+            
+            .transaction-amount > div:first-child {
+                font-size: 1.125rem;
             }
         }
         

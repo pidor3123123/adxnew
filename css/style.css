@@ -2212,45 +2212,121 @@ h6 { font-size: 1rem; }
 }
 
 /* Мобильное меню */
-.mobile-menu {
+.mobile-menu-overlay {
     position: fixed;
-    top: var(--header-height);
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: var(--bg-secondary);
-    border-top: 1px solid var(--border-color);
-    z-index: 99;
-    transform: translateY(-100%);
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    z-index: 9998;
     opacity: 0;
     visibility: hidden;
     transition: all var(--transition-normal);
-    overflow-y: auto;
 }
 
-.mobile-menu.open {
-    transform: translateY(0);
+.mobile-menu-overlay.open {
     opacity: 1;
     visibility: visible;
 }
 
+.mobile-menu {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--bg-secondary);
+    z-index: 9999;
+    transform: translateX(-100%);
+    transition: transform var(--transition-normal);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    display: flex;
+    flex-direction: column;
+    max-width: 320px;
+    box-shadow: var(--shadow-xl);
+}
+
+.mobile-menu.open {
+    transform: translateX(0);
+}
+
+.mobile-menu-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border-color);
+    min-height: var(--header-height);
+}
+
+.mobile-menu-header .logo {
+    font-size: 1.25rem;
+}
+
+.mobile-menu-close {
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-md);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    flex-shrink: 0;
+}
+
+.mobile-menu-close:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-color-light);
+}
+
 .mobile-menu-content {
+    flex: 1;
     padding: 20px;
+    overflow-y: auto;
 }
 
 .mobile-menu .nav-link {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 16px;
+    gap: 16px;
+    padding: 16px 20px;
     border-radius: var(--radius-md);
     margin-bottom: 8px;
     font-size: 1rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    background: transparent;
+    transition: all var(--transition-fast);
+    text-decoration: none;
+    min-height: 56px;
+}
+
+.mobile-menu .nav-link:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.mobile-menu .nav-link.active {
+    background: var(--accent-primary-soft);
+    color: var(--accent-primary);
 }
 
 .mobile-menu .nav-link i {
-    font-size: 1.25rem;
-    width: 24px;
+    font-size: 1.5rem;
+    width: 28px;
+    flex-shrink: 0;
+}
+
+/* Блокировка scroll body при открытом меню */
+body.mobile-menu-open {
+    overflow: hidden;
+    position: fixed;
+    width: 100%;
 }
 
 /* ================================================
@@ -2740,6 +2816,154 @@ h6 { font-size: 1rem; }
     
     .form-input {
         padding: 12px 14px;
+    }
+}
+
+/* ================================================
+   Базовые мобильные улучшения
+   ================================================ */
+
+/* Safe area insets для iPhone X+ */
+@supports (padding: max(0px)) {
+    .header,
+    .mobile-menu,
+    .main-content {
+        padding-left: max(16px, env(safe-area-inset-left));
+        padding-right: max(16px, env(safe-area-inset-right));
+    }
+    
+    .header {
+        padding-top: max(0px, env(safe-area-inset-top));
+    }
+    
+    .mobile-menu {
+        padding-top: max(0px, env(safe-area-inset-top));
+        padding-bottom: max(0px, env(safe-area-inset-bottom));
+    }
+}
+
+/* Улучшенные touch-target размеры */
+@media (max-width: 768px) {
+    /* Минимальный размер для всех интерактивных элементов */
+    button,
+    .btn,
+    a.btn,
+    .nav-link,
+    .tab,
+    .dropdown-item,
+    .form-check-input,
+    input[type="checkbox"],
+    input[type="radio"],
+    .mobile-menu-close,
+    .theme-toggle,
+    .user-menu-trigger {
+        min-height: 44px;
+        min-width: 44px;
+        touch-action: manipulation;
+    }
+    
+    /* Улучшенная отзывчивость на touch */
+    button:active,
+    .btn:active,
+    a:active {
+        transform: scale(0.98);
+        transition: transform 0.1s ease;
+    }
+    
+    /* Улучшенная типографика для мобильных */
+    body {
+        -webkit-text-size-adjust: 100%;
+        text-size-adjust: 100%;
+    }
+    
+    /* Улучшенная читаемость на маленьких экранах */
+    p, span, div {
+        line-height: 1.6;
+    }
+    
+    /* Улучшенные отступы для touch */
+    .form-group {
+        margin-bottom: 20px;
+    }
+    
+    /* Улучшенные карточки */
+    .card {
+        margin-bottom: 16px;
+    }
+    
+    /* Улучшенные списки */
+    ul, ol {
+        padding-left: 20px;
+    }
+    
+    /* Улучшенные иконки */
+    i[class^="bi-"] {
+        min-width: 20px;
+        text-align: center;
+    }
+}
+
+/* Предотвращение zoom на input focus (iOS) */
+@media (max-width: 768px) {
+    input[type="text"],
+    input[type="number"],
+    input[type="email"],
+    input[type="password"],
+    input[type="tel"],
+    input[type="search"],
+    input[type="url"],
+    select,
+    textarea {
+        font-size: 16px !important;
+    }
+}
+
+/* Улучшенная прокрутка на мобильных */
+@media (max-width: 768px) {
+    * {
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    /* Плавная прокрутка */
+    html {
+        scroll-behavior: smooth;
+    }
+    
+    /* Улучшенная прокрутка для контейнеров */
+    .table-container,
+    .mobile-menu-content,
+    .asset-dropdown-list {
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
+    }
+}
+
+/* Улучшенные модальные окна на мобильных */
+@media (max-width: 768px) {
+    .modal {
+        margin: 16px;
+        max-width: calc(100% - 32px);
+        max-height: calc(100vh - 32px);
+    }
+    
+    .modal-overlay {
+        padding: 16px;
+        align-items: flex-end;
+    }
+    
+    .modal-overlay.active .modal {
+        animation: slideUp 0.3s ease;
+    }
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
     }
 }
 

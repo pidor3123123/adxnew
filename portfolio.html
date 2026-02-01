@@ -74,12 +74,48 @@
                 align-items: flex-start;
             }
             
+            .portfolio-summary {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 16px;
+            }
+            
+            .stat-card {
+                padding: 20px;
+            }
+            
+            .stat-value {
+                font-size: 1.5rem;
+            }
+            
             .allocation-chart {
                 height: 200px;
+                padding: 16px;
+            }
+            
+            .allocation-list {
+                padding: 0 16px 16px;
             }
             
             .portfolio-item {
-                padding: 12px;
+                padding: 16px;
+                flex-wrap: wrap;
+            }
+            
+            .portfolio-item-info {
+                flex: 1;
+                min-width: 0;
+            }
+            
+            .portfolio-item-actions {
+                width: 100%;
+                display: flex;
+                gap: 8px;
+                margin-top: 12px;
+            }
+            
+            .portfolio-item-actions .btn {
+                flex: 1;
+                min-height: 44px;
             }
         }
         
@@ -88,8 +124,39 @@
                 gap: 12px;
             }
             
+            .portfolio-summary {
+                grid-template-columns: 1fr;
+                gap: 12px;
+            }
+            
+            .stat-card {
+                padding: 16px;
+            }
+            
+            .stat-value {
+                font-size: 1.25rem;
+            }
+            
             .allocation-chart {
                 height: 180px;
+                padding: 12px;
+            }
+            
+            .allocation-list {
+                padding: 0 12px 12px;
+            }
+            
+            .allocation-item {
+                padding: 12px 0;
+            }
+            
+            .portfolio-item {
+                padding: 12px;
+            }
+            
+            .portfolio-item-info {
+                width: 100%;
+                margin-bottom: 12px;
             }
         }
         

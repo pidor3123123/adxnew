@@ -91,15 +91,72 @@
                 min-width: 0;
             }
             
+            .filters {
+                flex-direction: column;
+            }
+            
+            .filter-select {
+                width: 100%;
+                min-height: 48px;
+                font-size: 16px;
+            }
+            
+            /* Order rows - карточный вид на mobile */
+            .order-row.header {
+                display: none;
+            }
+            
             .order-row {
-                padding: 12px;
-                gap: 8px;
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+                padding: 16px;
+                background: var(--bg-secondary);
+                border: 1px solid var(--border-color);
+                border-radius: var(--radius-md);
+                margin-bottom: 12px;
+            }
+            
+            .order-row:hover {
+                background: var(--bg-hover);
+                transform: translateY(-2px);
+                box-shadow: var(--shadow-md);
             }
             
             .order-icon {
-                width: 32px;
-                height: 32px;
-                font-size: 0.75rem;
+                width: 40px;
+                height: 40px;
+                font-size: 0.875rem;
+            }
+            
+            .order-asset {
+                width: 100%;
+                margin-bottom: 8px;
+            }
+            
+            .order-info {
+                width: 100%;
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+            }
+            
+            .order-value {
+                width: 100%;
+                text-align: left;
+                margin-top: 8px;
+            }
+            
+            .order-actions {
+                width: 100%;
+                display: flex;
+                gap: 8px;
+                margin-top: 8px;
+            }
+            
+            .order-actions .btn {
+                flex: 1;
+                min-height: 44px;
             }
         }
         
@@ -117,33 +174,13 @@
             }
             
             .order-row {
-                padding: 10px;
-                flex-wrap: wrap;
+                padding: 12px;
             }
             
-            .order-asset {
-                width: 100%;
-                margin-bottom: 8px;
-            }
-            
-            .order-info {
-                width: 100%;
-            }
-            
-            .order-value {
-                width: 100%;
-                text-align: left;
-                margin-top: 8px;
-            }
-            
-            .order-actions {
-                width: 100%;
-                display: flex;
-                gap: 8px;
-            }
-            
-            .order-actions .btn {
-                flex: 1;
+            .order-icon {
+                width: 36px;
+                height: 36px;
+                font-size: 0.75rem;
             }
         }
         

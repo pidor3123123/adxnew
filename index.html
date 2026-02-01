@@ -221,15 +221,57 @@
                 display: none;
             }
             
-            .market-item {
-                grid-template-columns: 1fr auto auto;
+            /* Market list - карточный вид на mobile */
+            .market-list {
+                display: flex;
+                flex-direction: column;
                 gap: 12px;
-                padding: 12px 16px;
+            }
+            
+            .market-item {
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+                padding: 16px;
+                background: var(--bg-secondary);
+                border: 1px solid var(--border-color);
+                border-radius: var(--radius-md);
+                cursor: pointer;
+                transition: all var(--transition-fast);
+            }
+            
+            .market-item:hover {
+                background: var(--bg-hover);
+                transform: translateY(-2px);
+                box-shadow: var(--shadow-md);
+            }
+            
+            .market-item .market-row {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                width: 100%;
+            }
+            
+            .market-item .market-price {
+                font-size: 1.25rem;
+                font-weight: 600;
+                margin-top: 8px;
+            }
+            
+            .market-item .market-change {
+                margin-top: 8px;
+                align-self: flex-start;
             }
             
             .market-item .market-cap,
             .market-item .market-volume,
             .market-item .market-sparkline {
+                display: none;
+            }
+            
+            /* Header таблицы скрываем на mobile */
+            .market-item.header {
                 display: none;
             }
             
@@ -249,6 +291,19 @@
                 grid-template-columns: 1fr;
                 gap: 32px;
             }
+            
+            footer > .container > div:first-child > div {
+                margin-bottom: 24px;
+            }
+            
+            /* Features grid - 1 колонка на mobile */
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .feature-card {
+                padding: 24px;
+            }
         }
         
         @media (max-width: 480px) {
@@ -267,11 +322,24 @@
             }
             
             .market-item {
-                padding: 10px 12px;
+                padding: 12px;
+            }
+            
+            .market-item .market-price {
+                font-size: 1.125rem;
             }
             
             .feature-card {
-                padding: 24px;
+                padding: 20px;
+            }
+            
+            .quick-stats {
+                grid-template-columns: 1fr;
+                gap: 16px;
+            }
+            
+            .stat-card {
+                padding: 20px;
             }
             
             .feature-icon {
