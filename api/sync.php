@@ -811,23 +811,55 @@ function handleAdminWebhook(string $type, array $payload): void {
             $user = $stmt->fetch();
             
             if (!$user) {
-                throw new Exception('User not found', 404);
+                // Пользователь не найден в MySQL - создаем его
+                error_log("User $email not found in MySQL, creating new user...");
+                try {
+                    syncUserFromSupabase($supabaseId);
+                    $stmt = $db->prepare('SELECT id FROM users WHERE email = ?');
+                    $stmt->execute([$email]);
+                    $user = $stmt->fetch();
+                    if (!$user) {
+                        throw new Exception("Failed to create user in MySQL: $email", 500);
+                    }
+                    error_log("Created user $email in MySQL with ID: " . $user['id']);
+                } catch (Exception $e) {
+                    error_log("Error syncing user from Supabase: " . $e->getMessage());
+                    throw new Exception('User not found and sync failed: ' . $email, 404);
+                }
             }
             
-            // Обновляем баланс в MySQL
+            $mysqlUserId = $user['id'];
+            error_log("balance_updated webhook: MySQL user_id=$mysqlUserId, email=$email, currency=$currency, available=$available");
+            
+            // Обновляем/создаем баланс в MySQL
             $stmt = $db->prepare('
                 INSERT INTO balances (user_id, currency, available, reserved)
                 VALUES (?, ?, ?, ?)
                 ON DUPLICATE KEY UPDATE
                     available = VALUES(available),
-                    reserved = VALUES(reserved)
+                    reserved = VALUES(reserved),
+                    updated_at = CURRENT_TIMESTAMP
             ');
             $stmt->execute([
-                $user['id'],
+                $mysqlUserId,
                 $currency,
                 $available ?? 0,
                 $locked ?? 0
             ]);
+            
+            $affectedRows = $stmt->rowCount();
+            error_log("balance_updated webhook: MySQL balances updated, affected_rows=$affectedRows");
+            
+            // Проверяем, что баланс создан/обновлен
+            $stmt = $db->prepare('SELECT available, reserved FROM balances WHERE user_id = ? AND currency = ?');
+            $stmt->execute([$mysqlUserId, $currency]);
+            $newBalance = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($newBalance) {
+                error_log("balance_updated webhook: MySQL balance verified - available=" . $newBalance['available'] . ", reserved=" . $newBalance['reserved']);
+            } else {
+                error_log("balance_updated webhook: WARNING - MySQL balance not found after insert!");
+            }
             break;
             
         default:
