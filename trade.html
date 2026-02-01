@@ -1939,12 +1939,12 @@
                 // Если актив не найден, создаем его с базовыми данными
                 if (!asset) {
                     // Используем реальную базовую цену из MarketAPI, если доступна
-                    let basePrice = 43250; // Дефолт для BTC
+                    let basePrice = 78350; // Дефолт для BTC
                     if (typeof MarketAPI !== 'undefined' && MarketAPI.basePrices) {
                         basePrice = MarketAPI.basePrices[baseSymbol] 
                             || MarketAPI.basePrices[baseSymbol.toLowerCase()] 
                             || MarketAPI.basePrices['BTC'] 
-                            || 43250; // Fallback на BTC цену
+                            || 78350; // Fallback на BTC цену
                     }
                     console.log(`[updateChart] Creating asset for ${baseSymbol} with base price: $${basePrice}`);
                     

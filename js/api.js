@@ -339,7 +339,7 @@ const MarketAPI = {
      */
     getMockCryptoPrices() {
         return [
-            { id: 'bitcoin', symbol: 'btc', name: 'Bitcoin', current_price: 43250.00, price_change_percentage_24h: 2.45, market_cap: 847000000000, total_volume: 28000000000, sparkline_in_7d: { price: this.generateSparkline(43250) } },
+            { id: 'bitcoin', symbol: 'btc', name: 'Bitcoin', current_price: 78350.00, price_change_percentage_24h: 2.45, market_cap: 1535000000000, total_volume: 28000000000, sparkline_in_7d: { price: this.generateSparkline(78350) } },
             { id: 'ethereum', symbol: 'eth', name: 'Ethereum', current_price: 2285.50, price_change_percentage_24h: 1.82, market_cap: 274000000000, total_volume: 15000000000, sparkline_in_7d: { price: this.generateSparkline(2285) } },
             { id: 'binancecoin', symbol: 'bnb', name: 'BNB', current_price: 312.40, price_change_percentage_24h: -0.54, market_cap: 48000000000, total_volume: 890000000, sparkline_in_7d: { price: this.generateSparkline(312) } },
             { id: 'ripple', symbol: 'xrp', name: 'XRP', current_price: 0.62, price_change_percentage_24h: 3.21, market_cap: 33000000000, total_volume: 1200000000, sparkline_in_7d: { price: this.generateSparkline(0.62) } },
@@ -576,7 +576,7 @@ const MarketAPI = {
      */
     basePrices: {
         // Crypto
-        'BTC': 43250.00,
+        'BTC': 78350.00,
         'ETH': 2285.50,
         'BNB': 312.40,
         'XRP': 0.62,
