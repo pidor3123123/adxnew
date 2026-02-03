@@ -29,69 +29,6 @@ if (!window.TradingState) {
 }
 let assetList = [];
 
-// Reference MarketAPI from window with fallback (defined in api.js)
-const MarketAPI = window.MarketAPI || {
-    getCryptoPrices: async () => [
-        { id: 'bitcoin', symbol: 'btc', name: 'Bitcoin', current_price: 78350.00, price_change_percentage_24h: 2.45 },
-        { id: 'ethereum', symbol: 'eth', name: 'Ethereum', current_price: 2285.50, price_change_percentage_24h: 1.82 },
-        { id: 'binancecoin', symbol: 'bnb', name: 'BNB', current_price: 312.40, price_change_percentage_24h: -0.54 },
-        { id: 'ripple', symbol: 'xrp', name: 'XRP', current_price: 0.62, price_change_percentage_24h: 3.21 },
-        { id: 'solana', symbol: 'sol', name: 'Solana', current_price: 98.75, price_change_percentage_24h: 5.67 },
-        { id: 'cardano', symbol: 'ada', name: 'Cardano', current_price: 0.58, price_change_percentage_24h: -1.23 },
-        { id: 'dogecoin', symbol: 'doge', name: 'Dogecoin', current_price: 0.082, price_change_percentage_24h: 1.45 },
-        { id: 'polkadot', symbol: 'dot', name: 'Polkadot', current_price: 7.85, price_change_percentage_24h: -2.10 },
-        { id: 'polygon-ecosystem-token', symbol: 'matic', name: 'Polygon', current_price: 0.92, price_change_percentage_24h: 4.32 },
-        { id: 'litecoin', symbol: 'ltc', name: 'Litecoin', current_price: 72.30, price_change_percentage_24h: 0.87 }
-    ],
-    getStockPrices: async () => [
-        { symbol: 'AAPL', name: 'Apple Inc.', price: 225.50, changePercent: 0.45 },
-        { symbol: 'GOOGL', name: 'Alphabet Inc.', price: 195.20, changePercent: 0.32 },
-        { symbol: 'MSFT', name: 'Microsoft Corp.', price: 415.80, changePercent: 0.58 },
-        { symbol: 'AMZN', name: 'Amazon.com Inc.', price: 228.40, changePercent: 0.41 },
-        { symbol: 'TSLA', name: 'Tesla Inc.', price: 395.60, changePercent: -1.20 },
-        { symbol: 'META', name: 'Meta Platforms', price: 615.30, changePercent: 0.65 },
-        { symbol: 'NVDA', name: 'NVIDIA Corp.', price: 191.50, changePercent: 1.22 },
-        { symbol: 'JPM', name: 'JPMorgan Chase', price: 255.40, changePercent: 0.28 },
-        { symbol: 'V', name: 'Visa Inc.', price: 325.20, changePercent: 0.15 },
-        { symbol: 'JNJ', name: 'Johnson & Johnson', price: 148.90, changePercent: 0.12 }
-    ],
-    getForexRates: async () => [
-        { symbol: 'EURUSD', name: 'EUR/USD', price: 1.0872, changePercent: 0.12 },
-        { symbol: 'GBPUSD', name: 'GBP/USD', price: 1.2698, changePercent: 0.08 },
-        { symbol: 'USDJPY', name: 'USD/JPY', price: 148.52, changePercent: -0.15 },
-        { symbol: 'USDCHF', name: 'USD/CHF', price: 0.8742, changePercent: 0.05 },
-        { symbol: 'AUDUSD', name: 'AUD/USD', price: 0.6578, changePercent: 0.22 },
-        { symbol: 'USDCAD', name: 'USD/CAD', price: 1.3485, changePercent: -0.10 },
-        { symbol: 'NZDUSD', name: 'NZD/USD', price: 0.6142, changePercent: 0.18 },
-        { symbol: 'EURGBP', name: 'EUR/GBP', price: 0.8561, changePercent: 0.04 },
-        { symbol: 'EURJPY', name: 'EUR/JPY', price: 161.42, changePercent: 0.20 },
-        { symbol: 'GBPJPY', name: 'GBP/JPY', price: 188.58, changePercent: 0.12 }
-    ],
-    getIndicesPrices: async () => [],
-    getCommoditiesPrices: async () => [],
-    getChartData: async (symbol, interval) => {
-        const basePrices = { BTC: 43000, ETH: 2300, SOL: 100, AAPL: 225, EURUSD: 1.09 };
-        let base = basePrices[symbol.toUpperCase()] || 100;
-        const candles = [];
-        const now = Math.floor(Date.now() / 1000);
-        for (let i = 0; i < 100; i++) {
-            const open = base + (Math.random() - 0.5) * 500;
-            const close = open + (Math.random() - 0.5) * 400;
-            candles.push({
-                time: now - (100 - i) * 60,
-                open,
-                high: Math.max(open, close) + Math.random() * 200,
-                low: Math.min(open, close) - Math.random() * 200,
-                close,
-                volume: Math.random() * 1000000
-            });
-            base = close;
-        }
-        return candles;
-    },
-    basePrices: { BTC: 78350, ETH: 2285.50, SOL: 98.75, AAPL: 225.50, BNB: 312.40, XRP: 0.62, ADA: 0.58, DOGE: 0.082, DOT: 7.85, MATIC: 0.92, LTC: 72.30 }
-};
-
 // Balance API retry limit to prevent spam on repeated failures
 let balanceLoadRetries = 0;
 const MAX_BALANCE_RETRIES = 3;
