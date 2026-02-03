@@ -875,13 +875,11 @@ async function updateAssetPrice() {
         } else {
             console.warn(`Failed to get price for ${symbol}, newPrice:`, newPrice);
         }
-        } catch (error) {
-            console.error('[updateAssetPrice] Error updating asset price:', error);
-            console.error('[updateAssetPrice] Error stack:', error.stack);
-        }
-    } else {
-        console.warn(`[updateAssetPrice] No price received or price is 0. newPrice: ${newPrice}`);
+    } catch (error) {
+        console.error('[updateAssetPrice] Error updating asset price:', error);
+        console.error('[updateAssetPrice] Error stack:', error.stack);
     }
+}
 
 /**
  * Realtime price updates from API
