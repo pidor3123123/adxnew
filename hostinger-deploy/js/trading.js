@@ -29,6 +29,20 @@ if (!window.TradingState) {
 }
 let assetList = [];
 
+// Reference MarketAPI from window with fallback (defined in api.js)
+const MarketAPI = window.MarketAPI || {
+    getCryptoPrices: async () => [],
+    getStockPrices: async () => [],
+    getForexRates: async () => [],
+    getIndicesPrices: async () => [],
+    getCommoditiesPrices: async () => [],
+    basePrices: {}
+};
+
+// Balance API retry limit to prevent spam on repeated failures
+let balanceLoadRetries = 0;
+const MAX_BALANCE_RETRIES = 3;
+
 // WebSocket больше не используется - используем только API опрос
 
 /**
@@ -659,6 +673,7 @@ async function loadUserBalances(forceRefresh = false) {
             updateTradeUI(side);
             
             console.log('[loadUserBalances] Balance loading completed successfully');
+            balanceLoadRetries = 0; // Reset on success
         } else {
             console.warn('[loadUserBalances] API returned success=false or invalid response:', result);
             // Fallback: пытаемся получить баланс из Auth.getUser()
@@ -679,6 +694,11 @@ async function loadUserBalances(forceRefresh = false) {
             }
         }
     } catch (error) {
+        if (balanceLoadRetries >= MAX_BALANCE_RETRIES) {
+            console.warn('[loadUserBalances] Max retries reached, stopping balance polling');
+            return;
+        }
+        balanceLoadRetries++;
         console.error('[loadUserBalances] Error loading balances:', error);
         // Fallback: пытаемся получить баланс из Auth.getUser()
         try {
