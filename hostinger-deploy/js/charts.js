@@ -319,26 +319,27 @@ function startRealtimeUpdates() {
     
     realtimeUpdateInterval = setInterval(() => {
         if (!lastCandle || !candlestickSeries || !chart) return;
-        
+
+        // Get current price from same source as page (Binance via trading.js)
+        const currentPrice = window.currentAsset?.price || lastCandle.close;
+        if (!currentPrice || currentPrice <= 0) return; // Skip invalid price updates
+
         const now = Date.now();
         const interval = intervalMs[currentInterval] || intervalMs['5m'];
         const currentCandleTime = Math.floor(now / interval) * interval;
         const lastCandleTimeMs = lastCandle.time * 1000;
-        
-        // Получаем текущую цену из trading.js если доступна
-        const currentPrice = window.currentAsset?.price || lastCandle.close;
-        
-        // Проверяем, нужно ли создать новую свечу
+
+        // Check if we need to create a new candle
         if (currentCandleTime > lastCandleTimeMs) {
-            // Создаём новую свечу
+            // New candle: open = previous close (smooth transition, no jump)
             const newCandleTime = Math.floor(currentCandleTime / 1000);
             lastCandle = {
                 time: newCandleTime,
-                open: currentPrice,
+                open: lastCandle.close,
                 high: currentPrice,
-                low: currentPrice,
+                low: Math.min(lastCandle.close, currentPrice),
                 close: currentPrice,
-                volume: Math.floor(Math.random() * 100000)
+                volume: lastCandle.volume ? lastCandle.volume + 1 : 1000
             };
             
             // Добавляем новую свечу через update (автоматически создастся если не существует)
@@ -372,11 +373,11 @@ function startRealtimeUpdates() {
                 isScrolledToRealTime = true;
             }
         } else {
-            // Обновляем текущую свечу
+            // Update current candle (smooth, no random jumps)
             lastCandle.close = currentPrice;
             lastCandle.high = Math.max(lastCandle.high, currentPrice);
             lastCandle.low = Math.min(lastCandle.low, currentPrice);
-            lastCandle.volume += Math.floor(Math.random() * 1000);
+            lastCandle.volume = (lastCandle.volume || 0) + 1;
             
             // Обновляем существующую свечу БЕЗ изменения позиции скролла
             candlestickSeries.update({
@@ -396,10 +397,10 @@ function startRealtimeUpdates() {
             });
         }
         
-        // Обновляем отображение цены
+        // Sync price display with chart (same source)
         updatePriceDisplay(lastCandle.close, null);
-        
-    }, 1000); // Обновляем каждую секунду
+
+    }, 5000); // Update every 5 seconds (synced with price updates)
 }
 
 /**

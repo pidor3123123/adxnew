@@ -378,16 +378,16 @@ const MarketAPI = {
      */
     getMockCryptoPrices() {
         return [
-            { id: 'bitcoin', symbol: 'btc', name: 'Bitcoin', current_price: 78350.00, price_change_percentage_24h: 2.45, market_cap: 1535000000000, total_volume: 28000000000, sparkline_in_7d: { price: this.generateSparkline(78350) } },
-            { id: 'ethereum', symbol: 'eth', name: 'Ethereum', current_price: 2285.50, price_change_percentage_24h: 1.82, market_cap: 274000000000, total_volume: 15000000000, sparkline_in_7d: { price: this.generateSparkline(2285) } },
-            { id: 'binancecoin', symbol: 'bnb', name: 'BNB', current_price: 312.40, price_change_percentage_24h: -0.54, market_cap: 48000000000, total_volume: 890000000, sparkline_in_7d: { price: this.generateSparkline(312) } },
-            { id: 'ripple', symbol: 'xrp', name: 'XRP', current_price: 0.62, price_change_percentage_24h: 3.21, market_cap: 33000000000, total_volume: 1200000000, sparkline_in_7d: { price: this.generateSparkline(0.62) } },
-            { id: 'solana', symbol: 'sol', name: 'Solana', current_price: 98.75, price_change_percentage_24h: 5.67, market_cap: 42000000000, total_volume: 2100000000, sparkline_in_7d: { price: this.generateSparkline(98) } },
-            { id: 'cardano', symbol: 'ada', name: 'Cardano', current_price: 0.58, price_change_percentage_24h: -1.23, market_cap: 20000000000, total_volume: 450000000, sparkline_in_7d: { price: this.generateSparkline(0.58) } },
-            { id: 'dogecoin', symbol: 'doge', name: 'Dogecoin', current_price: 0.082, price_change_percentage_24h: 1.45, market_cap: 11500000000, total_volume: 380000000, sparkline_in_7d: { price: this.generateSparkline(0.082) } },
-            { id: 'polkadot', symbol: 'dot', name: 'Polkadot', current_price: 7.85, price_change_percentage_24h: -2.10, market_cap: 9800000000, total_volume: 280000000, sparkline_in_7d: { price: this.generateSparkline(7.85) } },
-            { id: 'polygon', symbol: 'matic', name: 'Polygon', current_price: 0.92, price_change_percentage_24h: 4.32, market_cap: 8500000000, total_volume: 520000000, sparkline_in_7d: { price: this.generateSparkline(0.92) } },
-            { id: 'litecoin', symbol: 'ltc', name: 'Litecoin', current_price: 72.30, price_change_percentage_24h: 0.87, market_cap: 5300000000, total_volume: 340000000, sparkline_in_7d: { price: this.generateSparkline(72) } }
+            { id: 'bitcoin', symbol: 'btc', name: 'Bitcoin', current_price: 98000.00, price_change_percentage_24h: 2.45, market_cap: 1920000000000, total_volume: 45000000000, sparkline_in_7d: { price: this.generateSparkline(98000) } },
+            { id: 'ethereum', symbol: 'eth', name: 'Ethereum', current_price: 3400.00, price_change_percentage_24h: 1.82, market_cap: 408000000000, total_volume: 18000000000, sparkline_in_7d: { price: this.generateSparkline(3400) } },
+            { id: 'binancecoin', symbol: 'bnb', name: 'BNB', current_price: 680.00, price_change_percentage_24h: -0.54, market_cap: 102000000000, total_volume: 1500000000, sparkline_in_7d: { price: this.generateSparkline(680) } },
+            { id: 'ripple', symbol: 'xrp', name: 'XRP', current_price: 2.45, price_change_percentage_24h: 3.21, market_cap: 135000000000, total_volume: 2500000000, sparkline_in_7d: { price: this.generateSparkline(2.45) } },
+            { id: 'solana', symbol: 'sol', name: 'Solana', current_price: 245.00, price_change_percentage_24h: 5.67, market_cap: 110000000000, total_volume: 5500000000, sparkline_in_7d: { price: this.generateSparkline(245) } },
+            { id: 'cardano', symbol: 'ada', name: 'Cardano', current_price: 1.15, price_change_percentage_24h: -1.23, market_cap: 40000000000, total_volume: 650000000, sparkline_in_7d: { price: this.generateSparkline(1.15) } },
+            { id: 'dogecoin', symbol: 'doge', name: 'Dogecoin', current_price: 0.42, price_change_percentage_24h: 1.45, market_cap: 60000000000, total_volume: 1200000000, sparkline_in_7d: { price: this.generateSparkline(0.42) } },
+            { id: 'polkadot', symbol: 'dot', name: 'Polkadot', current_price: 8.90, price_change_percentage_24h: -2.10, market_cap: 11000000000, total_volume: 380000000, sparkline_in_7d: { price: this.generateSparkline(8.90) } },
+            { id: 'polygon', symbol: 'matic', name: 'Polygon', current_price: 0.68, price_change_percentage_24h: 4.32, market_cap: 6200000000, total_volume: 480000000, sparkline_in_7d: { price: this.generateSparkline(0.68) } },
+            { id: 'litecoin', symbol: 'ltc', name: 'Litecoin', current_price: 95.00, price_change_percentage_24h: 0.87, market_cap: 7100000000, total_volume: 520000000, sparkline_in_7d: { price: this.generateSparkline(95) } }
         ];
     },
     
@@ -573,38 +573,71 @@ const MarketAPI = {
     },
     
     /**
-     * Get chart OHLCV data - same source as price for consistency
+     * Get current Binance price for a symbol (for mock fallback)
      */
-    async getChartData(symbol, interval) {
+    async getCurrentBinancePrice(symbol) {
         try {
-            const res = await fetch(`/api/market.php?action=chart&symbol=${encodeURIComponent(symbol)}&limit=100`);
-            const result = await res.json();
-            if (result.success && result.data) return result.data;
-        } catch (error) {
-            console.warn('[MarketAPI] getChartData API failed, using mock data:', error);
+            const data = await this.getBinancePrices();
+            const item = data.find(b => (b.symbol || '').toUpperCase() === (symbol || '').toUpperCase());
+            return item ? parseFloat(item.price) : 0;
+        } catch (e) {
+            return 0;
         }
+    },
 
-        // Fallback: generate mock OHLCV data
-        const basePrice = this.basePrices[symbol.toUpperCase()] || 100;
+    /**
+     * Generate mock klines based on current price (smooth data, no jumps)
+     */
+    generateMockKlines(basePrice, limit = 100, intervalSeconds = 3600) {
+        if (!basePrice || basePrice <= 0) basePrice = this.basePrices?.['BTC'] || 50000;
         const candles = [];
-        const now = Math.floor(Date.now() / 1000);
-        let price = basePrice;
+        const now = Math.floor(Date.now() / intervalSeconds) * intervalSeconds;
+        let price = basePrice * 0.95;
 
-        for (let i = 0; i < 100; i++) {
+        for (let i = 0; i < limit; i++) {
             const open = price;
-            const change = (Math.random() - 0.5) * basePrice * 0.02;
-            const close = open + change;
-            const high = Math.max(open, close) + Math.random() * basePrice * 0.005;
-            const low = Math.min(open, close) - Math.random() * basePrice * 0.005;
+            const change = (Math.random() - 0.5) * basePrice * 0.008;
+            const close = Math.max(open * 0.99, open + change);
+            const high = Math.max(open, close) * (1 + Math.random() * 0.005);
+            const low = Math.min(open, close) * (1 - Math.random() * 0.005);
 
             candles.push({
-                time: now - (100 - i) * 60,
-                open, high, low, close,
-                volume: Math.random() * 1000000
+                time: now - (limit - i) * intervalSeconds,
+                open: Math.round(open * 100) / 100,
+                high: Math.round(high * 100) / 100,
+                low: Math.round(low * 100) / 100,
+                close: Math.round(close * 100) / 100,
+                volume: Math.floor(Math.random() * 500000 + 200000)
             });
             price = close;
         }
+        // Last candle close should be near basePrice for smooth sync
+        candles[candles.length - 1].close = basePrice;
+        candles[candles.length - 1].high = Math.max(candles[candles.length - 1].high, basePrice);
+        candles[candles.length - 1].low = Math.min(candles[candles.length - 1].low, basePrice);
         return candles;
+    },
+
+    /**
+     * Get chart OHLCV data - Binance klines first, then mock based on current price
+     */
+    async getChartData(symbol, interval = '1h') {
+        // Try Binance klines first (real data, no jumps)
+        try {
+            const intervalParam = interval || '1h';
+            const res = await fetch(`/api/market.php?action=klines&symbol=${encodeURIComponent(symbol)}&interval=${encodeURIComponent(intervalParam)}&limit=100`);
+            const result = await res.json();
+            if (result.success && result.data && result.data.length > 0) {
+                return result.data;
+            }
+        } catch (error) {
+            console.warn('[MarketAPI] getChartData Binance klines failed, using fallback:', error);
+        }
+
+        // Fallback: get current Binance price and generate smooth mock data
+        const currentPrice = await this.getCurrentBinancePrice(symbol);
+        const intervalSec = (this.intervals && this.intervals[interval]) ? this.intervals[interval] / 1000 : 3600;
+        return this.generateMockKlines(currentPrice || this.basePrices?.[symbol?.toUpperCase()] || 50000, 100, intervalSec);
     },
 
     /**
@@ -624,17 +657,17 @@ const MarketAPI = {
      * Базовые цены активов
      */
     basePrices: {
-        // Crypto
-        'BTC': 78350.00,
-        'ETH': 2285.50,
-        'BNB': 312.40,
-        'XRP': 0.62,
-        'SOL': 98.75,
-        'ADA': 0.58,
-        'DOGE': 0.082,
-        'DOT': 7.85,
-        'MATIC': 0.92,
-        'LTC': 72.30,
+        // Crypto (updated for fallback when API unavailable)
+        'BTC': 98000.00,
+        'ETH': 3400.00,
+        'BNB': 680.00,
+        'XRP': 2.45,
+        'SOL': 245.00,
+        'ADA': 1.15,
+        'DOGE': 0.42,
+        'DOT': 8.90,
+        'MATIC': 0.68,
+        'LTC': 95.00,
         // Stocks
         'AAPL': 225.50,
         'GOOGL': 195.20,

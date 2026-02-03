@@ -16,28 +16,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 /**
- * Получение данных криптовалют через CoinGecko API
+ * Fetch URL - cURL first (reliable on Hostinger), fallback to file_get_contents
  */
-function getCryptoPrices(): array {
-    $url = 'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=bitcoin,ethereum,binancecoin,ripple,solana,cardano,dogecoin,polkadot,polygon-ecosystem-token,litecoin&order=market_cap_desc&sparkline=true&price_change_percentage=24h';
-    
+function fetchUrl(string $url) {
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 10,
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_HTTPHEADER => ['Accept: application/json']
+        ]);
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
+        curl_close($ch);
+        if ($httpCode === 200 && $response !== false) {
+            return $response;
+        }
+        if ($curlError) {
+            error_log('[ADX] cURL failed: ' . $curlError . ' for ' . $url);
+        }
+    }
     $context = stream_context_create([
         'http' => [
             'timeout' => 10,
             'header' => 'Accept: application/json'
         ]
     ]);
-    
     $response = @file_get_contents($url, false, $context);
-    
     if ($response === false) {
-        // Возвращаем моковые данные если API недоступен
+        error_log('[ADX] file_get_contents failed for ' . $url);
+    }
+    return $response;
+}
+
+/**
+ * Получение данных криптовалют через CoinGecko API
+ */
+function getCryptoPrices(): array {
+    $url = 'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=bitcoin,ethereum,binancecoin,ripple,solana,cardano,dogecoin,polkadot,polygon-ecosystem-token,litecoin&order=market_cap_desc&sparkline=true&price_change_percentage=24h';
+    $response = fetchUrl($url);
+    if ($response === false) {
+        error_log('[ADX] CoinGecko API failed, using mock prices');
         return getMockCryptoPrices();
     }
-    
+
     $data = json_decode($response, true);
-    
     if (!$data) {
+        error_log('[ADX] CoinGecko API invalid response, using mock prices');
         return getMockCryptoPrices();
     }
     
@@ -49,16 +76,16 @@ function getCryptoPrices(): array {
  */
 function getMockCryptoPrices(): array {
     return [
-        ['id' => 'bitcoin', 'symbol' => 'btc', 'name' => 'Bitcoin', 'current_price' => 43250.00, 'price_change_percentage_24h' => 2.45, 'market_cap' => 847000000000, 'total_volume' => 28000000000],
-        ['id' => 'ethereum', 'symbol' => 'eth', 'name' => 'Ethereum', 'current_price' => 2285.50, 'price_change_percentage_24h' => 1.82, 'market_cap' => 274000000000, 'total_volume' => 15000000000],
-        ['id' => 'binancecoin', 'symbol' => 'bnb', 'name' => 'BNB', 'current_price' => 312.40, 'price_change_percentage_24h' => -0.54, 'market_cap' => 48000000000, 'total_volume' => 890000000],
-        ['id' => 'ripple', 'symbol' => 'xrp', 'name' => 'XRP', 'current_price' => 0.62, 'price_change_percentage_24h' => 3.21, 'market_cap' => 33000000000, 'total_volume' => 1200000000],
-        ['id' => 'solana', 'symbol' => 'sol', 'name' => 'Solana', 'current_price' => 98.75, 'price_change_percentage_24h' => 5.67, 'market_cap' => 42000000000, 'total_volume' => 2100000000],
-        ['id' => 'cardano', 'symbol' => 'ada', 'name' => 'Cardano', 'current_price' => 0.58, 'price_change_percentage_24h' => -1.23, 'market_cap' => 20000000000, 'total_volume' => 450000000],
-        ['id' => 'dogecoin', 'symbol' => 'doge', 'name' => 'Dogecoin', 'current_price' => 0.082, 'price_change_percentage_24h' => 1.45, 'market_cap' => 11500000000, 'total_volume' => 380000000],
-        ['id' => 'polkadot', 'symbol' => 'dot', 'name' => 'Polkadot', 'current_price' => 7.85, 'price_change_percentage_24h' => -2.10, 'market_cap' => 9800000000, 'total_volume' => 280000000],
-        ['id' => 'polygon', 'symbol' => 'matic', 'name' => 'Polygon', 'current_price' => 0.92, 'price_change_percentage_24h' => 4.32, 'market_cap' => 8500000000, 'total_volume' => 520000000],
-        ['id' => 'litecoin', 'symbol' => 'ltc', 'name' => 'Litecoin', 'current_price' => 72.30, 'price_change_percentage_24h' => 0.87, 'market_cap' => 5300000000, 'total_volume' => 340000000],
+        ['id' => 'bitcoin', 'symbol' => 'btc', 'name' => 'Bitcoin', 'current_price' => 98000.00, 'price_change_percentage_24h' => 2.45, 'market_cap' => 1920000000000, 'total_volume' => 45000000000],
+        ['id' => 'ethereum', 'symbol' => 'eth', 'name' => 'Ethereum', 'current_price' => 3400.00, 'price_change_percentage_24h' => 1.82, 'market_cap' => 408000000000, 'total_volume' => 18000000000],
+        ['id' => 'binancecoin', 'symbol' => 'bnb', 'name' => 'BNB', 'current_price' => 680.00, 'price_change_percentage_24h' => -0.54, 'market_cap' => 102000000000, 'total_volume' => 1500000000],
+        ['id' => 'ripple', 'symbol' => 'xrp', 'name' => 'XRP', 'current_price' => 2.45, 'price_change_percentage_24h' => 3.21, 'market_cap' => 135000000000, 'total_volume' => 2500000000],
+        ['id' => 'solana', 'symbol' => 'sol', 'name' => 'Solana', 'current_price' => 245.00, 'price_change_percentage_24h' => 5.67, 'market_cap' => 110000000000, 'total_volume' => 5500000000],
+        ['id' => 'cardano', 'symbol' => 'ada', 'name' => 'Cardano', 'current_price' => 1.15, 'price_change_percentage_24h' => -1.23, 'market_cap' => 40000000000, 'total_volume' => 650000000],
+        ['id' => 'dogecoin', 'symbol' => 'doge', 'name' => 'Dogecoin', 'current_price' => 0.42, 'price_change_percentage_24h' => 1.45, 'market_cap' => 60000000000, 'total_volume' => 1200000000],
+        ['id' => 'polkadot', 'symbol' => 'dot', 'name' => 'Polkadot', 'current_price' => 8.90, 'price_change_percentage_24h' => -2.10, 'market_cap' => 11000000000, 'total_volume' => 380000000],
+        ['id' => 'polygon', 'symbol' => 'matic', 'name' => 'Polygon', 'current_price' => 0.68, 'price_change_percentage_24h' => 4.32, 'market_cap' => 6200000000, 'total_volume' => 480000000],
+        ['id' => 'litecoin', 'symbol' => 'ltc', 'name' => 'Litecoin', 'current_price' => 95.00, 'price_change_percentage_24h' => 0.87, 'market_cap' => 7100000000, 'total_volume' => 520000000],
     ];
 }
 
@@ -118,10 +145,10 @@ function generateChartData(string $symbol, int $limit = 100): array {
     $data = [];
     $time = time() - ($limit * 24 * 3600);
     
-    // Базовые цены
+    // Базовые цены (актуальные для fallback)
     $basePrices = [
-        'BTC' => 43250, 'ETH' => 2285, 'BNB' => 312, 'XRP' => 0.62, 'SOL' => 98,
-        'ADA' => 0.58, 'DOGE' => 0.082, 'DOT' => 7.85, 'MATIC' => 0.92, 'LTC' => 72,
+        'BTC' => 98000, 'ETH' => 3400, 'BNB' => 680, 'XRP' => 2.45, 'SOL' => 245,
+        'ADA' => 1.15, 'DOGE' => 0.42, 'DOT' => 8.90, 'MATIC' => 0.68, 'LTC' => 95,
         'AAPL' => 178, 'GOOGL' => 142, 'MSFT' => 379, 'AMZN' => 155, 'TSLA' => 248,
         'EURUSD' => 1.087, 'GBPUSD' => 1.27, 'USDJPY' => 148.5,
         'SPX' => 4500, 'NDX' => 15000, 'DJI' => 35000, 'FTSE' => 7500, 'DAX' => 16000
@@ -152,24 +179,48 @@ function generateChartData(string $symbol, int $limit = 100): array {
 }
 
 /**
+ * Получение исторических свечей (klines) через Binance API
+ * Binance format: [openTime, open, high, low, close, volume, ...]
+ */
+function getBinanceKlines(string $symbol, string $interval = '1h', int $limit = 100): array {
+    $binanceSymbol = strtoupper($symbol) . 'USDT';
+    $url = "https://api.binance.com/api/v3/klines?symbol={$binanceSymbol}&interval={$interval}&limit={$limit}";
+    $response = fetchUrl($url);
+    if ($response === false) {
+        error_log('[ADX] Binance API getBinanceKlines failed for ' . $binanceSymbol);
+        return [];
+    }
+
+    $data = json_decode($response, true);
+    if (!is_array($data)) {
+        error_log('[ADX] Binance klines invalid JSON for ' . $binanceSymbol);
+        return [];
+    }
+
+    $result = [];
+    foreach ($data as $kline) {
+        $result[] = [
+            'time' => (int)($kline[0] / 1000),
+            'open' => (float)$kline[1],
+            'high' => (float)$kline[2],
+            'low' => (float)$kline[3],
+            'close' => (float)$kline[4],
+            'volume' => (float)$kline[5]
+        ];
+    }
+    return $result;
+}
+
+/**
  * Получение цен криптовалют через Binance API (точные real-time цены)
  */
 function getBinancePrices(): array {
     $symbols = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'XRPUSDT', 'SOLUSDT', 'ADAUSDT', 'DOGEUSDT', 'DOTUSDT', 'MATICUSDT', 'LTCUSDT'];
     $result = [];
-    
-    $context = stream_context_create([
-        'http' => [
-            'timeout' => 10,
-            'header' => 'Accept: application/json'
-        ]
-    ]);
-    
-    // Binance returns all tickers in one call - filter for our symbols
     $url = 'https://api.binance.com/api/v3/ticker/24hr';
-    $response = @file_get_contents($url, false, $context);
-    
+    $response = fetchUrl($url);
     if ($response === false) {
+        error_log('[ADX] Binance API getBinancePrices failed');
         return [];
     }
     
@@ -201,6 +252,17 @@ try {
             $data = getBinancePrices();
             if (empty($data)) {
                 throw new Exception('Binance API unavailable', 503);
+            }
+            echo json_encode(['success' => true, 'data' => $data]);
+            break;
+
+        case 'klines':
+            $symbol = $_GET['symbol'] ?? 'BTC';
+            $interval = $_GET['interval'] ?? '1h';
+            $limit = min((int)($_GET['limit'] ?? 100), 500);
+            $data = getBinanceKlines($symbol, $interval, $limit);
+            if (empty($data)) {
+                throw new Exception('Binance klines unavailable', 503);
             }
             echo json_encode(['success' => true, 'data' => $data]);
             break;
@@ -247,9 +309,9 @@ try {
             $symbol = strtoupper($_GET['symbol'] ?? 'BTC');
             
             $prices = [
-                'BTC' => 43250.00, 'ETH' => 2285.50, 'BNB' => 312.40, 'XRP' => 0.62,
-                'SOL' => 98.75, 'ADA' => 0.58, 'DOGE' => 0.082, 'DOT' => 7.85,
-                'MATIC' => 0.92, 'LTC' => 72.30, 'AAPL' => 178.52, 'GOOGL' => 141.80,
+                'BTC' => 98000.00, 'ETH' => 3400.00, 'BNB' => 680.00, 'XRP' => 2.45,
+                'SOL' => 245.00, 'ADA' => 1.15, 'DOGE' => 0.42, 'DOT' => 8.90,
+                'MATIC' => 0.68, 'LTC' => 95.00, 'AAPL' => 178.52, 'GOOGL' => 141.80,
                 'MSFT' => 378.91, 'AMZN' => 155.34, 'TSLA' => 248.50,
                 'SPX' => 4500.00, 'NDX' => 15000.00, 'DJI' => 35000.00, 'FTSE' => 7500.00, 'DAX' => 16000.00
             ];
@@ -273,6 +335,17 @@ try {
                 'forex' => getForexRates(),
                 'indices' => getIndicesPrices()
             ]);
+            break;
+
+        case 'test_binance':
+            $result = [
+                'curl_available' => function_exists('curl_init'),
+                'allow_url_fopen' => ini_get('allow_url_fopen'),
+                'binance_test' => false
+            ];
+            $response = fetchUrl('https://api.binance.com/api/v3/ping');
+            $result['binance_test'] = ($response !== false);
+            echo json_encode($result);
             break;
             
         default:
