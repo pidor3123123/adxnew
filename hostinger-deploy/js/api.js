@@ -226,6 +226,20 @@ const MarketAPI = {
     },
     
     /**
+     * Получить цены криптовалют через Binance API (точные real-time цены)
+     */
+    async getBinancePrices() {
+        try {
+            const res = await fetch('/api/market.php?action=binance_prices');
+            const data = await res.json();
+            return (data.success && Array.isArray(data.data)) ? data.data : [];
+        } catch (e) {
+            console.warn('[MarketAPI] getBinancePrices failed:', e);
+            return [];
+        }
+    },
+    
+    /**
      * Получить данные с кэшированием
      */
     async getCached(key, fetcher) {
@@ -264,6 +278,31 @@ const MarketAPI = {
      */
     async getCryptoPrices(coins = ['bitcoin', 'ethereum', 'binancecoin', 'ripple', 'solana', 'cardano', 'dogecoin', 'polkadot', 'polygon', 'litecoin']) {
         return this.getCached('crypto_prices', async () => {
+            // Try Binance first (more reliable, real-time, accurate like TradingView)
+            try {
+                const binanceData = await this.getBinancePrices();
+                if (binanceData.length > 0) {
+                    const mapped = binanceData.map(b => {
+                        const sym = (b.symbol || '').toUpperCase();
+                        const price = parseFloat(b.price) || 0;
+                        if (price > 0) this.basePrices[sym] = price;
+                        return {
+                            id: (b.symbol || '').toLowerCase(),
+                            symbol: (b.symbol || '').toLowerCase(),
+                            current_price: price,
+                            price_change_percentage_24h: parseFloat(b.change) || 0,
+                            name: sym,
+                            market_cap: 0,
+                            total_volume: 0
+                        };
+                    });
+                    console.log(`[MarketAPI] BTC price from Binance: $${mapped.find(m => m.symbol === 'btc')?.current_price || 'N/A'}`);
+                    return mapped;
+                }
+            } catch (e) {
+                console.warn('[MarketAPI] Binance fallback, trying CoinGecko:', e);
+            }
+            
             const maxRetries = 3;
             const retryDelay = 1000; // 1 секунда
             
@@ -273,7 +312,7 @@ const MarketAPI = {
                     const controller = new AbortController();
                     const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 секунд таймаут
                     
-                    // Используем наш PHP API вместо прямого запроса к CoinGecko (избегаем CORS)
+                    // Fallback: CoinGecko API
                     const response = await fetch('/api/market.php?action=crypto', {
                         signal: controller.signal,
                         headers: {

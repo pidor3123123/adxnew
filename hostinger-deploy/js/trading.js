@@ -5,7 +5,7 @@
 let currentAsset = {
     symbol: 'BTC',
     name: 'Bitcoin',
-    price: 0, // Будет загружено из API
+    price: null, // null = unloaded, will be fetched from API
     change: 0,
     decimals: 8
 };
@@ -132,6 +132,10 @@ function filterAssetList(query) {
  */
 async function selectAsset(symbol) {
     const oldSymbol = currentAsset?.symbol;
+    
+    // Show loading state for price
+    const priceEl = document.getElementById('currentPrice');
+    if (priceEl) priceEl.textContent = 'Loading...';
     
     let asset = assetList.find(a => a.symbol === symbol || a.symbol === symbol.toUpperCase());
     
@@ -624,7 +628,7 @@ async function loadUserBalances(forceRefresh = false) {
             success: result.success,
             balancesCount: result.balances?.length || 0,
             totalUsd: result.total_usd,
-            balances: result.balances
+            balances: JSON.stringify(result.balances)
         });
         
         if (result && result.success) {
@@ -906,13 +910,13 @@ function startPriceUpdates() {
     // Обновляем цену сразу для всех активов
     updateAssetPrice();
     
-    // Обновляем цену каждые 2 секунды для всех активов (криптовалюты, акции, форекс)
+    // Обновляем цену каждые 5 секунд для всех активов (криптовалюты, акции, форекс)
     priceUpdateInterval = setInterval(() => {
         updateAssetPrice();
         
         // Update trade summary if quantity entered
         updateTradeSummary();
-    }, 2000); // Update every 2 seconds
+    }, 5000); // Update every 5 seconds
 }
 
 // Initialize on load

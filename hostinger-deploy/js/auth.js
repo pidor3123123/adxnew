@@ -651,7 +651,7 @@ const Auth = {
                 success: result.success,
                 balancesCount: result.balances?.length || 0,
                 totalUsd: result.total_usd,
-                balances: result.balances
+                balances: JSON.stringify(result.balances)
             });
             
             if (result && result.success) {

@@ -151,10 +151,60 @@ function generateChartData(string $symbol, int $limit = 100): array {
     return $data;
 }
 
+/**
+ * Получение цен криптовалют через Binance API (точные real-time цены)
+ */
+function getBinancePrices(): array {
+    $symbols = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'XRPUSDT', 'SOLUSDT', 'ADAUSDT', 'DOGEUSDT', 'DOTUSDT', 'MATICUSDT', 'LTCUSDT'];
+    $result = [];
+    
+    $context = stream_context_create([
+        'http' => [
+            'timeout' => 10,
+            'header' => 'Accept: application/json'
+        ]
+    ]);
+    
+    // Binance returns all tickers in one call - filter for our symbols
+    $url = 'https://api.binance.com/api/v3/ticker/24hr';
+    $response = @file_get_contents($url, false, $context);
+    
+    if ($response === false) {
+        return [];
+    }
+    
+    $data = json_decode($response, true);
+    if (!is_array($data)) {
+        return [];
+    }
+    
+    $wanted = array_flip($symbols);
+    foreach ($data as $item) {
+        if (!isset($item['symbol'], $wanted[$item['symbol']])) {
+            continue;
+        }
+        $result[] = [
+            'symbol' => str_replace('USDT', '', $item['symbol']),
+            'price' => (float)($item['lastPrice'] ?? 0),
+            'change' => (float)($item['priceChangePercent'] ?? 0)
+        ];
+    }
+    
+    return $result;
+}
+
 $action = $_GET['action'] ?? '';
 
 try {
     switch ($action) {
+        case 'binance_prices':
+            $data = getBinancePrices();
+            if (empty($data)) {
+                throw new Exception('Binance API unavailable', 503);
+            }
+            echo json_encode(['success' => true, 'data' => $data]);
+            break;
+            
         case 'crypto':
             echo json_encode([
                 'success' => true,
