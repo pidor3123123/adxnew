@@ -19,13 +19,6 @@ require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/../config/supabase.php';
 
-// Получение пользователя из токена
-function getAuthUser(): ?array {
-    $token = getAuthorizationToken();
-    if (!$token) return null;
-    return getUserByToken($token);
-}
-
 // Получение balance_available и balance_locked пользователя
 function getUserBalances(int $userId): array {
     $db = getDB();
@@ -110,11 +103,26 @@ try {
                 throw new Exception('Unauthorized', 401);
             }
             
-            $data = json_decode(file_get_contents('php://input'), true);
+            // DEBUG: Log received data
+            $rawInput = file_get_contents('php://input');
+            $data = json_decode($rawInput, true);
             
-            if (!$data) {
-                throw new Exception('Invalid JSON data', 400);
-            }
+            // Return debug info
+            echo json_encode([
+                'debug' => true,
+                'received_raw' => $rawInput,
+                'parsed_data' => $data,
+                'user_id' => $user['id'],
+                'symbol_check' => isset($data['symbol']) ? getAssetId($data['symbol']) : 'no symbol',
+                'validation' => [
+                    'has_symbol' => !empty($data['symbol']),
+                    'has_side' => !empty($data['side']),
+                    'side_valid' => in_array(strtolower($data['side'] ?? ''), ['buy', 'sell']),
+                    'amount_usd' => (float)($data['amount_usd'] ?? $data['amount'] ?? 0),
+                    'asset_exists' => isset($data['symbol']) ? (getAssetId($data['symbol']) !== null) : false
+                ]
+            ]);
+            exit;
             
             $symbol = strtoupper(trim($data['symbol'] ?? ''));
             $side = strtolower(trim($data['side'] ?? ''));

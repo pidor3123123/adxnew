@@ -630,7 +630,8 @@ const Auth = {
                 method: 'GET',
                 headers: {
                     'Accept': 'application/json',
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.getToken()}`
                 },
                 credentials: 'include'
             });
