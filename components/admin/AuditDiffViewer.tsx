@@ -1,9 +1,14 @@
+'use client'
+
+import { useTranslations } from 'next-intl'
+
 interface AuditDiffViewerProps {
   oldData: Record<string, any> | null
   newData: Record<string, any> | null
 }
 
 export default function AuditDiffViewer({ oldData, newData }: AuditDiffViewerProps) {
+  const t = useTranslations('common')
   const allKeys = new Set([
     ...(oldData ? Object.keys(oldData) : []),
     ...(newData ? Object.keys(newData) : []),
@@ -34,7 +39,7 @@ export default function AuditDiffViewer({ oldData, newData }: AuditDiffViewerPro
                 </div>
               </div>
               <div>
-                <div className="text-gray-500 text-xs mb-1">New Value</div>
+                <div className="text-gray-500 text-xs mb-1">{t('newValue')}</div>
                 <div className="bg-green-900/20 border border-green-800 rounded p-2 text-green-300">
                   {newValue === null || newValue === undefined
                     ? <span className="italic">null</span>
@@ -53,7 +58,7 @@ export default function AuditDiffViewer({ oldData, newData }: AuditDiffViewerPro
         const newValue = newData?.[key]
         return JSON.stringify(oldValue) === JSON.stringify(newValue)
       }) && (
-        <div className="text-gray-400 text-sm italic">No changes detected</div>
+        <div className="text-gray-400 text-sm italic">{t('noChanges')}</div>
       )}
     </div>
   )

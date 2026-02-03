@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import DataTable from '@/components/admin/DataTable'
 import Modal from '@/components/admin/Modal'
 import type { UserBalance } from '@/lib/types'
+import { useTranslations } from 'next-intl'
 
 interface BalanceWithUser extends UserBalance {
   users: {
@@ -15,6 +16,7 @@ interface BalanceWithUser extends UserBalance {
 }
 
 export default function BalancesPage() {
+  const t = useTranslations()
   const [balances, setBalances] = useState<BalanceWithUser[]>([])
   const [loading, setLoading] = useState(true)
   const [currencyFilter, setCurrencyFilter] = useState('')
@@ -84,18 +86,17 @@ export default function BalancesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-white mb-2">Balances</h1>
-        <p className="text-gray-400">Manage user balances</p>
+        <h1 className="text-3xl font-bold text-white mb-2">{t('balances.title')}</h1>
+        <p className="text-gray-400">{t('balances.subtitle')}</p>
       </div>
 
-      {/* Filter */}
       <div>
         <select
           value={currencyFilter}
           onChange={(e) => setCurrencyFilter(e.target.value)}
           className="px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
-          <option value="">All Currencies</option>
+          <option value="">{t('balances.allCurrencies')}</option>
           {currencies.map(currency => (
             <option key={currency} value={currency}>{currency}</option>
           ))}
@@ -108,32 +109,32 @@ export default function BalancesPage() {
         columns={[
           {
             key: 'users',
-            label: 'User',
+            label: t('common.user'),
             render: (user) => {
               const name = `${user?.first_name || ''} ${user?.last_name || ''}`.trim()
-              return name || user?.email || 'N/A'
+              return name || user?.email || t('common.nA')
             },
           },
-          { key: 'currency', label: 'Currency' },
+          { key: 'currency', label: t('common.currency') },
           {
             key: 'available_balance',
-            label: 'Available',
+            label: t('balances.available'),
             render: (val) => parseFloat(val).toFixed(2),
           },
           {
             key: 'locked_balance',
-            label: 'Locked',
+            label: t('balances.locked'),
             render: (val) => parseFloat(val).toFixed(2),
           },
           {
             key: 'updated_at',
-            label: 'Updated',
+            label: t('balances.updated'),
             render: (date) => new Date(date).toLocaleString(),
           },
         ]}
         onRowClick={openEditModal}
         isLoading={loading}
-        emptyMessage="No balances found"
+        emptyMessage={t('balances.noBalances')}
       />
 
       <Modal
@@ -142,13 +143,13 @@ export default function BalancesPage() {
           setEditModalOpen(false)
           setSelectedBalance(null)
         }}
-        title="Edit Balance"
+        title={t('balances.editBalance')}
       >
         {selectedBalance && (
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
-                User
+                {t('common.user')}
               </label>
               <p className="text-white">
                 {selectedBalance.users?.first_name} {selectedBalance.users?.last_name} ({selectedBalance.users?.email})
@@ -156,13 +157,13 @@ export default function BalancesPage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
-                Currency
+                {t('common.currency')}
               </label>
               <p className="text-white">{selectedBalance.currency}</p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
-                Available Balance
+                {t('users.availableBalance')}
               </label>
               <input
                 type="number"
@@ -192,13 +193,13 @@ export default function BalancesPage() {
                 }}
                 className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 onClick={handleSave}
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
               >
-                Save
+                {t('common.save')}
               </button>
             </div>
           </div>

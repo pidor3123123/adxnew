@@ -421,6 +421,11 @@ function updatePriceDisplay(price, data) {
     
     if (!priceEl || !changeEl) return;
     
+    // Sync price to trading form - same source for chart and trade
+    if (window.currentAsset && price > 0) {
+        window.currentAsset.price = price;
+    }
+    
     priceEl.textContent = NovaTrade.formatCurrency(price);
     
     // Вычисляем изменение за период

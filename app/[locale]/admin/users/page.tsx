@@ -1,13 +1,15 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter } from '@/lib/navigation'
 import DataTable from '@/components/admin/DataTable'
 import KycStatusBadge from '@/components/admin/KycStatusBadge'
 import Modal from '@/components/admin/Modal'
 import type { UserWithSecurity, KycStatus } from '@/lib/types'
+import { useTranslations } from 'next-intl'
 
 export default function UsersPage() {
+  const t = useTranslations()
   const router = useRouter()
   const [users, setUsers] = useState<UserWithSecurity[]>([])
   const [loading, setLoading] = useState(true)
@@ -167,17 +169,17 @@ export default function UsersPage() {
       const data = await res.json()
 
       if (res.ok) {
-        const message = data.message || `Синхронизировано ${data.synced} из ${data.total} пользователей`
+        const message = data.message || t('users.syncSuccess', { synced: data.synced, total: data.total })
         const details: string[] = []
         
         if (data.syncedUsers && data.syncedUsers.length > 0) {
-          details.push(`Создано: ${data.syncedUsers.slice(0, 5).join(', ')}${data.syncedUsers.length > 5 ? '...' : ''}`)
+          details.push(`${t('users.created')}: ${data.syncedUsers.slice(0, 5).join(', ')}${data.syncedUsers.length > 5 ? '...' : ''}`)
         }
         if (data.skipped && data.skipped > 0) {
-          details.push(`Пропущено (уже существуют): ${data.skipped}`)
+          details.push(`${t('users.skipped')}: ${data.skipped}`)
         }
         if (data.errors && data.errors.length > 0) {
-          details.push(`Ошибки: ${data.errors.length}`)
+          details.push(`${t('users.errors')}: ${data.errors.length}`)
         }
         
         setSyncMessage({
@@ -189,13 +191,13 @@ export default function UsersPage() {
       } else {
         setSyncMessage({
           type: 'error',
-          text: data.error || 'Ошибка при синхронизации',
+          text: data.error || t('users.syncError'),
         })
       }
     } catch (error: any) {
       setSyncMessage({
         type: 'error',
-        text: 'Ошибка при синхронизации',
+        text: t('users.syncError'),
       })
     } finally {
       setSyncing(false)
@@ -206,15 +208,15 @@ export default function UsersPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-white mb-2">Users</h1>
-          <p className="text-gray-400">Manage all users in the system</p>
+          <h1 className="text-3xl font-bold text-white mb-2">{t('users.title')}</h1>
+          <p className="text-gray-400">{t('users.subtitle')}</p>
         </div>
         <button
           onClick={handleSyncUsers}
           disabled={syncing}
           className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition-colors font-medium"
         >
-          {syncing ? 'Синхронизация...' : 'Синхронизировать пользователей'}
+          {syncing ? t('users.syncing') : t('users.syncUsers')}
         </button>
       </div>
 
@@ -234,7 +236,7 @@ export default function UsersPage() {
       <div className="flex gap-4">
         <input
           type="text"
-          placeholder="Search by name or email..."
+          placeholder={t('users.searchPlaceholder')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="flex-1 px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -244,11 +246,11 @@ export default function UsersPage() {
           onChange={(e) => setFilterKyc(e.target.value)}
           className="px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
-          <option value="all">All KYC Status</option>
-          <option value="pending">Pending</option>
-          <option value="approved">Approved</option>
-          <option value="rejected">Rejected</option>
-          <option value="under_review">Under Review</option>
+          <option value="all">{t('users.allKycStatus')}</option>
+          <option value="pending">{t('kycStatus.pending')}</option>
+          <option value="approved">{t('kycStatus.approved')}</option>
+          <option value="rejected">{t('kycStatus.rejected')}</option>
+          <option value="under_review">{t('kycStatus.underReview')}</option>
         </select>
       </div>
 
@@ -258,64 +260,64 @@ export default function UsersPage() {
         columns={[
           {
             key: 'first_name',
-            label: 'Name',
+            label: t('common.name'),
             render: (_, row: UserWithSecurity) => {
               const name = `${row.first_name || ''} ${row.last_name || ''}`.trim()
-              return name || 'N/A'
+              return name || t('common.nA')
             },
           },
-          { key: 'email', label: 'Email' },
-          { key: 'country', label: 'Country' },
+          { key: 'email', label: t('common.email') },
+          { key: 'country', label: t('userTabs.country') },
           {
             key: 'is_verified',
-            label: 'Verified',
+            label: t('users.verified'),
             render: (verified) => (
               <span className={verified ? 'text-green-400' : 'text-gray-400'}>
-                {verified ? 'Yes' : 'No'}
+                {verified ? t('common.yes') : t('common.no')}
               </span>
             ),
           },
           {
             key: 'kyc_status',
-            label: 'KYC Status',
+            label: t('users.kycStatus'),
             render: (status) => <KycStatusBadge status={status} />,
           },
           {
             key: 'user_security.account_locked_until',
-            label: 'Account Status',
+            label: t('users.accountStatus'),
             render: (lockedUntil) => {
-              if (!lockedUntil) return <span className="text-green-400">Active</span>
+              if (!lockedUntil) return <span className="text-green-400">{t('common.active')}</span>
               const lockedDate = new Date(lockedUntil)
               const now = new Date()
               if (lockedDate > now) {
-                return <span className="text-red-400">Blocked</span>
+                return <span className="text-red-400">{t('common.blocked')}</span>
               }
-              return <span className="text-green-400">Active</span>
+              return <span className="text-green-400">{t('common.active')}</span>
             },
           },
           {
             key: 'user_security.last_login_at',
-            label: 'Last Login',
+            label: t('users.lastLogin'),
             render: (lastLogin) => {
-              if (!lastLogin) return <span className="text-gray-500">Never</span>
+              if (!lastLogin) return <span className="text-gray-500">{t('common.never')}</span>
               return <span className="text-white">{new Date(lastLogin).toLocaleDateString()}</span>
             },
           },
           {
             key: 'user_balances',
-            label: 'Balance',
+            label: t('users.balance'),
             render: (balances, row: UserWithSecurity) => (
               <span className="text-white font-medium">{getMainBalance(row)}</span>
             ),
           },
           {
             key: 'created_at',
-            label: 'Joined',
+            label: t('dashboard.joined'),
             render: (date) => new Date(date).toLocaleDateString(),
           },
           {
             key: 'id',
-            label: 'Actions',
+            label: t('common.actions'),
             render: (id, row: UserWithSecurity) => (
               <div className="flex gap-2">
                 <button
@@ -325,7 +327,7 @@ export default function UsersPage() {
                   }}
                   className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors"
                 >
-                  Edit
+                  {t('users.editUser')}
                 </button>
                 <button
                   onClick={(e) => {
@@ -334,7 +336,7 @@ export default function UsersPage() {
                   }}
                   className="px-2 py-1 bg-gray-600 hover:bg-gray-700 text-white text-xs rounded transition-colors"
                 >
-                  View
+                  {t('users.viewUser')}
                 </button>
               </div>
             ),
@@ -344,7 +346,7 @@ export default function UsersPage() {
           router.push(`/admin/users/${row.id}`)
         }}
         isLoading={loading}
-        emptyMessage="No users found"
+        emptyMessage={t('users.noUsers')}
       />
 
       {/* Edit Modal */}
@@ -354,19 +356,18 @@ export default function UsersPage() {
           setEditModalOpen(false)
           setSelectedUser(null)
         }}
-        title="Edit User Status & Balance"
+        title={t('users.editUserStatusBalance')}
         size="lg"
       >
         {selectedUser && (
           <div className="space-y-6">
             <div>
-              <h3 className="text-lg font-semibold text-white mb-4">User: {selectedUser.first_name} {selectedUser.last_name}</h3>
+              <h3 className="text-lg font-semibold text-white mb-4">{t('common.user')}: {selectedUser.first_name} {selectedUser.last_name}</h3>
               <p className="text-gray-400 text-sm">{selectedUser.email}</p>
             </div>
 
-            {/* Statuses */}
             <div className="space-y-4">
-              <h4 className="text-md font-semibold text-white">Statuses</h4>
+              <h4 className="text-md font-semibold text-white">{t('users.statuses')}</h4>
               
               <div>
                 <label className="flex items-center space-x-2 cursor-pointer">
@@ -376,23 +377,23 @@ export default function UsersPage() {
                     onChange={(e) => setEditData({ ...editData, is_verified: e.target.checked })}
                     className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500"
                   />
-                  <span className="text-white">Verified</span>
+                  <span className="text-white">{t('users.verified')}</span>
                 </label>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
-                  KYC Status
+                  {t('users.kycStatus')}
                 </label>
                 <select
                   value={editData.kyc_status}
                   onChange={(e) => setEditData({ ...editData, kyc_status: e.target.value as KycStatus })}
                   className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="pending">Pending</option>
-                  <option value="approved">Approved</option>
-                  <option value="rejected">Rejected</option>
-                  <option value="under_review">Under Review</option>
+                  <option value="pending">{t('kycStatus.pending')}</option>
+                  <option value="approved">{t('kycStatus.approved')}</option>
+                  <option value="rejected">{t('kycStatus.rejected')}</option>
+                  <option value="under_review">{t('kycStatus.underReview')}</option>
                 </select>
               </div>
 
@@ -404,18 +405,17 @@ export default function UsersPage() {
                     onChange={(e) => setEditData({ ...editData, kyc_verified: e.target.checked })}
                     className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500"
                   />
-                  <span className="text-white">KYC Verified</span>
+                  <span className="text-white">{t('users.kycVerified')}</span>
                 </label>
               </div>
             </div>
 
-            {/* Balance */}
             <div className="space-y-4 border-t border-gray-700 pt-4">
-              <h4 className="text-md font-semibold text-white">Balance</h4>
+              <h4 className="text-md font-semibold text-white">{t('users.balance')}</h4>
               
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Currency
+                  {t('common.currency')}
                 </label>
                 <select
                   value={editData.balance_currency}
@@ -431,7 +431,7 @@ export default function UsersPage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Available Balance
+                  {t('users.availableBalance')}
                 </label>
                 <input
                   type="number"
@@ -444,7 +444,7 @@ export default function UsersPage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Locked Balance
+                  {t('users.lockedBalance')}
                 </label>
                 <input
                   type="number"
@@ -464,14 +464,14 @@ export default function UsersPage() {
                 }}
                 className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 onClick={handleSave}
                 disabled={saving}
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white rounded-lg transition-colors"
               >
-                {saving ? 'Saving...' : 'Save Changes'}
+                {saving ? t('users.saving') : t('users.saveChanges')}
               </button>
             </div>
           </div>

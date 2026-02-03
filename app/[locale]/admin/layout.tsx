@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation"
 import { getServerSession } from "next-auth"
+import { getLocale } from "next-intl/server"
 import { authOptions, isAdmin } from "@/lib/auth"
 import Sidebar from "@/components/admin/Sidebar"
 
@@ -8,17 +9,16 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode
 }) {
+  const locale = await getLocale()
   const session = await getServerSession(authOptions)
 
-  // ❌ не залогинен - редиректим на страницу входа
   if (!session?.user?.email) {
-    redirect("/api/auth/signin")
+    redirect(`/api/auth/signin?callbackUrl=/${locale}/admin`)
   }
 
-  // ❌ не админ - редиректим на страницу входа
   const userIsAdmin = await isAdmin(session.user.email)
   if (!userIsAdmin) {
-    redirect("/api/auth/signin")
+    redirect(`/api/auth/signin?callbackUrl=/${locale}/admin`)
   }
 
   return (

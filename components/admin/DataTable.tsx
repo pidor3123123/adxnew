@@ -1,5 +1,7 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
+
 interface Column<T> {
   key: keyof T | string
   label: string
@@ -33,7 +35,7 @@ export default function DataTable<T extends Record<string, any>>({
   if (data.length === 0) {
     return (
       <div className="bg-gray-800 rounded-lg border border-gray-700 p-8">
-        <div className="text-center text-gray-400">{emptyMessage}</div>
+        <div className="text-center text-gray-400">{message}</div>
       </div>
     )
   }

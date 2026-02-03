@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Modal from './Modal'
+import { useTranslations } from 'next-intl'
 
 interface AuthInfoProps {
   userId: string
@@ -42,7 +43,7 @@ export default function AuthInfo({ userId }: AuthInfoProps) {
 
   async function handleResetPassword() {
     if (!newPassword) {
-      alert('Please enter a new password')
+      alert(t('auth.enterNewPassword'))
       return
     }
 
@@ -74,11 +75,11 @@ export default function AuthInfo({ userId }: AuthInfoProps) {
   }
 
   if (loading) {
-    return <p className="text-gray-400">Loading auth info...</p>
+    return <p className="text-gray-400">{t('userTabs.loadingAuthInfo')}</p>
   }
 
   if (!authData) {
-    return <p className="text-gray-400">No auth data available</p>
+    return <p className="text-gray-400">{t('userTabs.noAuthData')}</p>
   }
 
   return (
@@ -98,26 +99,26 @@ export default function AuthInfo({ userId }: AuthInfoProps) {
                 </span>
               ))
             ) : (
-              <span className="text-gray-400">None</span>
+              <span className="text-gray-400">{t('userTabs.none')}</span>
             )}
           </div>
         </div>
         <div>
-          <label className="text-sm font-medium text-gray-400">Email Confirmed</label>
-          <p className="mt-1 text-white">{authData.email_confirmed ? 'Yes' : 'No'}</p>
+          <label className="text-sm font-medium text-gray-400">{t('userTabs.emailConfirmed')}</label>
+          <p className="mt-1 text-white">{authData.email_confirmed ? t('common.yes') : t('common.no')}</p>
         </div>
         <div>
-          <label className="text-sm font-medium text-gray-400">Account Created</label>
+          <label className="text-sm font-medium text-gray-400">{t('userTabs.accountCreated')}</label>
           <p className="mt-1 text-white">{new Date(authData.created_at).toLocaleString()}</p>
         </div>
         <div>
-          <label className="text-sm font-medium text-gray-400">Password</label>
+          <label className="text-sm font-medium text-gray-400">{t('auth.password')}</label>
           <div className="mt-1">
             <button
               onClick={() => setResetModalOpen(true)}
               className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded transition-colors"
             >
-              Reset Password
+              {t('auth.resetPassword')}
             </button>
           </div>
         </div>
@@ -129,22 +130,22 @@ export default function AuthInfo({ userId }: AuthInfoProps) {
           setResetModalOpen(false)
           setNewPassword('')
         }}
-        title="Reset Password"
+        title={t('auth.resetPassword')}
       >
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
-              New Password
+              {t('auth.newPassword')}
             </label>
             <input
               type="text"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="Enter new password"
+              placeholder={t('auth.enterNewPassword')}
               className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <p className="text-xs text-gray-500 mt-1">
-              User will need to use this password to login
+              {t('auth.userWillUsePassword')}
             </p>
           </div>
           <div className="flex justify-end gap-2">
@@ -155,14 +156,14 @@ export default function AuthInfo({ userId }: AuthInfoProps) {
               }}
               className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
             >
-              Cancel
+              {t('common.cancel')}
             </button>
             <button
               onClick={handleResetPassword}
               disabled={resetting || !newPassword}
               className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white rounded-lg transition-colors"
             >
-              {resetting ? 'Resetting...' : 'Reset Password'}
+              {resetting ? t('auth.resetting') : t('auth.resetPassword')}
             </button>
           </div>
         </div>

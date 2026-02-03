@@ -5,6 +5,7 @@ import type { UserWithDetails, KycStatus } from '@/lib/types'
 import KycStatusBadge from './KycStatusBadge'
 import DataTable from './DataTable'
 import AuthInfo from './AuthInfo'
+import { useTranslations } from 'next-intl'
 
 interface UserDetailTabsProps {
   user: UserWithDetails
@@ -12,6 +13,7 @@ interface UserDetailTabsProps {
 }
 
 export default function UserDetailTabs({ user: initialUser, onUserUpdate }: UserDetailTabsProps) {
+  const t = useTranslations()
   const [activeTab, setActiveTab] = useState<'info' | 'security' | 'documents' | 'balances' | 'history'>('info')
   const [user, setUser] = useState<UserWithDetails>(initialUser)
   const [isEditing, setIsEditing] = useState(false)
@@ -23,11 +25,11 @@ export default function UserDetailTabs({ user: initialUser, onUserUpdate }: User
   })
 
   const tabs = [
-    { id: 'info' as const, label: 'Information' },
-    { id: 'security' as const, label: 'Security' },
-    { id: 'documents' as const, label: 'Documents' },
-    { id: 'balances' as const, label: 'Balances' },
-    { id: 'history' as const, label: 'History' },
+    { id: 'info' as const, label: t('userTabs.information') },
+    { id: 'security' as const, label: t('userTabs.security') },
+    { id: 'documents' as const, label: t('userTabs.documents') },
+    { id: 'balances' as const, label: t('userTabs.balances') },
+    { id: 'history' as const, label: t('userTabs.history') },
   ]
 
   return (
@@ -54,13 +56,13 @@ export default function UserDetailTabs({ user: initialUser, onUserUpdate }: User
         {activeTab === 'info' && (
           <div className="space-y-4">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-white">User Information</h3>
+              <h3 className="text-lg font-semibold text-white">{t('userTabs.information')}</h3>
               {!isEditing ? (
                 <button
                   onClick={() => setIsEditing(true)}
                   className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium"
                 >
-                  Edit Statuses
+                  {t('userTabs.editStatuses')}
                 </button>
               ) : (
                 <div className="flex gap-2">
@@ -92,7 +94,7 @@ export default function UserDetailTabs({ user: initialUser, onUserUpdate }: User
                     disabled={saving}
                     className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white rounded-lg transition-colors text-sm font-medium"
                   >
-                    {saving ? 'Saving...' : 'Save'}
+                    {saving ? t('users.saving') : t('common.save')}
                   </button>
                   <button
                     onClick={() => {
@@ -105,30 +107,30 @@ export default function UserDetailTabs({ user: initialUser, onUserUpdate }: User
                     }}
                     className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors text-sm font-medium"
                   >
-                    Cancel
+                    {t('common.cancel')}
                   </button>
                 </div>
               )}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-sm font-medium text-gray-400">First Name</label>
-                <p className="mt-1 text-white">{user.first_name || 'N/A'}</p>
+                <label className="text-sm font-medium text-gray-400">{t('userTabs.firstName')}</label>
+                <p className="mt-1 text-white">{user.first_name || t('common.nA')}</p>
               </div>
               <div>
-                <label className="text-sm font-medium text-gray-400">Last Name</label>
-                <p className="mt-1 text-white">{user.last_name || 'N/A'}</p>
+                <label className="text-sm font-medium text-gray-400">{t('userTabs.lastName')}</label>
+                <p className="mt-1 text-white">{user.last_name || t('common.nA')}</p>
               </div>
               <div>
-                <label className="text-sm font-medium text-gray-400">Email</label>
-                <p className="mt-1 text-white">{user.email || 'N/A'}</p>
+                <label className="text-sm font-medium text-gray-400">{t('common.email')}</label>
+                <p className="mt-1 text-white">{user.email || t('common.nA')}</p>
               </div>
               <div>
-                <label className="text-sm font-medium text-gray-400">Country</label>
-                <p className="mt-1 text-white">{user.country || 'N/A'}</p>
+                <label className="text-sm font-medium text-gray-400">{t('userTabs.country')}</label>
+                <p className="mt-1 text-white">{user.country || t('common.nA')}</p>
               </div>
               <div>
-                <label className="text-sm font-medium text-gray-400">Verified</label>
+                <label className="text-sm font-medium text-gray-400">{t('userTabs.verified')}</label>
                 {isEditing ? (
                   <div className="mt-1">
                     <label className="flex items-center space-x-2 cursor-pointer">
@@ -138,15 +140,15 @@ export default function UserDetailTabs({ user: initialUser, onUserUpdate }: User
                         onChange={(e) => setEditData({ ...editData, is_verified: e.target.checked })}
                         className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500"
                       />
-                      <span className="text-white">{editData.is_verified ? 'Yes' : 'No'}</span>
+                      <span className="text-white">{editData.is_verified ? t('common.yes') : t('common.no')}</span>
                     </label>
                   </div>
                 ) : (
-                  <p className="mt-1 text-white">{user.is_verified ? 'Yes' : 'No'}</p>
+                  <p className="mt-1 text-white">{user.is_verified ? t('common.yes') : t('common.no')}</p>
                 )}
               </div>
               <div>
-                <label className="text-sm font-medium text-gray-400">KYC Status</label>
+                <label className="text-sm font-medium text-gray-400">{t('userTabs.kycStatus')}</label>
                 {isEditing ? (
                   <div className="mt-1">
                     <select
@@ -154,10 +156,10 @@ export default function UserDetailTabs({ user: initialUser, onUserUpdate }: User
                       onChange={(e) => setEditData({ ...editData, kyc_status: e.target.value as KycStatus })}
                       className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
-                      <option value="pending">Pending</option>
-                      <option value="approved">Approved</option>
-                      <option value="rejected">Rejected</option>
-                      <option value="under_review">Under Review</option>
+                      <option value="pending">{t('kycStatus.pending')}</option>
+                      <option value="approved">{t('kycStatus.approved')}</option>
+                      <option value="rejected">{t('kycStatus.rejected')}</option>
+                      <option value="under_review">{t('kycStatus.underReview')}</option>
                     </select>
                   </div>
                 ) : (
@@ -167,7 +169,7 @@ export default function UserDetailTabs({ user: initialUser, onUserUpdate }: User
                 )}
               </div>
               <div>
-                <label className="text-sm font-medium text-gray-400">KYC Verified</label>
+                <label className="text-sm font-medium text-gray-400">{t('userTabs.kycVerified')}</label>
                 {isEditing ? (
                   <div className="mt-1">
                     <label className="flex items-center space-x-2 cursor-pointer">
@@ -177,15 +179,15 @@ export default function UserDetailTabs({ user: initialUser, onUserUpdate }: User
                         onChange={(e) => setEditData({ ...editData, kyc_verified: e.target.checked })}
                         className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500"
                       />
-                      <span className="text-white">{editData.kyc_verified ? 'Yes' : 'No'}</span>
+                      <span className="text-white">{editData.kyc_verified ? t('common.yes') : t('common.no')}</span>
                     </label>
                   </div>
                 ) : (
-                  <p className="mt-1 text-white">{user.kyc_verified ? 'Yes' : 'No'}</p>
+                  <p className="mt-1 text-white">{user.kyc_verified ? t('common.yes') : t('common.no')}</p>
                 )}
               </div>
               <div>
-                <label className="text-sm font-medium text-gray-400">Created At</label>
+                <label className="text-sm font-medium text-gray-400">{t('userTabs.createdAt')}</label>
                 <p className="mt-1 text-white">{new Date(user.created_at).toLocaleString()}</p>
               </div>
             </div>
@@ -242,7 +244,7 @@ export default function UserDetailTabs({ user: initialUser, onUserUpdate }: User
               <DataTable
                 data={user.user_documents}
                 columns={[
-                  { key: 'type', label: 'Type' },
+                  { key: 'type', label: t('common.type') },
                   { key: 'status', label: 'Status', render: (status) => (
                     <span className={`px-2 py-1 rounded text-xs ${
                       status === 'approved' ? 'bg-green-900 text-green-300' :
@@ -252,16 +254,16 @@ export default function UserDetailTabs({ user: initialUser, onUserUpdate }: User
                       {status}
                     </span>
                   )},
-                  { key: 'uploaded_at', label: 'Uploaded', render: (date) => new Date(date).toLocaleString() },
-                  { key: 'file_url', label: 'File', render: (url) => (
+                  { key: 'uploaded_at', label: t('documents.uploaded'), render: (date) => new Date(date).toLocaleString() },
+                  { key: 'file_url', label: t('common.file'), render: (url) => (
                     <a href={url} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">
-                      View
+                      {t('common.view')}
                     </a>
                   )},
                 ]}
               />
             ) : (
-              <p className="text-gray-400">No documents uploaded</p>
+              <p className="text-gray-400">{t('userTabs.noDocumentsUploaded')}</p>
             )}
           </div>
         )}
@@ -290,12 +292,12 @@ export default function UserDetailTabs({ user: initialUser, onUserUpdate }: User
               <DataTable
                 data={user.admin_actions}
                 columns={[
-                  { key: 'action', label: 'Action' },
-                  { key: 'created_at', label: 'Date', render: (date) => new Date(date).toLocaleString() },
+                  { key: 'action', label: t('audit.action') },
+                  { key: 'created_at', label: t('common.date'), render: (date) => new Date(date).toLocaleString() },
                 ]}
               />
             ) : (
-              <p className="text-gray-400">No admin actions recorded</p>
+              <p className="text-gray-400">{t('userTabs.noAdminActions')}</p>
             )}
           </div>
         )}

@@ -559,6 +559,16 @@ const MarketAPI = {
     },
     
     /**
+     * Get chart OHLCV data - same source as price for consistency
+     */
+    async getChartData(symbol, interval) {
+        const res = await fetch(`/api/market.php?action=chart&symbol=${encodeURIComponent(symbol)}&limit=100`);
+        const result = await res.json();
+        if (result.success && result.data) return result.data;
+        throw new Error('Failed to load chart data');
+    },
+
+    /**
      * Интервалы в миллисекундах
      */
     intervals: {

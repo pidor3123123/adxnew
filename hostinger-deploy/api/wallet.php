@@ -49,34 +49,28 @@ try {
             }
             
             $db = getDB();
-            $stmt = $db->prepare('
-                SELECT currency, available, reserved 
-                FROM balances 
-                WHERE user_id = ?
-                ORDER BY 
-                    CASE currency 
-                        WHEN "USD" THEN 0 
-                        WHEN "BTC" THEN 1 
-                        WHEN "ETH" THEN 2 
-                        ELSE 3 
-                    END,
-                    currency
-            ');
+            // Получаем balance_available и balance_locked из users
+            $stmt = $db->prepare('SELECT balance_available, balance_locked FROM users WHERE id = ?');
             $stmt->execute([$user['id']]);
-            $balances = $stmt->fetchAll();
+            $userRow = $stmt->fetch();
+            $balanceAvailable = isset($userRow['balance_available']) ? (float)$userRow['balance_available'] : 0;
+            $balanceLocked = isset($userRow['balance_locked']) ? (float)$userRow['balance_locked'] : 0;
             
-            // Добавляем USD эквивалент
-            $prices = getUsdPrices();
-            $totalUsd = 0;
-            
-            foreach ($balances as &$balance) {
-                $price = $prices[$balance['currency']] ?? 0;
-                $balance['usd_value'] = (float)$balance['available'] * $price;
-                $totalUsd += $balance['usd_value'];
-            }
+            // Для совместимости - балансы по валютам (USD основной для торговли)
+            $balances = [
+                [
+                    'currency' => 'USD',
+                    'available' => $balanceAvailable,
+                    'reserved' => $balanceLocked,
+                    'usd_value' => $balanceAvailable
+                ]
+            ];
+            $totalUsd = $balanceAvailable + $balanceLocked;
             
             echo json_encode([
                 'success' => true,
+                'balance_available' => $balanceAvailable,
+                'balance_locked' => $balanceLocked,
                 'balances' => $balances,
                 'total_usd' => $totalUsd
             ]);
@@ -93,79 +87,50 @@ try {
             
             $data = json_decode(file_get_contents('php://input'), true);
             
-            $currency = strtoupper(trim($data['currency'] ?? ''));
             $amount = (float)($data['amount'] ?? 0);
-            
-            if (!$currency) {
-                throw new Exception('Currency required', 400);
-            }
+            $methodName = trim($data['method'] ?? 'Bank Transfer');
             
             if ($amount <= 0) {
                 throw new Exception('Invalid amount', 400);
             }
             
             $db = getDB();
-            $db->beginTransaction();
+            // Создаём заявку на депозит - баланс НЕ изменяем
+            $stmt = $db->prepare('
+                INSERT INTO deposit_requests (user_id, amount, method, status)
+                VALUES (?, ?, ?, "PENDING")
+            ');
+            $stmt->execute([$user['id'], $amount, $methodName]);
+            $requestId = (int) $db->lastInsertId();
             
-            try {
-                // Проверяем/создаём баланс
-                $stmt = $db->prepare('SELECT id, available FROM balances WHERE user_id = ? AND currency = ?');
-                $stmt->execute([$user['id'], $currency]);
-                $balance = $stmt->fetch();
-                
-                if ($balance) {
-                    $stmt = $db->prepare('UPDATE balances SET available = available + ? WHERE id = ?');
-                    $stmt->execute([$amount, $balance['id']]);
-                } else {
-                    $stmt = $db->prepare('INSERT INTO balances (user_id, currency, available) VALUES (?, ?, ?)');
-                    $stmt->execute([$user['id'], $currency, $amount]);
-                }
-                
-                // Создаём транзакцию
-                $stmt = $db->prepare('
-                    INSERT INTO transactions (user_id, type, currency, amount, status, description, completed_at)
-                    VALUES (?, "deposit", ?, ?, "completed", ?, NOW())
-                ');
-                $stmt->execute([
-                    $user['id'],
-                    $currency,
-                    $amount,
-                    "Пополнение {$amount} {$currency}"
-                ]);
-                
-                $db->commit();
-                
-                // Синхронизация баланса с Supabase (в фоне)
-                try {
-                    $syncData = [
-                        'user_id' => $user['id'],
-                        'currency' => $currency
-                    ];
-                    
-                    $ch = curl_init('http' . (isset($_SERVER['HTTPS']) ? 's' : '') . '://' . $_SERVER['HTTP_HOST'] . '/api/sync.php?action=balance');
-                    curl_setopt_array($ch, [
-                        CURLOPT_POST => true,
-                        CURLOPT_POSTFIELDS => json_encode($syncData),
-                        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-                        CURLOPT_RETURNTRANSFER => false,
-                        CURLOPT_TIMEOUT => 1,
-                        CURLOPT_NOSIGNAL => 1,
-                    ]);
-                    curl_exec($ch);
-                    curl_close($ch);
-                } catch (Exception $e) {
-                    error_log('Supabase balance sync error: ' . $e->getMessage());
-                }
-                
-                echo json_encode([
-                    'success' => true,
-                    'message' => 'Deposit successful'
-                ]);
-                
-            } catch (Exception $e) {
-                $db->rollBack();
-                throw $e;
+            echo json_encode([
+                'success' => true,
+                'message' => 'Deposit request created. Awaiting admin approval.',
+                'request_id' => $requestId,
+                'status' => 'PENDING'
+            ]);
+            break;
+            
+        case 'deposit_requests':
+            if (!$user) {
+                throw new Exception('Unauthorized', 401);
             }
+            
+            $db = getDB();
+            $stmt = $db->prepare('
+                SELECT id, amount, method, status, created_at, processed_at
+                FROM deposit_requests
+                WHERE user_id = ?
+                ORDER BY created_at DESC
+                LIMIT 50
+            ');
+            $stmt->execute([$user['id']]);
+            $requests = $stmt->fetchAll();
+            
+            echo json_encode([
+                'success' => true,
+                'deposit_requests' => $requests
+            ]);
             break;
             
         case 'withdraw':
@@ -179,13 +144,8 @@ try {
             
             $data = json_decode(file_get_contents('php://input'), true);
             
-            $currency = strtoupper(trim($data['currency'] ?? ''));
             $amount = (float)($data['amount'] ?? 0);
             $address = trim($data['address'] ?? '');
-            
-            if (!$currency) {
-                throw new Exception('Currency required', 400);
-            }
             
             if ($amount <= 0) {
                 throw new Exception('Invalid amount', 400);
@@ -193,32 +153,32 @@ try {
             
             $db = getDB();
             
-            // Проверяем баланс
-            $stmt = $db->prepare('SELECT available FROM balances WHERE user_id = ? AND currency = ?');
-            $stmt->execute([$user['id'], $currency]);
-            $balance = $stmt->fetch();
+            // Проверяем balance_available
+            $stmt = $db->prepare('SELECT balance_available FROM users WHERE id = ?');
+            $stmt->execute([$user['id']]);
+            $userRow = $stmt->fetch();
+            $balanceAvailable = isset($userRow['balance_available']) ? (float)$userRow['balance_available'] : 0;
             
-            if (!$balance || (float)$balance['available'] < $amount) {
+            if ($balanceAvailable < $amount) {
                 throw new Exception('Insufficient balance', 400);
             }
             
             $db->beginTransaction();
             
             try {
-                // Списываем средства
-                $stmt = $db->prepare('UPDATE balances SET available = available - ? WHERE user_id = ? AND currency = ?');
-                $stmt->execute([$amount, $user['id'], $currency]);
+                // Списываем balance_available
+                $stmt = $db->prepare('UPDATE users SET balance_available = balance_available - ? WHERE id = ?');
+                $stmt->execute([$amount, $user['id']]);
                 
                 // Создаём транзакцию
                 $stmt = $db->prepare('
                     INSERT INTO transactions (user_id, type, currency, amount, status, description)
-                    VALUES (?, "withdrawal", ?, ?, "pending", ?)
+                    VALUES (?, "withdrawal", "USD", ?, "pending", ?)
                 ');
                 $stmt->execute([
                     $user['id'],
-                    $currency,
                     -$amount,
-                    "Вывод {$amount} {$currency}" . ($address ? " на {$address}" : '')
+                    "Вывод {$amount} USD" . ($address ? " на {$address}" : '')
                 ]);
                 
                 $db->commit();
@@ -227,7 +187,7 @@ try {
                 try {
                     $syncData = [
                         'user_id' => $user['id'],
-                        'currency' => $currency
+                        'currency' => 'USD'
                     ];
                     
                     $ch = curl_init('http' . (isset($_SERVER['HTTPS']) ? 's' : '') . '://' . $_SERVER['HTTP_HOST'] . '/api/sync.php?action=balance');
@@ -269,7 +229,7 @@ try {
             $sql = 'SELECT * FROM transactions WHERE user_id = ?';
             $params = [$user['id']];
             
-            if ($type && in_array($type, ['deposit', 'withdrawal', 'trade', 'fee'])) {
+            if ($type && in_array($type, ['deposit', 'withdrawal', 'trade', 'DEPOSIT', 'TRADE_OPEN', 'TRADE_CLOSE', 'fee'])) {
                 $sql .= ' AND type = ?';
                 $params[] = $type;
             }

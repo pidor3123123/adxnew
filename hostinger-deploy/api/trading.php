@@ -26,64 +26,28 @@ function getAuthUser(): ?array {
     return getUserByToken($token);
 }
 
-// Получение баланса пользователя
-function getBalance(int $userId, string $currency): float {
+// Получение balance_available и balance_locked пользователя
+function getUserBalances(int $userId): array {
     $db = getDB();
-    $stmt = $db->prepare('SELECT available FROM balances WHERE user_id = ? AND currency = ?');
-    $stmt->execute([$userId, $currency]);
-    $result = $stmt->fetch();
-    return $result ? (float)$result['available'] : 0.0;
+    $stmt = $db->prepare('SELECT balance_available, balance_locked FROM users WHERE id = ?');
+    $stmt->execute([$userId]);
+    $row = $stmt->fetch();
+    return [
+        'available' => isset($row['balance_available']) ? (float)$row['balance_available'] : 0,
+        'locked' => isset($row['balance_locked']) ? (float)$row['balance_locked'] : 0
+    ];
 }
 
-// Обновление баланса
-function updateBalance(int $userId, string $currency, float $amount, bool $add = true, bool $skipSync = false): bool {
+// Обновление balance_available и balance_locked пользователя
+function updateUserBalances(int $userId, float $availableDelta, float $lockedDelta): bool {
     $db = getDB();
-    
-    // Проверяем существование записи
-    $stmt = $db->prepare('SELECT id, available, reserved FROM balances WHERE user_id = ? AND currency = ?');
-    $stmt->execute([$userId, $currency]);
-    $balance = $stmt->fetch();
-    
-    if ($balance) {
-        $newAmount = $add ? (float)$balance['available'] + $amount : (float)$balance['available'] - $amount;
-        if ($newAmount < 0) return false;
-        
-        $stmt = $db->prepare('UPDATE balances SET available = ? WHERE id = ?');
-        $result = $stmt->execute([$newAmount, $balance['id']]);
-        
-        // Синхронизация с Supabase (в фоне, не блокирует основную логику)
-        // Пропускаем синхронизацию, если $skipSync = true (для случаев, когда синхронизация будет выполнена позже)
-        if ($result && !$skipSync) {
-            try {
-                require_once __DIR__ . '/sync.php';
-                syncBalanceToSupabase($userId, $currency);
-            } catch (Exception $e) {
-                // Логируем ошибку, но не прерываем выполнение
-                error_log("Supabase balance sync error for user $userId, currency $currency: " . $e->getMessage());
-            }
-        }
-        
-        return $result;
-    } else {
-        if (!$add || $amount < 0) return false;
-        
-        $stmt = $db->prepare('INSERT INTO balances (user_id, currency, available) VALUES (?, ?, ?)');
-        $result = $stmt->execute([$userId, $currency, $amount]);
-        
-        // Синхронизация с Supabase (в фоне, не блокирует основную логику)
-        // Пропускаем синхронизацию, если $skipSync = true (для случаев, когда синхронизация будет выполнена позже)
-        if ($result && !$skipSync) {
-            try {
-                require_once __DIR__ . '/sync.php';
-                syncBalanceToSupabase($userId, $currency);
-            } catch (Exception $e) {
-                // Логируем ошибку, но не прерываем выполнение
-                error_log("Supabase balance sync error for user $userId, currency $currency: " . $e->getMessage());
-            }
-        }
-        
-        return $result;
-    }
+    $stmt = $db->prepare('
+        UPDATE users 
+        SET balance_available = balance_available + ?,
+            balance_locked = balance_locked + ?
+        WHERE id = ?
+    ');
+    return $stmt->execute([$availableDelta, $lockedDelta, $userId]);
 }
 
 // Получение ID актива
@@ -154,14 +118,8 @@ try {
             
             $symbol = strtoupper(trim($data['symbol'] ?? ''));
             $side = strtolower(trim($data['side'] ?? ''));
-            $type = strtolower(trim($data['type'] ?? 'market'));
-            $quantity = (float)($data['quantity'] ?? 0);
-            $limitPrice = isset($data['price']) ? (float)$data['price'] : null;
-            $currentPrice = isset($data['current_price']) && $data['current_price'] ? (float)$data['current_price'] : null;
-            $takeProfit = isset($data['take_profit']) && $data['take_profit'] ? (float)$data['take_profit'] : null;
-            $stopLoss = isset($data['stop_loss']) && $data['stop_loss'] ? (float)$data['stop_loss'] : null;
+            $amountUsd = (float)($data['amount_usd'] ?? $data['amount'] ?? 0);
             
-            // Валидация
             if (!$symbol) {
                 throw new Exception('Symbol required', 400);
             }
@@ -170,16 +128,8 @@ try {
                 throw new Exception('Invalid side (buy/sell)', 400);
             }
             
-            if (!in_array($type, ['market', 'limit'])) {
-                throw new Exception('Invalid order type', 400);
-            }
-            
-            if ($quantity <= 0) {
-                throw new Exception('Invalid quantity', 400);
-            }
-            
-            if ($type === 'limit' && (!$limitPrice || $limitPrice <= 0)) {
-                throw new Exception('Limit price required for limit orders', 400);
+            if ($amountUsd <= 0) {
+                throw new Exception('Invalid amount', 400);
             }
             
             $assetId = getAssetId($symbol);
@@ -187,129 +137,54 @@ try {
                 throw new Exception('Unknown asset', 400);
             }
             
-            // Получаем рыночную цену для расчетов
-            $marketPrice = getMarketPrice($symbol);
-            $price = $type === 'market' ? $marketPrice : $limitPrice;
-            $total = $quantity * $price;
-            $fee = $total * 0.001; // 0.1% комиссия
+            $entryPrice = getMarketPrice($symbol);
             
-            // Валидация TP/SL
-            // Используем цену от клиента для валидации, если она предоставлена
-            // Иначе используем расчетную цену (рыночную или лимитную)
-            $validationPrice = $currentPrice ?? $price;
-            $tolerance = $validationPrice * 0.0001; // 0.01% толерантность для учета различий в ценах
-            
-            if ($takeProfit !== null || $stopLoss !== null) {
-                if ($side === 'buy') {
-                    // Для buy: TP должен быть выше цены входа, SL - ниже
-                    if ($takeProfit !== null && $takeProfit <= ($validationPrice - $tolerance)) {
-                        throw new Exception(sprintf('Take Profit должен быть выше цены покупки (текущая цена: %.2f)', $validationPrice), 400);
-                    }
-                    if ($stopLoss !== null && $stopLoss >= ($validationPrice + $tolerance)) {
-                        throw new Exception(sprintf('Stop Loss должен быть ниже цены покупки (текущая цена: %.2f)', $validationPrice), 400);
-                    }
-                } else {
-                    // Для sell (короткие позиции): TP должен быть ниже цены входа, SL - выше
-                    if ($takeProfit !== null && $takeProfit >= ($validationPrice + $tolerance)) {
-                        throw new Exception(sprintf('Take Profit должен быть ниже цены продажи (текущая цена: %.2f)', $validationPrice), 400);
-                    }
-                    if ($stopLoss !== null && $stopLoss <= ($validationPrice - $tolerance)) {
-                        throw new Exception(sprintf('Stop Loss должен быть выше цены продажи (текущая цена: %.2f)', $validationPrice), 400);
-                    }
-                }
+            // Проверяем balance_available
+            $balances = getUserBalances($user['id']);
+            if ($balances['available'] < $amountUsd) {
+                throw new Exception('Insufficient funds', 400);
             }
             
             $db = getDB();
             $db->beginTransaction();
             
             try {
-                if ($side === 'buy') {
-                    // Проверяем баланс USD
-                    $usdBalance = getBalance($user['id'], 'USD');
-                    $requiredAmount = $total + $fee;
-                    
-                    if ($usdBalance < $requiredAmount) {
-                        throw new Exception('Insufficient USD balance', 400);
-                    }
-                    
-                    // Списываем USD
-                    updateBalance($user['id'], 'USD', $requiredAmount, false);
-                    
-                    // Начисляем актив
-                    updateBalance($user['id'], $symbol, $quantity, true);
-                    
-                } else { // sell
-                    // Проверяем баланс актива
-                    $assetBalance = getBalance($user['id'], $symbol);
-                    
-                    if ($assetBalance < $quantity) {
-                        throw new Exception('Insufficient ' . $symbol . ' balance', 400);
-                    }
-                    
-                    // Списываем актив
-                    updateBalance($user['id'], $symbol, $quantity, false);
-                    
-                    // Начисляем USD (минус комиссия)
-                    updateBalance($user['id'], 'USD', $total - $fee, true);
+                // 1. balance_available -= amount_usd, balance_locked += amount_usd
+                if (!updateUserBalances($user['id'], -$amountUsd, $amountUsd)) {
+                    throw new Exception('Failed to update balance', 500);
                 }
                 
-                // Создаём запись ордера
+                // 2. Создаём Order (status OPEN)
+                $quantity = $amountUsd / $entryPrice;
                 $stmt = $db->prepare('
-                    INSERT INTO orders (user_id, asset_id, type, side, status, quantity, filled_quantity, price, average_price, total, fee, take_profit, stop_loss, filled_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                    INSERT INTO orders (user_id, asset_id, type, side, status, quantity, amount_usd, entry_price, filled_quantity, price, average_price, total, fee, filled_at)
+                    VALUES (?, ?, "market", ?, "open", ?, ?, ?, ?, ?, ?, ?, 0, NOW())
                 ');
-                
                 $stmt->execute([
                     $user['id'],
                     $assetId,
-                    $type,
                     $side,
-                    'filled', // Для market ордеров сразу filled
                     $quantity,
+                    $amountUsd,
+                    $entryPrice,
                     $quantity,
-                    $price,
-                    $price,
-                    $total,
-                    $fee,
-                    $takeProfit,
-                    $stopLoss
+                    $entryPrice,
+                    $entryPrice,
+                    $amountUsd
                 ]);
                 
                 $orderId = (int) $db->lastInsertId();
                 
-                // Синхронизация балансов с Supabase (в фоне, не блокирует основную логику)
-                // Выполняется после commit транзакции, чтобы ошибки синхронизации не влияли на сделку
-                try {
-                    $syncCurrencies = ['USD', $symbol];
-                    foreach ($syncCurrencies as $syncCurrency) {
-                        try {
-                            require_once __DIR__ . '/sync.php';
-                            syncBalanceToSupabase($user['id'], $syncCurrency);
-                        } catch (Exception $syncError) {
-                            // Логируем ошибку синхронизации, но не прерываем выполнение
-                            error_log("Supabase balance sync error for user {$user['id']}, currency $syncCurrency: " . $syncError->getMessage());
-                        }
-                    }
-                } catch (Exception $e) {
-                    // Логируем общую ошибку синхронизации, но не прерываем выполнение
-                    error_log('Supabase balance sync error (general): ' . $e->getMessage());
-                }
-                
-                // Создаём запись транзакции
+                // 3. Создаём Transaction TRADE_OPEN
                 $stmt = $db->prepare('
-                    INSERT INTO transactions (user_id, type, currency, amount, fee, status, order_id, description, completed_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                    INSERT INTO transactions (user_id, type, currency, amount, status, order_id, description, completed_at)
+                    VALUES (?, "TRADE_OPEN", "USD", ?, "completed", ?, ?, NOW())
                 ');
-                
                 $stmt->execute([
                     $user['id'],
-                    'trade',
-                    $symbol,
-                    $side === 'buy' ? $quantity : -$quantity,
-                    $fee,
-                    'completed',
+                    -$amountUsd,
                     $orderId,
-                    ($side === 'buy' ? 'Покупка' : 'Продажа') . " {$quantity} {$symbol} по {$price}"
+                    ($side === 'buy' ? 'Buy' : 'Sell') . " $amountUsd USD {$symbol} @ {$entryPrice}"
                 ]);
                 
                 $db->commit();
@@ -320,14 +195,10 @@ try {
                         'id' => $orderId,
                         'symbol' => $symbol,
                         'side' => $side,
-                        'type' => $type,
+                        'amount_usd' => $amountUsd,
+                        'entry_price' => $entryPrice,
                         'quantity' => $quantity,
-                        'price' => $price,
-                        'total' => $total,
-                        'fee' => $fee,
-                        'status' => 'filled',
-                        'take_profit' => $takeProfit,
-                        'stop_loss' => $stopLoss
+                        'status' => 'open'
                     ]
                 ], JSON_NUMERIC_CHECK);
                 
@@ -418,15 +289,12 @@ try {
             $db->beginTransaction();
             
             try {
-                // Возвращаем зарезервированные средства
-                $remainingQty = $order['quantity'] - $order['filled_quantity'];
-                
-                if ($order['side'] === 'buy') {
-                    $returnAmount = $remainingQty * $order['price'];
-                    updateBalance($user['id'], 'USD', $returnAmount, true);
-                } else {
-                    updateBalance($user['id'], $order['symbol'], $remainingQty, true);
+                // Возвращаем зарезервированные средства (balance_locked -> balance_available)
+                $amountUsd = (float)($order['amount_usd'] ?? ($order['quantity'] * ($order['price'] ?? $order['entry_price'] ?? 0)));
+                if ($amountUsd <= 0 && isset($order['quantity'], $order['price'])) {
+                    $amountUsd = (float)$order['quantity'] * (float)$order['price'];
                 }
+                updateUserBalances($user['id'], $amountUsd, -$amountUsd);
                 
                 // Обновляем статус ордера
                 $stmt = $db->prepare('UPDATE orders SET status = "cancelled" WHERE id = ?');
@@ -625,7 +493,7 @@ try {
             }
             
             $db = getDB();
-            // Получаем открытые позиции - это ордера со статусом filled, у которых есть остаток
+            // Получаем открытые позиции - ордера со статусом open (новая модель)
             $stmt = $db->prepare('
                 SELECT 
                     o.*, 
@@ -634,51 +502,31 @@ try {
                 FROM orders o
                 JOIN assets a ON a.id = o.asset_id
                 WHERE o.user_id = ? 
-                AND o.status = "filled"
+                AND o.status = "open"
                 ORDER BY o.created_at DESC
             ');
             $stmt->execute([$user['id']]);
-            $allOrders = $stmt->fetchAll();
-            
-            // Фильтруем открытые позиции (те, которые не закрыты полностью)
             $openPositions = [];
-            foreach ($allOrders as $order) {
-                $oppositeSide = $order['side'] === 'buy' ? 'sell' : 'buy';
-                $checkStmt = $db->prepare('
-                    SELECT SUM(filled_quantity) as closed_qty
-                    FROM orders
-                    WHERE user_id = ? 
-                    AND asset_id = ?
-                    AND side = ?
-                    AND status = "filled"
-                    AND created_at > ?
-                ');
-                $checkStmt->execute([$user['id'], $order['asset_id'], $oppositeSide, $order['created_at']]);
-                $closed = $checkStmt->fetch();
-                $closedQty = (float)($closed['closed_qty'] ?? 0);
-                $remainingQty = (float)$order['filled_quantity'] - $closedQty;
+            foreach ($stmt->fetchAll() as $order) {
+                $amountUsd = (float)($order['amount_usd'] ?? ($order['quantity'] * ($order['entry_price'] ?? $order['price'] ?? 1)));
+                $entryPrice = (float)($order['entry_price'] ?? $order['price'] ?? $order['average_price'] ?? 0);
+                if ($entryPrice <= 0) $entryPrice = (float)$order['price'];
                 
-                if ($remainingQty > 0) {
-                    $currentPrice = getMarketPrice($order['symbol']);
-                    // Используем average_price, если он установлен, иначе используем price
-                    $entryPrice = (float)($order['average_price'] ?? $order['price'] ?? 0);
-                    if ($entryPrice <= 0) {
-                        $entryPrice = (float)$order['price'];
-                    }
-                    $order['average_price'] = $entryPrice; // Убеждаемся, что average_price установлен
-                    $order['entry_price'] = $entryPrice; // Добавляем явную цену входа для фронтенда
-                    $order['current_price'] = $currentPrice;
-                    $order['remaining_quantity'] = $remainingQty;
-                    
-                    if ($order['side'] === 'buy') {
-                        $order['unrealized_pnl'] = ($currentPrice - $entryPrice) * $remainingQty;
-                        $order['unrealized_pnl_percent'] = $entryPrice > 0 ? (($currentPrice - $entryPrice) / $entryPrice) * 100 : 0;
-                    } else {
-                        $order['unrealized_pnl'] = ($entryPrice - $currentPrice) * $remainingQty;
-                        $order['unrealized_pnl_percent'] = $entryPrice > 0 ? (($entryPrice - $currentPrice) / $entryPrice) * 100 : 0;
-                    }
-                    $openPositions[] = $order;
+                $currentPrice = getMarketPrice($order['symbol']);
+                $order['amount_usd'] = $amountUsd;
+                $order['entry_price'] = $entryPrice;
+                $order['current_price'] = $currentPrice;
+                
+                if ($order['side'] === 'buy') {
+                    $order['unrealized_pnl'] = ($currentPrice - $entryPrice) / $entryPrice * $amountUsd;
+                } else {
+                    $order['unrealized_pnl'] = ($entryPrice - $currentPrice) / $entryPrice * $amountUsd;
                 }
+                $order['unrealized_pnl_percent'] = $entryPrice > 0 
+                    ? (($order['unrealized_pnl'] / $amountUsd) * 100) 
+                    : 0;
+                $order['remaining_quantity'] = (float)$order['quantity'];
+                $openPositions[] = $order;
             }
             
             echo json_encode([
@@ -705,12 +553,12 @@ try {
             
             $db = getDB();
             
-            // Получаем открытую позицию
+            // Получаем открытую позицию (status = open)
             $stmt = $db->prepare('
                 SELECT o.*, a.symbol
                 FROM orders o
                 JOIN assets a ON a.id = o.asset_id
-                WHERE o.id = ? AND o.user_id = ? AND o.status = "filled"
+                WHERE o.id = ? AND o.user_id = ? AND o.status = "open"
             ');
             $stmt->execute([$orderId, $user['id']]);
             $order = $stmt->fetch();
@@ -719,106 +567,50 @@ try {
                 throw new Exception('Position not found', 404);
             }
             
-            // Проверяем, сколько осталось закрыть
-            $oppositeSide = $order['side'] === 'buy' ? 'sell' : 'buy';
-            $checkStmt = $db->prepare('
-                SELECT SUM(filled_quantity) as closed_qty
-                FROM orders
-                WHERE user_id = ? 
-                AND asset_id = ?
-                AND side = ?
-                AND status = "filled"
-                AND created_at > ?
-            ');
-            $checkStmt->execute([$user['id'], $order['asset_id'], $oppositeSide, $order['created_at']]);
-            $closed = $checkStmt->fetch();
-            $closedQty = (float)($closed['closed_qty'] ?? 0);
-            $remainingQty = (float)$order['filled_quantity'] - $closedQty;
-            
-            if ($remainingQty <= 0) {
-                throw new Exception('Position already closed', 400);
-            }
+            $amountUsd = (float)($order['amount_usd'] ?? ($order['quantity'] * ($order['entry_price'] ?? $order['price'] ?? 1)));
+            $entryPrice = (float)($order['entry_price'] ?? $order['price'] ?? $order['average_price'] ?? 0);
+            if ($entryPrice <= 0) $entryPrice = (float)$order['price'];
             
             $currentPrice = getMarketPrice($order['symbol']);
+            
+            // Расчёт PnL
+            if ($order['side'] === 'buy') {
+                $pnl = ($currentPrice - $entryPrice) / $entryPrice * $amountUsd;
+            } else {
+                $pnl = ($entryPrice - $currentPrice) / $entryPrice * $amountUsd;
+            }
+            
             $db->beginTransaction();
             
             try {
-                if ($oppositeSide === 'sell') {
-                    // Продаем актив
-                    $assetBalance = getBalance($user['id'], $order['symbol']);
-                    if ($assetBalance < $remainingQty) {
-                        throw new Exception('Insufficient ' . $order['symbol'] . ' balance', 400);
-                    }
-                    
-                    $closeTotal = $remainingQty * $currentPrice;
-                    $closeFee = $closeTotal * 0.001;
-                    
-                    // Списываем актив (пропускаем синхронизацию, будет выполнена после commit)
-                    updateBalance($user['id'], $order['symbol'], $remainingQty, false, true);
-                    // Начисляем USD (пропускаем синхронизацию, будет выполнена после commit)
-                    updateBalance($user['id'], 'USD', $closeTotal - $closeFee, true, true);
-                } else {
-                    // Покупаем актив (закрываем короткую позицию)
-                    $closeTotal = $remainingQty * $currentPrice;
-                    $closeFee = $closeTotal * 0.001;
-                    $requiredAmount = $closeTotal + $closeFee;
-                    
-                    $usdBalance = getBalance($user['id'], 'USD');
-                    if ($usdBalance < $requiredAmount) {
-                        throw new Exception('Insufficient USD balance', 400);
-                    }
-                    
-                    // Списываем USD (пропускаем синхронизацию, будет выполнена после commit)
-                    updateBalance($user['id'], 'USD', $requiredAmount, false, true);
-                    // Начисляем актив (пропускаем синхронизацию, будет выполнена после commit)
-                    updateBalance($user['id'], $order['symbol'], $remainingQty, true, true);
+                // balance_locked -= amount_usd, balance_available += amount_usd + pnl
+                if (!updateUserBalances($user['id'], $amountUsd + $pnl, -$amountUsd)) {
+                    throw new Exception('Failed to update balance', 500);
                 }
                 
-                // Создаем закрывающий ордер
-                $closeStmt = $db->prepare('
-                    INSERT INTO orders (user_id, asset_id, type, side, status, quantity, filled_quantity, price, average_price, total, fee, filled_at)
-                    VALUES (?, ?, "market", ?, "filled", ?, ?, ?, ?, ?, ?, NOW())
+                // Обновляем Order: status=CLOSED, profit_loss, closed_at
+                $stmt = $db->prepare('
+                    UPDATE orders SET status = "filled", profit_loss = ?, closed_at = NOW() WHERE id = ?
                 ');
-                $closeTotal = $remainingQty * $currentPrice;
-                $closeFee = $closeTotal * 0.001;
+                $stmt->execute([$pnl, $orderId]);
                 
-                $closeStmt->execute([
-                    $user['id'],
-                    $order['asset_id'],
-                    $oppositeSide,
-                    $remainingQty,
-                    $remainingQty,
-                    $currentPrice,
-                    $currentPrice,
-                    $closeTotal,
-                    $closeFee
-                ]);
-                
-                $closeOrderId = (int) $db->lastInsertId();
-                
-                // Создаем транзакцию
+                // Создаем Transaction TRADE_CLOSE
                 $transStmt = $db->prepare('
-                    INSERT INTO transactions (user_id, type, currency, amount, fee, status, order_id, description, completed_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                    INSERT INTO transactions (user_id, type, currency, amount, status, order_id, description, completed_at)
+                    VALUES (?, "TRADE_CLOSE", "USD", ?, "completed", ?, ?, NOW())
                 ');
-                
                 $transStmt->execute([
                     $user['id'],
-                    'trade',
-                    $order['symbol'],
-                    $oppositeSide === 'sell' ? -$remainingQty : $remainingQty,
-                    $closeFee,
-                    'completed',
-                    $closeOrderId,
-                    "Закрытие позиции вручную: " . ($oppositeSide === 'sell' ? 'Продажа' : 'Покупка') . " {$remainingQty} {$order['symbol']} по {$currentPrice}"
+                    $pnl,
+                    $orderId,
+                    "Close " . $order['symbol'] . ": PnL " . ($pnl >= 0 ? '+' : '') . number_format($pnl, 2) . " USD"
                 ]);
                 
                 $db->commit();
                 
-                // Синхронизация балансов с Supabase (в фоне, после commit)
-                // Используем буферизацию вывода, чтобы curl ответ не попал в основной JSON ответ
+                // Синхронизация баланса USD с Supabase (в фоне, после commit)
                 try {
-                    $syncCurrencies = ['USD', $order['symbol']];
+                    $syncCurrencies = ['USD'];
                     foreach ($syncCurrencies as $syncCurrency) {
                         $syncData = [
                             'user_id' => $user['id'],
@@ -865,7 +657,8 @@ try {
                 echo json_encode([
                     'success' => true,
                     'message' => 'Position closed',
-                    'close_order_id' => $closeOrderId
+                    'order_id' => $orderId,
+                    'profit_loss' => $pnl
                 ], JSON_NUMERIC_CHECK);
                 
             } catch (Exception $e) {

@@ -4,8 +4,10 @@ import { useEffect, useState } from 'react'
 import DataTable from '@/components/admin/DataTable'
 import Modal from '@/components/admin/Modal'
 import type { Admin } from '@/lib/types'
+import { useTranslations } from 'next-intl'
 
 export default function SettingsPage() {
+  const t = useTranslations()
   const [admins, setAdmins] = useState<Admin[]>([])
   const [loading, setLoading] = useState(true)
   const [addModalOpen, setAddModalOpen] = useState(false)
@@ -33,17 +35,17 @@ export default function SettingsPage() {
 
   async function handleAddAdmin() {
     if (!newAdminEmail) {
-      alert('Email is required')
+      alert(t('settings.emailRequired'))
       return
     }
 
     if (adminType === 'password' && !newAdminPassword) {
-      alert('Password is required for email/password admin')
+      alert(t('settings.passwordRequired'))
       return
     }
 
     if (adminType === 'password' && newAdminPassword.length < 8) {
-      alert('Password must be at least 8 characters')
+      alert(t('settings.passwordMinLength'))
       return
     }
 
@@ -76,7 +78,7 @@ export default function SettingsPage() {
   }
 
   async function handleDeleteAdmin(adminId: string) {
-    if (!confirm('Are you sure you want to delete this admin?')) {
+    if (!confirm(t('settings.deleteConfirm'))) {
       return
     }
 
@@ -101,27 +103,26 @@ export default function SettingsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-white mb-2">Settings</h1>
-          <p className="text-gray-400">Manage administrators and system settings</p>
+          <h1 className="text-3xl font-bold text-white mb-2">{t('settings.title')}</h1>
+          <p className="text-gray-400">{t('settings.subtitle')}</p>
         </div>
         <button
           onClick={() => setAddModalOpen(true)}
           className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
         >
-          Add Admin
+          {t('settings.addAdmin')}
         </button>
       </div>
 
-      {/* Admins Table */}
       <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
-        <h2 className="text-xl font-semibold text-white mb-4">Administrators</h2>
+        <h2 className="text-xl font-semibold text-white mb-4">{t('settings.administrators')}</h2>
         <DataTable
           data={admins}
           columns={[
-            { key: 'email', label: 'Email' },
+            { key: 'email', label: t('common.email') },
             {
               key: 'role',
-              label: 'Role',
+              label: t('settings.role'),
               render: (role) => (
                 <span className="px-2 py-1 bg-blue-900 text-blue-300 rounded text-xs font-medium">
                   {role}
@@ -130,31 +131,30 @@ export default function SettingsPage() {
             },
             {
               key: 'created_at',
-              label: 'Created',
+              label: t('settings.created'),
               render: (date) => new Date(date).toLocaleString(),
             },
             {
               key: 'id',
-              label: 'Actions',
+              label: t('common.actions'),
               render: (id) => (
                 <button
                   onClick={() => handleDeleteAdmin(id)}
                   className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded transition-colors"
                 >
-                  Delete
+                  {t('common.delete')}
                 </button>
               ),
             },
           ]}
           isLoading={loading}
-          emptyMessage="No admins found"
+          emptyMessage={t('settings.noAdmins')}
         />
       </div>
 
-      {/* System Settings Placeholder */}
       <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
-        <h2 className="text-xl font-semibold text-white mb-4">System Settings</h2>
-        <p className="text-gray-400">System configuration options will be available here in the future.</p>
+        <h2 className="text-xl font-semibold text-white mb-4">{t('settings.systemSettings')}</h2>
+        <p className="text-gray-400">{t('settings.systemSettingsPlaceholder')}</p>
       </div>
 
       <Modal
@@ -166,30 +166,30 @@ export default function SettingsPage() {
           setNewAdminRole('admin')
           setAdminType('password')
         }}
-        title="Add Administrator"
+        title={t('settings.addAdministrator')}
       >
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
-              Admin Type
+              {t('settings.adminType')}
             </label>
             <select
               value={adminType}
               onChange={(e) => setAdminType(e.target.value as 'password' | 'github')}
               className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="password">Email/Password</option>
-              <option value="github">GitHub OAuth (no password)</option>
+              <option value="password">{t('settings.emailPassword')}</option>
+              <option value="github">{t('settings.githubOAuth')}</option>
             </select>
             <p className="text-xs text-gray-400 mt-1">
               {adminType === 'password' 
-                ? 'Admin will be able to login with email and password'
-                : 'Admin will need to login via GitHub OAuth'}
+                ? t('settings.emailPasswordDescription')
+                : t('settings.githubOAuthDescription')}
             </p>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
-              Email
+              {t('common.email')}
             </label>
             <input
               type="email"
@@ -203,7 +203,7 @@ export default function SettingsPage() {
           {adminType === 'password' && (
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
-                Password
+                {t('auth.password')}
               </label>
               <input
                 type="password"
@@ -215,21 +215,21 @@ export default function SettingsPage() {
                 required
               />
               <p className="text-xs text-gray-400 mt-1">
-                Minimum 8 characters
+                {t('settings.passwordMinLength')}
               </p>
             </div>
           )}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
-              Role
+              {t('settings.role')}
             </label>
             <select
               value={newAdminRole}
               onChange={(e) => setNewAdminRole(e.target.value)}
               className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="admin">Admin</option>
-              <option value="compliance">Compliance</option>
+              <option value="admin">{t('settings.admin')}</option>
+              <option value="compliance">{t('settings.compliance')}</option>
             </select>
           </div>
           <div className="flex justify-end gap-2">
@@ -243,13 +243,13 @@ export default function SettingsPage() {
               }}
               className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
             >
-              Cancel
+              {t('common.cancel')}
             </button>
             <button
               onClick={handleAddAdmin}
               className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
             >
-              Add Admin
+              {t('settings.addAdmin')}
             </button>
           </div>
         </div>

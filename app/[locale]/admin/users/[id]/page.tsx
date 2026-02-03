@@ -1,12 +1,15 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter, useParams } from 'next/navigation'
+import { useRouter } from '@/lib/navigation'
+import { useParams } from 'next/navigation'
 import UserDetailTabs from '@/components/admin/UserDetailTabs'
 import Modal from '@/components/admin/Modal'
 import type { UserWithDetails } from '@/lib/types'
+import { useTranslations } from 'next-intl'
 
 export default function UserDetailPage() {
+  const t = useTranslations()
   const params = useParams()
   const router = useRouter()
   const [user, setUser] = useState<UserWithDetails | null>(null)
@@ -63,7 +66,7 @@ export default function UserDetailPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-gray-400">Loading...</div>
+        <div className="text-gray-400">{t('userDetail.loading')}</div>
       </div>
     )
   }
@@ -71,7 +74,7 @@ export default function UserDetailPage() {
   if (!user) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-gray-400">User not found</div>
+        <div className="text-gray-400">{t('userDetail.userNotFound')}</div>
       </div>
     )
   }
@@ -88,7 +91,7 @@ export default function UserDetailPage() {
             onClick={() => router.back()}
             className="text-gray-400 hover:text-white mb-4"
           >
-            ← Back
+            ← {t('userDetail.back')}
           </button>
           <h1 className="text-3xl font-bold text-white">
             {user.first_name} {user.last_name}
@@ -104,7 +107,7 @@ export default function UserDetailPage() {
                 : 'bg-red-600 hover:bg-red-700 text-white'
             }`}
           >
-            {isBlocked ? 'Unblock User' : 'Block User'}
+            {isBlocked ? t('userDetail.unblockUser') : t('userDetail.blockUser')}
           </button>
         </div>
       </div>
@@ -119,13 +122,13 @@ export default function UserDetailPage() {
           setBlockModalOpen(false)
           setBlockUntil('')
         }}
-        title={isBlocked ? 'Unblock User' : 'Block User'}
+        title={isBlocked ? t('userDetail.unblockUser') : t('userDetail.blockUser')}
       >
         <div className="space-y-4">
           {!isBlocked && (
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
-                Block until (leave empty to block indefinitely)
+                {t('userDetail.blockUntil')}
               </label>
               <input
                 type="datetime-local"
@@ -143,7 +146,7 @@ export default function UserDetailPage() {
               }}
               className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
             >
-              Cancel
+              {t('common.cancel')}
             </button>
             <button
               onClick={handleBlock}
@@ -153,7 +156,7 @@ export default function UserDetailPage() {
                   : 'bg-red-600 hover:bg-red-700 text-white'
               }`}
             >
-              {isBlocked ? 'Unblock' : 'Block'}
+              {isBlocked ? t('userDetail.unblock') : t('userDetail.block')}
             </button>
           </div>
         </div>

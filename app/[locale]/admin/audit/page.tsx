@@ -5,6 +5,7 @@ import DataTable from '@/components/admin/DataTable'
 import Modal from '@/components/admin/Modal'
 import AuditDiffViewer from '@/components/admin/AuditDiffViewer'
 import type { AdminActionAuditLog } from '@/lib/types'
+import { useTranslations } from 'next-intl'
 
 interface AuditLogWithAdmin extends AdminActionAuditLog {
   admins: {
@@ -15,6 +16,7 @@ interface AuditLogWithAdmin extends AdminActionAuditLog {
 }
 
 export default function AuditPage() {
+  const t = useTranslations()
   const [logs, setLogs] = useState<AuditLogWithAdmin[]>([])
   const [loading, setLoading] = useState(true)
   const [tableFilter, setTableFilter] = useState<string>('all')
@@ -47,18 +49,17 @@ export default function AuditPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-white mb-2">Audit Log</h1>
-        <p className="text-gray-400">View all administrative changes and actions</p>
+        <h1 className="text-3xl font-bold text-white mb-2">{t('audit.title')}</h1>
+        <p className="text-gray-400">{t('audit.subtitle')}</p>
       </div>
 
-      {/* Filter */}
       <div>
         <select
           value={tableFilter}
           onChange={(e) => setTableFilter(e.target.value)}
           className="px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
-          <option value="all">All Tables</option>
+          <option value="all">{t('audit.allTables')}</option>
           {tables.map(table => (
             <option key={table} value={table}>{table}</option>
           ))}
@@ -71,20 +72,20 @@ export default function AuditPage() {
         columns={[
           {
             key: 'admins',
-            label: 'Admin',
-            render: (admin) => admin?.email || 'N/A',
+            label: t('audit.admin'),
+            render: (admin) => admin?.email || t('common.nA'),
           },
-          { key: 'action', label: 'Action' },
-          { key: 'table_name', label: 'Table' },
-          { key: 'record_id', label: 'Record ID' },
+          { key: 'action', label: t('audit.action') },
+          { key: 'table_name', label: t('audit.table') },
+          { key: 'record_id', label: t('audit.recordId') },
           {
             key: 'created_at',
-            label: 'Date',
+            label: t('common.date'),
             render: (date) => new Date(date).toLocaleString(),
           },
           {
             key: 'id',
-            label: 'View Changes',
+            label: t('audit.viewChanges'),
             render: (id, row: AuditLogWithAdmin) => (
               <button
                 onClick={(e) => {
@@ -94,13 +95,13 @@ export default function AuditPage() {
                 }}
                 className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors"
               >
-                View Diff
+                {t('audit.viewDiff')}
               </button>
             ),
           },
         ]}
         isLoading={loading}
-        emptyMessage="No audit logs found"
+        emptyMessage={t('audit.noLogs')}
       />
 
       <Modal
@@ -109,35 +110,35 @@ export default function AuditPage() {
           setDiffModalOpen(false)
           setSelectedLog(null)
         }}
-        title="Audit Log Details"
+        title={t('audit.auditDetails')}
         size="xl"
       >
         {selectedLog && (
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
-                <span className="text-gray-400">Admin:</span>
-                <p className="text-white">{selectedLog.admins?.email || 'N/A'}</p>
+                <span className="text-gray-400">{t('audit.admin')}:</span>
+                <p className="text-white">{selectedLog.admins?.email || t('common.nA')}</p>
               </div>
               <div>
-                <span className="text-gray-400">Action:</span>
+                <span className="text-gray-400">{t('audit.action')}:</span>
                 <p className="text-white">{selectedLog.action}</p>
               </div>
               <div>
-                <span className="text-gray-400">Table:</span>
+                <span className="text-gray-400">{t('audit.table')}:</span>
                 <p className="text-white">{selectedLog.table_name}</p>
               </div>
               <div>
-                <span className="text-gray-400">Record ID:</span>
+                <span className="text-gray-400">{t('audit.recordId')}:</span>
                 <p className="text-white">{selectedLog.record_id}</p>
               </div>
               <div>
-                <span className="text-gray-400">Date:</span>
+                <span className="text-gray-400">{t('common.date')}:</span>
                 <p className="text-white">{new Date(selectedLog.created_at).toLocaleString()}</p>
               </div>
             </div>
             <div className="border-t border-gray-700 pt-4">
-              <h3 className="text-lg font-semibold text-white mb-4">Changes</h3>
+              <h3 className="text-lg font-semibold text-white mb-4">{t('audit.changes')}</h3>
               <AuditDiffViewer oldData={selectedLog.old_data} newData={selectedLog.new_data} />
             </div>
           </div>

@@ -9,6 +9,7 @@ SET FOREIGN_KEY_CHECKS = 0;
 -- ----------------------------
 -- Удаление существующих таблиц
 -- ----------------------------
+DROP TABLE IF EXISTS `deposit_requests`;
 DROP TABLE IF EXISTS `transactions`;
 DROP TABLE IF EXISTS `orders`;
 DROP TABLE IF EXISTS `balances`;
@@ -122,6 +123,8 @@ CREATE TABLE `users` (
     `is_active` TINYINT(1) DEFAULT 1,
     `two_factor_enabled` TINYINT(1) DEFAULT 0,
     `two_factor_secret` VARCHAR(255) DEFAULT NULL,
+    `balance_available` DECIMAL(20,2) DEFAULT 0 COMMENT 'Доступный баланс для торговли',
+    `balance_locked` DECIMAL(20,2) DEFAULT 0 COMMENT 'Средства в открытых сделках',
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
@@ -162,6 +165,25 @@ CREATE TABLE `balances` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ----------------------------
+-- Таблица заявок на депозит
+-- ----------------------------
+CREATE TABLE `deposit_requests` (
+    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `user_id` INT UNSIGNED NOT NULL,
+    `amount` DECIMAL(20,2) NOT NULL,
+    `method` VARCHAR(50) NOT NULL,
+    `status` ENUM('PENDING', 'APPROVED', 'REJECTED') DEFAULT 'PENDING',
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `processed_at` TIMESTAMP NULL DEFAULT NULL,
+    `processed_by` INT UNSIGNED NULL DEFAULT NULL,
+    `notes` TEXT NULL,
+    PRIMARY KEY (`id`),
+    KEY `idx_user` (`user_id`),
+    KEY `idx_status` (`status`),
+    CONSTRAINT `fk_deposit_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ----------------------------
 -- Таблица ордеров
 -- ----------------------------
 CREATE TABLE `orders` (
@@ -172,6 +194,9 @@ CREATE TABLE `orders` (
     `side` ENUM('buy', 'sell') NOT NULL,
     `status` ENUM('pending', 'open', 'filled', 'partially_filled', 'cancelled') NOT NULL DEFAULT 'pending',
     `quantity` DECIMAL(20,8) NOT NULL COMMENT 'Количество актива',
+    `amount_usd` DECIMAL(20,2) DEFAULT 0 COMMENT 'Сумма сделки в USD',
+    `entry_price` DECIMAL(20,8) DEFAULT NULL COMMENT 'Цена входа',
+    `profit_loss` DECIMAL(20,2) DEFAULT 0 COMMENT 'Прибыль/убыток при закрытии',
     `filled_quantity` DECIMAL(20,8) DEFAULT 0 COMMENT 'Исполненное количество',
     `price` DECIMAL(20,8) DEFAULT NULL COMMENT 'Цена для лимитного ордера',
     `stop_price` DECIMAL(20,8) DEFAULT NULL COMMENT 'Стоп-цена',
@@ -183,6 +208,7 @@ CREATE TABLE `orders` (
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     `filled_at` TIMESTAMP NULL DEFAULT NULL,
+    `closed_at` TIMESTAMP NULL DEFAULT NULL COMMENT 'Время закрытия сделки',
     PRIMARY KEY (`id`),
     KEY `idx_user` (`user_id`),
     KEY `idx_asset` (`asset_id`),
@@ -198,7 +224,7 @@ CREATE TABLE `orders` (
 CREATE TABLE `transactions` (
     `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
     `user_id` INT UNSIGNED NOT NULL,
-    `type` ENUM('deposit', 'withdrawal', 'trade', 'fee', 'bonus', 'referral') NOT NULL,
+    `type` ENUM('deposit', 'withdrawal', 'trade', 'DEPOSIT', 'TRADE_OPEN', 'TRADE_CLOSE', 'fee', 'bonus', 'referral') NOT NULL,
     `currency` VARCHAR(20) NOT NULL,
     `amount` DECIMAL(20,8) NOT NULL,
     `fee` DECIMAL(20,8) DEFAULT 0,

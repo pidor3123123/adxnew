@@ -72,6 +72,97 @@
             min-width: 150px;
         }
         
+        .position-card {
+            padding: 20px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            margin-bottom: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        
+        .position-card:last-child {
+            margin-bottom: 0;
+        }
+        
+        .position-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        
+        .position-card-asset {
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+        
+        .position-card-type {
+            padding: 4px 12px;
+            border-radius: var(--radius-sm);
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+        
+        .position-card-type.buy {
+            background: var(--success-soft);
+            color: var(--success-text);
+        }
+        
+        .position-card-type.sell {
+            background: var(--danger-soft);
+            color: var(--danger-text);
+        }
+        
+        .position-card-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 16px;
+        }
+        
+        .position-card-detail {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        
+        .position-card-detail-label {
+            font-size: 0.75rem;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+        }
+        
+        .position-card-detail-value {
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        
+        .position-card-pnl {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+        
+        .position-card-close {
+            width: 100%;
+            padding: 16px 24px;
+            font-size: 1rem;
+            font-weight: 600;
+            background: var(--danger-soft);
+            color: var(--danger-text);
+            border: 2px solid var(--danger);
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            transition: all var(--transition-fast);
+        }
+        
+        .position-card-close:hover {
+            background: var(--danger);
+            color: white;
+        }
+        
         .position-row {
             display: grid;
             grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr 120px;
@@ -473,24 +564,11 @@
                     <button class="position-tab" data-tab="closed">Закрытые позиции</button>
                 </div>
                 
-                <!-- Открытые позиции -->
+                <!-- Открытые позиции (cards) -->
                 <div class="position-tab-content active" id="openPositions">
-                    <div class="card">
-                        <div class="card-body" style="padding: 0;">
-                            <div class="position-row header">
-                                <div>Актив</div>
-                                <div>Сторона</div>
-                                <div class="hide-tablet">Количество</div>
-                                <div class="hide-tablet">Цена входа / Текущая</div>
-                                <div class="hide-tablet">P&L</div>
-                                <div style="text-align: right;">Действие</div>
-                            </div>
-                            
-                            <div id="openPositionsList">
-                                <div style="padding: 40px; text-align: center;">
-                                    <div class="spinner"></div>
-                                </div>
-                            </div>
+                    <div id="openPositionsList">
+                        <div style="padding: 40px; text-align: center;">
+                            <div class="spinner"></div>
                         </div>
                     </div>
                 </div>
@@ -656,35 +734,37 @@
                 const pnl = parseFloat(pos.unrealized_pnl || 0) || 0;
                 const pnlPercent = parseFloat(pos.unrealized_pnl_percent || 0) || 0;
                 const pnlClass = pnl >= 0 ? 'positive' : 'negative';
+                const amountUsd = parseFloat(pos.amount_usd || (pos.remaining_quantity * (pos.entry_price || pos.price || 0))) || 0;
+                const entryPrice = pos.entry_price || pos.average_price || pos.price || 0;
+                const currentPrice = pos.current_price || 0;
                 
                 return `
-                    <div class="position-row">
-                        <div class="position-asset">
-                            <div class="position-icon ${pos.side}">
-                                <i class="bi bi-${pos.side === 'buy' ? 'arrow-down' : 'arrow-up'}"></i>
+                    <div class="position-card">
+                        <div class="position-card-header">
+                            <div class="position-card-asset">${pos.symbol}</div>
+                            <span class="position-card-type ${pos.side}">${pos.side === 'buy' ? 'BUY' : 'SELL'}</span>
+                        </div>
+                        <div class="position-card-details">
+                            <div class="position-card-detail">
+                                <span class="position-card-detail-label">Amount</span>
+                                <span class="position-card-detail-value">${NovaTrade.formatCurrency(amountUsd)}</span>
                             </div>
-                            <div>
-                                <div style="font-weight: 600;">${pos.symbol}/USD</div>
+                            <div class="position-card-detail">
+                                <span class="position-card-detail-label">Entry Price</span>
+                                <span class="position-card-detail-value">${NovaTrade.formatCurrency(entryPrice)}</span>
+                            </div>
+                            <div class="position-card-detail">
+                                <span class="position-card-detail-label">Current Price</span>
+                                <span class="position-card-detail-value">${NovaTrade.formatCurrency(currentPrice)}</span>
+                            </div>
+                            <div class="position-card-detail">
+                                <span class="position-card-detail-label">P&L</span>
+                                <span class="position-card-pnl pnl ${pnlClass}">${pnl >= 0 ? '+' : ''}${NovaTrade.formatCurrency(pnl)} (${pnlPercent >= 0 ? '+' : ''}${(isNaN(pnlPercent) || !isFinite(pnlPercent) ? 0 : pnlPercent).toFixed(2)}%)</span>
                             </div>
                         </div>
-                        <div>
-                            <span class="order-side ${pos.side}">${pos.side === 'buy' ? 'Покупка' : 'Продажа'}</span>
-                        </div>
-                        <div class="font-mono hide-tablet">${formatQuantity(pos.remaining_quantity, pos.symbol)}</div>
-                        <div class="hide-tablet">
-                            <div class="font-mono">${NovaTrade.formatCurrency(pos.entry_price || pos.average_price || pos.price || 0)}</div>
-                            <div style="font-size: 0.8125rem; color: var(--text-tertiary);">${NovaTrade.formatCurrency(pos.current_price || 0)}</div>
-                        </div>
-                        <div class="hide-tablet">
-                            <div class="pnl ${pnlClass}">${pnl >= 0 ? '+' : ''}${NovaTrade.formatCurrency(pnl)}</div>
-                            <div style="font-size: 0.8125rem; color: var(--text-tertiary);">${pnlPercent >= 0 ? '+' : ''}${(isNaN(pnlPercent) || !isFinite(pnlPercent) ? 0 : pnlPercent).toFixed(2)}%</div>
-                        </div>
-                        <div style="text-align: right;">
-                            <button class="close-btn" onclick="showConfirmModal(${pos.id})">
-                                <i class="bi bi-x-circle"></i>
-                                Закрыть
-                            </button>
-                        </div>
+                        <button class="position-card-close" onclick="showConfirmModal(${pos.id})">
+                            <i class="bi bi-x-circle"></i> Close Trade
+                        </button>
                     </div>
                 `;
             }).join('');

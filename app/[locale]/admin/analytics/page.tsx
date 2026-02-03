@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import StatsCard from '@/components/admin/StatsCard'
+import { useTranslations } from 'next-intl'
 
 interface AnalyticsData {
   totalUsers: number
@@ -14,6 +15,7 @@ interface AnalyticsData {
 }
 
 export default function AnalyticsPage() {
+  const t = useTranslations()
   const [data, setData] = useState<AnalyticsData | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -37,7 +39,7 @@ export default function AnalyticsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-gray-400">Loading analytics...</div>
+        <div className="text-gray-400">{t('analytics.loadingAnalytics')}</div>
       </div>
     )
   }
@@ -45,7 +47,7 @@ export default function AnalyticsPage() {
   if (!data) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-gray-400">Failed to load analytics</div>
+        <div className="text-gray-400">{t('analytics.loadError')}</div>
       </div>
     )
   }
@@ -53,30 +55,29 @@ export default function AnalyticsPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold text-white mb-2">Analytics</h1>
-        <p className="text-gray-400">System statistics and insights</p>
+        <h1 className="text-3xl font-bold text-white mb-2">{t('analytics.title')}</h1>
+        <p className="text-gray-400">{t('analytics.subtitle')}</p>
       </div>
 
-      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatsCard
-          title="Total Users"
+          title={t('analytics.totalUsers')}
           value={data.totalUsers}
           icon="👥"
         />
         <StatsCard
-          title="Verified Users"
+          title={t('analytics.verified')}
           value={data.verifiedUsers}
-          subtitle={`${data.totalUsers > 0 ? ((data.verifiedUsers / data.totalUsers) * 100).toFixed(1) : 0}% of total`}
+          subtitle={`${data.totalUsers > 0 ? ((data.verifiedUsers / data.totalUsers) * 100).toFixed(1) : 0}% ${t('analytics.ofTotal')}`}
           icon="✅"
         />
         <StatsCard
-          title="KYC Pending"
+          title={t('dashboard.kycPending')}
           value={data.kycPending}
           icon="⏳"
         />
         <StatsCard
-          title="Blocked Accounts"
+          title={t('dashboard.blockedAccounts')}
           value={data.blockedUsers}
           icon="🔒"
         />
@@ -85,19 +86,19 @@ export default function AnalyticsPage() {
       {/* Balances Summary */}
       {Object.keys(data.balancesByCurrency || {}).length > 0 && (
         <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
-          <h2 className="text-xl font-semibold text-white mb-4">Total Balances by Currency</h2>
+          <h2 className="text-xl font-semibold text-white mb-4">{t('analytics.totalBalancesByCurrency')}</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {Object.entries(data.balancesByCurrency).map(([currency, balances]) => (
               <div key={currency} className="bg-gray-900 rounded p-4">
                 <div className="text-sm text-gray-400 mb-2">{currency}</div>
                 <div className="text-lg font-semibold text-white">
-                  Available: {parseFloat(balances.available.toString()).toFixed(2)}
+                  {t('analytics.available')}: {parseFloat(balances.available.toString()).toFixed(2)}
                 </div>
                 <div className="text-sm text-gray-400">
-                  Locked: {parseFloat(balances.locked.toString()).toFixed(2)}
+                  {t('analytics.locked')}: {parseFloat(balances.locked.toString()).toFixed(2)}
                 </div>
                 <div className="text-sm text-gray-500 mt-2">
-                  Total: {parseFloat((balances.available + balances.locked).toString()).toFixed(2)}
+                  {t('analytics.total')}: {parseFloat((balances.available + balances.locked).toString()).toFixed(2)}
                 </div>
               </div>
             ))}
@@ -108,10 +109,10 @@ export default function AnalyticsPage() {
       {/* Additional Analytics Sections */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
-          <h2 className="text-xl font-semibold text-white mb-4">User Verification Rate</h2>
+          <h2 className="text-xl font-semibold text-white mb-4">{t('analytics.userVerificationRate')}</h2>
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
-              <span className="text-gray-400">Verified</span>
+              <span className="text-gray-400">{t('analytics.verified')}</span>
               <span className="text-white">{data.verifiedUsers} / {data.totalUsers}</span>
             </div>
             <div className="w-full bg-gray-700 rounded-full h-2">
@@ -124,14 +125,14 @@ export default function AnalyticsPage() {
         </div>
 
         <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
-          <h2 className="text-xl font-semibold text-white mb-4">KYC Status Distribution</h2>
+          <h2 className="text-xl font-semibold text-white mb-4">{t('analytics.kycStatusDistribution')}</h2>
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
-              <span className="text-gray-400">Pending</span>
+              <span className="text-gray-400">{t('analytics.pending')}</span>
               <span className="text-white">{data.kycPending}</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-gray-400">Total Users</span>
+              <span className="text-gray-400">{t('analytics.totalUsers')}</span>
               <span className="text-white">{data.totalUsers}</span>
             </div>
           </div>
@@ -140,8 +141,8 @@ export default function AnalyticsPage() {
 
       {/* Export Section */}
       <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
-        <h2 className="text-xl font-semibold text-white mb-4">Export Data</h2>
-        <p className="text-gray-400 mb-4">Export analytics data for further analysis</p>
+        <h2 className="text-xl font-semibold text-white mb-4">{t('analytics.exportData')}</h2>
+        <p className="text-gray-400 mb-4">{t('analytics.exportDescription')}</p>
         <button
           onClick={() => {
             const csv = `Metric,Value\nTotal Users,${data.totalUsers}\nVerified Users,${data.verifiedUsers}\nKYC Pending,${data.kycPending}\nBlocked Users,${data.blockedUsers}`
@@ -154,7 +155,7 @@ export default function AnalyticsPage() {
           }}
           className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
         >
-          Export to CSV
+          {t('analytics.exportCsv')}
         </button>
       </div>
     </div>

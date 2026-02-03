@@ -1,12 +1,14 @@
-import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
+import createMiddleware from 'next-intl/middleware';
+import { routing } from './i18n/routing';
 
-export function middleware(request: NextRequest) {
-  // Убрали редирект с корня, чтобы избежать бесконечного цикла
-  // Корень будет показывать страницу входа из app/page.tsx
-  return NextResponse.next()
-}
+export default createMiddleware(routing);
 
 export const config = {
-  matcher: '/',
-}
+  matcher: [
+    // Match all pathnames except for
+    // - API routes
+    // - _next (Next.js internals)
+    // - static files
+    '/((?!api|_next|_vercel|.*\\..*).*)',
+  ],
+};

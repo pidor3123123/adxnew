@@ -171,7 +171,8 @@ async function selectAsset(symbol) {
     // Update UI
     document.getElementById('currentAsset').textContent = asset.market === 'forex' ? asset.symbol : `${asset.symbol}/USD`;
     document.getElementById('currentAssetName').textContent = asset.name;
-    document.getElementById('quantitySuffix').textContent = asset.symbol;
+    const suffixEl = document.getElementById('quantitySuffix');
+    if (suffixEl) suffixEl.textContent = 'USD';
     
     // Обновляем цену из API для всех активов (криптовалюты, акции, форекс)
     await updateAssetPrice();
@@ -235,23 +236,18 @@ function updateTradeUI(side, parentSection = null) {
         `;
     }
     
-    // Update available balance
+    // Update available balance (both buy and sell use USD amount)
     const availableElId = isQuick ? 'quickAvailableBalance' : 'availableBalance';
     const availableEl = document.getElementById(availableElId);
     if (availableEl) {
-        if (side === 'buy') {
-            availableEl.textContent = NovaTrade.formatCurrency(userBalances.USD);
-        } else {
-            const assetBalance = userBalances[currentAsset.symbol] || 0;
-            availableEl.textContent = `${assetBalance.toFixed(8)} ${currentAsset.symbol}`;
-        }
+        availableEl.textContent = NovaTrade.formatCurrency(userBalances.USD || 0);
     }
     
-    // Update suffix
+    // Update suffix (USD for amount)
     const quantitySuffixId = isQuick ? 'quickQuantitySuffix' : 'quantitySuffix';
     const quantitySuffix = document.getElementById(quantitySuffixId);
     if (quantitySuffix) {
-        quantitySuffix.textContent = currentAsset.symbol;
+        quantitySuffix.textContent = isQuick ? currentAsset.symbol : 'USD';
     }
     
     if (isQuick) {
@@ -318,45 +314,21 @@ function formatQuantity(value, step = 0.0001) {
 }
 
 /**
- * Calculate quantity by percent
+ * Calculate amount (USD) by percent - new model uses amount_usd for both buy and sell
  */
 function calculateQuantityByPercent(percent, mode = 'normal') {
-    const quantityInputId = mode === 'quick' ? 'quickQuantity' : 'quantity';
-    const quantityInput = document.getElementById(quantityInputId);
-    if (!quantityInput) return;
+    const inputId = mode === 'quick' ? 'quickQuantity' : 'amountUsd';
+    const inputEl = document.getElementById(inputId);
+    if (!inputEl) return;
     
-    // Получаем активную сторону из соответствующей формы
-    const modeSelector = mode === 'quick' ? '#quickTradeMode' : '#normalTradeMode';
-    const activeTab = document.querySelector(`${modeSelector} .trade-tab.active`);
-    const side = activeTab?.dataset.side || (window.TradingState?.tradeSide || 'buy');
+    const availableUSD = userBalances.USD || 0;
+    const step = mode === 'quick' ? 0.0001 : 0.01;
     
-    // Получаем step из input поля
-    const step = parseFloat(quantityInput.getAttribute('step')) || 0.0001;
-    
-    // Если percent === 'max', используем весь доступный баланс
-    if (percent === 'max' || percent === 'max') {
-        if (side === 'buy') {
-            const availableUSD = userBalances.USD || 0;
-            // Для покупки: используем весь доступный USD с учетом комиссии
-            // Комиссия 0.1%, значит можем использовать 99.9% баланса
-            const usableUSD = availableUSD * 0.999; // Оставляем 0.1% на комиссию
-            const maxQuantity = usableUSD / currentAsset.price;
-            quantityInput.value = formatQuantity(Math.max(0, maxQuantity), step);
-        } else {
-            // Для продажи: используем весь доступный баланс актива
-            const availableAsset = userBalances[currentAsset.symbol] || 0;
-            quantityInput.value = formatQuantity(Math.max(0, availableAsset), step);
-        }
+    if (percent === 'max' || percent === 1) {
+        inputEl.value = (availableUSD * 0.999).toFixed(2); // Leave 0.1% buffer
     } else {
-        // Обычный расчет по проценту
-        if (side === 'buy') {
-            const availableUSD = userBalances.USD || 0;
-            const maxQuantity = availableUSD / currentAsset.price;
-            quantityInput.value = formatQuantity(maxQuantity * percent, step);
-        } else {
-            const availableAsset = userBalances[currentAsset.symbol] || 0;
-            quantityInput.value = formatQuantity(availableAsset * percent, step);
-        }
+        const amount = availableUSD * percent;
+        inputEl.value = amount.toFixed(2);
     }
     
     if (mode === 'quick') {
@@ -367,22 +339,16 @@ function calculateQuantityByPercent(percent, mode = 'normal') {
 }
 
 /**
- * Update trade summary
+ * Update trade summary - uses amount_usd
  */
 function updateTradeSummary() {
-    const quantity = parseFloat(document.getElementById('quantity')?.value) || 0;
-    const limitPrice = parseFloat(document.getElementById('limitPrice')?.value) || currentAsset.price;
-    const orderType = window.TradingState?.orderType || 'market';
-    const price = orderType === 'limit' ? limitPrice : currentAsset.price;
+    const amountUsd = parseFloat(document.getElementById('amountUsd')?.value) || 0;
+    const fee = amountUsd * 0.001; // 0.1% fee
     
-    const total = quantity * price;
-    const fee = total * 0.001; // 0.1% fee
-    const tradeSide = window.TradingState?.tradeSide || 'buy';
-    const finalTotal = tradeSide === 'buy' ? total + fee : total - fee;
-    
-    // Update display (price is no longer shown, users see it on the chart)
-    document.getElementById('tradeFee').textContent = NovaTrade.formatCurrency(fee);
-    document.getElementById('tradeTotal').textContent = NovaTrade.formatCurrency(finalTotal);
+    const feeEl = document.getElementById('tradeFee');
+    const totalEl = document.getElementById('tradeTotal');
+    if (feeEl) feeEl.textContent = NovaTrade.formatCurrency(fee);
+    if (totalEl) totalEl.textContent = NovaTrade.formatCurrency(amountUsd);
 }
 
 /**
@@ -414,14 +380,20 @@ function updateQuickTradeSummary() {
 window.updateQuickTradeSummary = updateQuickTradeSummary;
 
 /**
- * Submit order
+ * Submit order - uses amount_usd for new trading model
  */
 async function submitOrder(isQuick = false) {
-    const quantityId = isQuick ? 'quickQuantity' : 'quantity';
-    const quantity = parseFloat(document.getElementById(quantityId)?.value);
+    let amountUsd;
+    if (isQuick) {
+        const quantity = parseFloat(document.getElementById('quickQuantity')?.value) || 0;
+        const price = currentAsset?.price || 0;
+        amountUsd = quantity * price;
+    } else {
+        amountUsd = parseFloat(document.getElementById('amountUsd')?.value) || 0;
+    }
     
-    if (!quantity || quantity <= 0) {
-        NovaTrade.showToast('Ошибка', 'Введите количество', 'error');
+    if (!amountUsd || amountUsd <= 0) {
+        NovaTrade.showToast('Error', 'Enter amount (USD)', 'error');
         return;
     }
     
@@ -513,16 +485,23 @@ async function submitOrder(isQuick = false) {
             }
         }
         
-        const orderData = {
+        const orderData = isQuick ? {
             symbol: currentAsset.symbol,
             side: side,
-            type: type,
-            quantity: quantity,
-            price: type === 'limit' ? limitPrice : null,
-            current_price: entryPrice, // Отправляем цену входа для валидации
+            type: 'market',
+            amount_usd: amountUsd, // Quick mode: quantity*price = amount_usd
+            quantity: amountUsd / (currentAsset?.price || 1),
+            price: null,
+            current_price: entryPrice,
             take_profit: takeProfit || null,
             stop_loss: stopLoss || null,
-            trade_duration: tradeDuration // Длительность в секундах для быстрой торговли
+            trade_duration: tradeDuration
+        } : {
+            symbol: currentAsset.symbol,
+            side: side,
+            type: 'market',
+            amount_usd: amountUsd,
+            current_price: currentAsset?.price
         };
         
         // Логируем попытку создания ордера
@@ -557,13 +536,17 @@ async function submitOrder(isQuick = false) {
             }
             
             NovaTrade.showToast(
-                'Ордер создан', 
-                `${side === 'buy' ? 'Покупка' : 'Продажа'} ${quantity} ${currentAsset.symbol}${tpSlInfo}`,
+                'Order created', 
+                `${side === 'buy' ? 'Buy' : 'Sell'} $${amountUsd} ${currentAsset.symbol}${tpSlInfo}`,
                 'success'
             );
             
             // Clear form
-            document.getElementById(quantityId).value = '';
+            if (isQuick) {
+                document.getElementById('quickQuantity').value = '';
+            } else {
+                document.getElementById('amountUsd').value = '';
+            }
             if (isQuick) {
                 document.getElementById('quickTakeProfit').value = '';
                 document.getElementById('quickStopLoss').value = '';
@@ -640,20 +623,21 @@ async function loadUserBalances(forceRefresh = false) {
         });
         
         if (result && result.success) {
-            // Обновляем балансы из массива balances
+            // New model: balance_available and balance_locked from users table
+            const available = parseFloat(result.balance_available ?? result.balances?.[0]?.available ?? 0);
+            userBalances.USD = available;
+            
             if (result.balances && Array.isArray(result.balances)) {
                 result.balances.forEach(balance => {
                     const currency = balance.currency || 'USD';
-                    const available = parseFloat(balance.available) || 0;
-                    userBalances[currency] = available;
-                    console.log(`[loadUserBalances] Updated ${currency} balance:`, available);
+                    const av = parseFloat(balance.available) || 0;
+                    if (currency === 'USD') userBalances.USD = av;
+                    else userBalances[currency] = av;
                 });
             }
             
-            // Если USD баланс не найден в массиве, используем total_usd как fallback
             if (!userBalances.USD && result.total_usd !== undefined) {
                 userBalances.USD = parseFloat(result.total_usd || 0);
-                console.log('[loadUserBalances] Using total_usd as fallback:', userBalances.USD);
             }
             
             // Получаем USD баланс
