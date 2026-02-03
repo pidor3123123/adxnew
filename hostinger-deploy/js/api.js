@@ -223,7 +223,7 @@ const MarketAPI = {
             open: basePrice,
             previousClose: basePrice
         };
-    }
+    },
     
     /**
      * Получить данные с кэшированием
@@ -506,31 +506,6 @@ const MarketAPI = {
                 change: 0,
                 changePercent: 0
             }));
-        });
-    },
-                    } else {
-                        // Fallback
-                        results.push({
-                            symbol: forex.symbol,
-                            name: forex.name,
-                            price: this.basePrices[forex.symbol] || 1,
-                            change: 0,
-                            changePercent: 0
-                        });
-                    }
-                } catch (error) {
-                    console.warn(`Failed to get forex rate for ${forex.symbol}:`, error);
-                    results.push({
-                        symbol: forex.symbol,
-                        name: forex.name,
-                        price: this.basePrices[forex.symbol] || 1,
-                        change: 0,
-                        changePercent: 0
-                    });
-                }
-            }
-            
-            return results;
         });
     },
     
